@@ -11,10 +11,10 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
-	"github.com/solidDoWant/backup-tool/pkg/kubernetes"
-	"github.com/solidDoWant/backup-tool/pkg/kubernetes/helpers"
-	"github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/core"
-	"github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/externalsnapshotter"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -26,19 +26,19 @@ const baseMountPath = string(os.PathListSeparator) + "mnt"
 type VaultWardenBackupOptions struct {
 	VolumeSize                   resource.Quantity
 	VolumeStorageClass           string
-	CloneClusterOptions          kubernetes.CloneClusterOptions
+	CloneClusterOptions          kubecluster.CloneClusterOptions
 	BackupToolPodCreationTimeout helpers.MaxWaitTime
 	SnapshotReadyTimeout         helpers.MaxWaitTime
-	RemoteBackupToolOptions      kubernetes.CreateBackupToolInstanceOptions
+	RemoteBackupToolOptions      kubecluster.CreateBackupToolInstanceOptions
 	ClusterServiceSearchDomains  []string
 	CleanupTimeout               helpers.MaxWaitTime
 }
 
 type VaultWarden struct {
-	kubernetesClient kubernetes.ClientInterface
+	kubernetesClient kubecluster.ClientInterface
 }
 
-func NewVaultWarden(client kubernetes.ClientInterface) *VaultWarden {
+func NewVaultWarden(client kubecluster.ClientInterface) *VaultWarden {
 	return &VaultWarden{
 		kubernetesClient: client,
 	}
@@ -58,7 +58,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	defer backup.Stop()
 
 	// 1. Snapshot/clone PVC containing data directory
-	clonedPVC, err := vw.kubernetesClient.ClonePVC(ctx, namespace, dataPVC, kubernetes.ClonePVCOptions{DestPvcNamePrefix: backup.GetFullName(), CleanupTimeout: backupOptions.CleanupTimeout})
+	clonedPVC, err := vw.kubernetesClient.ClonePVC(ctx, namespace, dataPVC, kubecluster.ClonePVCOptions{DestPvcNamePrefix: backup.GetFullName(), CleanupTimeout: backupOptions.CleanupTimeout})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to clone data PVC")
 	}
@@ -88,13 +88,13 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	if backupOptions.CloneClusterOptions.CleanupTimeout == 0 {
 		backupOptions.CloneClusterOptions.CleanupTimeout = backupOptions.CleanupTimeout
 	}
-	cluster, err := vw.kubernetesClient.CloneCluster(ctx, namespace, cnpgClusterName,
+	clonedCluster, err := vw.kubernetesClient.CloneCluster(ctx, namespace, cnpgClusterName,
 		clonedClusterName, servingCertIssuerName, clientCertIssuerName,
 		backupOptions.CloneClusterOptions)
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to clone cluster %q", cnpgClusterName)
 	}
-	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(10*time.Minute), cluster.Delete).WithErrMessage("failed to cleanup cloned cluster %q resources", clonedClusterName).WithOriginalErr(&err).Run()
+	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(10*time.Minute), clonedCluster.Delete).WithErrMessage("failed to cleanup cloned cluster %q resources", clonedClusterName).WithOriginalErr(&err).Run()
 
 	// 4. Spawn a new tool instance with the cloned PVC attached, and DR mount and secrets attached
 	drVolumeMountPath := filepath.Join(baseMountPath, "dr")
@@ -102,13 +102,13 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	secretsVolumeMountPath := filepath.Join(baseMountPath, "secrets")
 	servingCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "serving-cert")
 	clientCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "client-cert")
-	btOpts := kubernetes.CreateBackupToolInstanceOptions{
+	btOpts := kubecluster.CreateBackupToolInstanceOptions{
 		NamePrefix: backup.GetFullName(),
-		Volumes: []kubernetes.SingleContainerVolume{
-			kubernetes.NewSingleContainerPVC(drPVC.Name, drVolumeMountPath),
-			kubernetes.NewSingleContainerPVC(clonedPVC.Name, clonedVolumeMountPath),
-			kubernetes.NewSingleContainerSecret(cluster.GetServingCert().Name, servingCertVolumeMountPath),
-			kubernetes.NewSingleContainerSecret(cluster.GetClientCert().Name, clientCertVolumeMountPath),
+		Volumes: []kubecluster.SingleContainerVolume{
+			kubecluster.NewSingleContainerPVC(drPVC.Name, drVolumeMountPath),
+			kubecluster.NewSingleContainerPVC(clonedPVC.Name, clonedVolumeMountPath),
+			kubecluster.NewSingleContainerSecret(clonedCluster.GetServingCert().Name, servingCertVolumeMountPath),
+			kubecluster.NewSingleContainerSecret(clonedCluster.GetClientCert().Name, clientCertVolumeMountPath),
 		},
 		CleanupTimeout: backupOptions.CleanupTimeout,
 	}
@@ -135,7 +135,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 
 	// 6. Perform a CNPG logical backup with PITR set to the PVC snapshot time
 	podSQLFilePath := filepath.Join(drVolumeMountPath, "dump.sql")
-	clusterCredentials := cluster.GetCredentials(servingCertVolumeMountPath, clientCertVolumeMountPath)
+	clusterCredentials := clonedCluster.GetCredentials(servingCertVolumeMountPath, clientCertVolumeMountPath)
 	err = backupToolClient.Postgres().DumpAll(ctx, clusterCredentials, podSQLFilePath, postgres.DumpAllOptions{CleanupTimeout: backupOptions.CleanupTimeout.MaxWait(10 * time.Second)})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to dump logical backup for postgres server at %q", postgres.GetServerAddress(clusterCredentials))

@@ -25,7 +25,7 @@ KUBE_CODEGEN_VERSION ?= kubernetes-1.32.0
 CNPG_CODEGEN_WORKING_DIR = /tmp/cnpg-gen
 CNPG_KUBE_CODEGEN = $(CNPG_CODEGEN_WORKING_DIR)/kube_codegen.sh
 CNPG_GIT_DIR = $(CNPG_CODEGEN_WORKING_DIR)/repo
-CNPG_GEN_DIR = $(PROJECT_DIR)/pkg/kubernetes/primatives/cnpg/gen
+CNPG_GEN_DIR = $(PROJECT_DIR)/pkg/kubecluster/primatives/cnpg/gen
 
 $(CNPG_KUBE_CODEGEN):
 	@mkdir -p $(shell dirname "$(CNPG_KUBE_CODEGEN)")

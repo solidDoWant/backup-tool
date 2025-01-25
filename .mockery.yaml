@@ -13,23 +13,23 @@ packages:
     <<: *baseline_config
     interfaces:
       ClientInterface:
-  github.com/solidDoWant/backup-tool/pkg/kubernetes/helpers:
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers:
     <<: *baseline_config
     interfaces:
       metaResource:
       ListerWatcher:
-  github.com/solidDoWant/backup-tool/pkg/kubernetes:
+  github.com/solidDoWant/backup-tool/pkg/kubecluster:
     <<: *baseline_config
     interfaces:
       ClientInterface:
       ClonedClusterInterface:
       BackupToolInstanceInterface:
-  github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/certmanager: &kube_primative_config
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager: &kube_primative_config
     <<: *baseline_config
     interfaces:
       ClientInterface:
-  github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/cnpg: *kube_primative_config
-  github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/externalsnapshotter: *kube_primative_config
-  github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/core: *kube_primative_config
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg: *kube_primative_config
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter: *kube_primative_config
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core: *kube_primative_config
   github.com/solidDoWant/backup-tool/pkg/postgres: *baseline_config
  

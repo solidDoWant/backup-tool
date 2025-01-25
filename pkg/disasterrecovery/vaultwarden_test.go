@@ -10,10 +10,10 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
-	"github.com/solidDoWant/backup-tool/pkg/kubernetes"
-	"github.com/solidDoWant/backup-tool/pkg/kubernetes/helpers"
-	"github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/core"
-	"github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/externalsnapshotter"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +26,7 @@ import (
 )
 
 func TestNewVaultWarden(t *testing.T) {
-	mockClient := kubernetes.NewMockClientInterface(t)
+	mockClient := kubecluster.NewMockClientInterface(t)
 	vw := NewVaultWarden(mockClient)
 
 	require.NotNil(t, vw)
@@ -66,7 +66,7 @@ func TestVaultWardenBackup(t *testing.T) {
 			backupOptions: VaultWardenBackupOptions{
 				VolumeSize:         resource.MustParse("10Gi"),
 				VolumeStorageClass: "custom-storage-class",
-				CloneClusterOptions: kubernetes.CloneClusterOptions{
+				CloneClusterOptions: kubecluster.CloneClusterOptions{
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
 				BackupToolPodCreationTimeout: helpers.MaxWaitTime(1 * time.Second),
@@ -131,7 +131,7 @@ func TestVaultWardenBackup(t *testing.T) {
 					},
 				},
 			}
-			clonedCluster := kubernetes.NewMockClonedClusterInterface(t)
+			clonedCluster := kubecluster.NewMockClonedClusterInterface(t)
 			servingCert := certmanagerv1.Certificate{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "serving-cert",
@@ -144,12 +144,12 @@ func TestVaultWardenBackup(t *testing.T) {
 					Namespace: namespace,
 				},
 			}
-			btInstance := kubernetes.NewMockBackupToolInstanceInterface(t)
+			btInstance := kubecluster.NewMockBackupToolInstanceInterface(t)
 			credentials := postgres.EnvironmentCredentials{
 				postgres.UserVarName: "postgres",
 			}
 
-			mockClient := kubernetes.NewMockClientInterface(t)
+			mockClient := kubecluster.NewMockClientInterface(t)
 			mockCoreClient := core.NewMockClientInterface(t)
 			mockESClient := externalsnapshotter.NewMockClientInterface(t)
 			mockClient.EXPECT().Core().Return(mockCoreClient).Maybe()
@@ -187,7 +187,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				// Step 1
 				var fullBackupName string
 				mockClient.EXPECT().ClonePVC(ctx, namespace, dataPVC, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace, dataPVC string, opts kubernetes.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+					RunAndReturn(func(ctx context.Context, namespace, dataPVC string, opts kubecluster.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error) {
 						fullBackupName = opts.DestPvcNamePrefix
 						require.True(t, strings.HasPrefix(fullBackupName, backupName))
 						require.Equal(t, tt.backupOptions.CleanupTimeout, opts.CleanupTimeout)
@@ -214,7 +214,7 @@ func TestVaultWardenBackup(t *testing.T) {
 
 				// Step 3
 				mockClient.EXPECT().CloneCluster(ctx, namespace, clusterName, mock.Anything, servingIssuerName, clientIssuerName, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts kubernetes.CloneClusterOptions) (kubernetes.ClonedClusterInterface, error) {
+					RunAndReturn(func(ctx context.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts kubecluster.CloneClusterOptions) (kubecluster.ClonedClusterInterface, error) {
 						require.True(t, strings.Contains(newClusterName, existingClusterName))
 						require.True(t, strings.Contains(newClusterName, fullBackupName))
 
@@ -232,7 +232,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				clonedCluster.EXPECT().GetServingCert().Return(&servingCert)
 				clonedCluster.EXPECT().GetClientCert().Return(&clientCert)
 				mockClient.EXPECT().CreateBackupToolInstance(ctx, namespace, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace, instance string, opts kubernetes.CreateBackupToolInstanceOptions) (kubernetes.BackupToolInstanceInterface, error) {
+					RunAndReturn(func(ctx context.Context, namespace, instance string, opts kubecluster.CreateBackupToolInstanceOptions) (kubecluster.BackupToolInstanceInterface, error) {
 						require.Equal(t, fullBackupName, opts.NamePrefix)
 						// TODO add test to ensure that the secrets are attached, along with the DR and cloned data PVCs
 						require.Len(t, opts.Volumes, 4)
