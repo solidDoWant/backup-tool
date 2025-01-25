@@ -9,6 +9,7 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/samber/lo"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
+	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/servers"
 	"github.com/solidDoWant/backup-tool/pkg/kubernetes/helpers"
@@ -16,12 +17,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-)
-
-const (
-	// TODO find a better place for these
-	ToolName  = "backup-tool"
-	ToolImage = "TODO"
 )
 
 type BackupToolInstanceInterface interface {
@@ -77,7 +72,6 @@ func NewSingleContainerSecret(secretName, mountPath string) SingleContainerVolum
 type CreateBackupToolInstanceOptions struct {
 	NamePrefix         string
 	Volumes            []SingleContainerVolume
-	Args               []string
 	CleanupTimeout     helpers.MaxWaitTime
 	ServiceType        corev1.ServiceType
 	PodWaitTimeout     helpers.MaxWaitTime
@@ -106,7 +100,7 @@ func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instan
 
 	namePrefix := opts.NamePrefix
 	if namePrefix == "" {
-		namePrefix = ToolName + "-"
+		namePrefix = constants.ToolName + "-"
 	}
 
 	// Prepare to handle resource cleanup in the event of an error
@@ -119,10 +113,10 @@ func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instan
 	}
 
 	container := corev1.Container{
-		Name:    ToolName,
-		Image:   ToolImage,
-		Command: []string{ToolName},
-		Args:    opts.Args,
+		Name:    constants.ToolName,
+		Image:   constants.FullImageName,
+		Command: []string{constants.ToolName},
+		Args:    []string{"grpc"},
 		VolumeMounts: lo.Map(opts.Volumes, func(vol SingleContainerVolume, _ int) corev1.VolumeMount {
 			return corev1.VolumeMount{
 				Name:      vol.Name,
@@ -142,7 +136,7 @@ func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instan
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: namePrefix,
 			Labels: map[string]string{
-				"app.kubernetes.io/name":     ToolName,
+				"app.kubernetes.io/name":     constants.ToolName,
 				"app.kubernetes.io/instance": instance,
 			},
 		},

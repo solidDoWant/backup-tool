@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/servers"
 	"github.com/solidDoWant/backup-tool/pkg/kubernetes/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/core"
@@ -137,7 +138,6 @@ func TestCreateBackupToolInstance(t *testing.T) {
 			name: "basic instance creation with all options set",
 			opts: CreateBackupToolInstanceOptions{
 				NamePrefix: "test-prefix-",
-				Args:       []string{"arg1", "arg2"},
 				Volumes: []SingleContainerVolume{
 					{
 						Name:      "vol1",
@@ -231,10 +231,9 @@ func TestCreateBackupToolInstance(t *testing.T) {
 					require.Contains(t, pod.ObjectMeta.Labels, "app.kubernetes.io/instance")
 
 					container := pod.Spec.Containers[0]
-					require.Equal(t, ToolName, container.Name)
-					require.Equal(t, ToolImage, container.Image)
-					require.Equal(t, []string{ToolName}, container.Command)
-					require.Equal(t, tt.opts.Args, container.Args)
+					require.Equal(t, constants.ToolName, container.Name)
+					require.Equal(t, constants.FullImageName, container.Image)
+					require.Equal(t, []string{constants.ToolName}, container.Command)
 					require.Equal(t, len(tt.opts.Volumes), len(container.VolumeMounts))
 					require.Len(t, container.Ports, 1)
 

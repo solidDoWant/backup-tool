@@ -10,6 +10,7 @@ import (
 	"dario.cat/mergo"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
+	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/kubernetes"
 	"github.com/solidDoWant/backup-tool/pkg/kubernetes/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/core"
@@ -46,12 +47,12 @@ func NewVaultWarden(client kubernetes.ClientInterface) *VaultWarden {
 // Backup process:
 // 1. Create the DR PVC if not exists
 // 2. Snapshot/clone PVC containing data directory
-// 3. Spawn a new backup-tool pod with the cloned PVC attached, and DR mount attached
+// 3. Spawn a new tool instance with the cloned PVC attached, and DR mount attached
 // 4. Sync the data directory to the DR volume
 // 5. Perform a CNPG logical backup with PITR set to the PVC snapshot time
 // 6. Copy the logical backup to the DR mount
 // 7. Take a snapshot of the DR volume
-// 8. Exit backup-tool pod, delete all created resources except for DR volume snapshot
+// 8. Exit the tool instance, delete all created resources except for DR volume snapshot
 func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPVC, cnpgClusterName, servingCertIssuerName, clientCertIssuerName string, backupOptions VaultWardenBackupOptions) (backup *Backup, err error) {
 	backup = NewBackupNow(backupName)
 	defer backup.Stop()
@@ -95,7 +96,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	}
 	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(10*time.Minute), cluster.Delete).WithErrMessage("failed to cleanup cloned cluster %q resources", clonedClusterName).WithOriginalErr(&err).Run()
 
-	// 4. Spawn a new backup-tool instance with the cloned PVC attached, and DR mount and secrets attached
+	// 4. Spawn a new tool instance with the cloned PVC attached, and DR mount and secrets attached
 	drVolumeMountPath := filepath.Join(baseMountPath, "dr")
 	clonedVolumeMountPath := filepath.Join(baseMountPath, "data")
 	secretsVolumeMountPath := filepath.Join(baseMountPath, "secrets")
@@ -114,7 +115,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	mergo.MergeWithOverwrite(&btOpts, backupOptions.RemoteBackupToolOptions)
 	btInstance, err := vw.kubernetesClient.CreateBackupToolInstance(ctx, namespace, backup.GetFullName(), btOpts)
 	if err != nil {
-		return backup, trace.Wrap(err, "failed to create backup-tool instance")
+		return backup, trace.Wrap(err, "failed to create %s instance", constants.ToolName)
 	}
 	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
 		return btInstance.Delete(ctx)

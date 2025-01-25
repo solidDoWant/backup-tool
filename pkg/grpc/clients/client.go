@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	"google.golang.org/grpc"
@@ -28,7 +29,7 @@ func NewClient(ctx context.Context, serverAddress string) (ClientInterface, erro
 	// TODO add option for this
 	conn, err := grpc.NewClient(serverAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, trace.Wrap(err, "failed to create new backup-tool GRPC client for server at %q", serverAddress)
+		return nil, trace.Wrap(err, "failed to create new %s GRPC client for server at %q", constants.ToolName, serverAddress)
 	}
 
 	// Verify the client _can_ connect to the server
