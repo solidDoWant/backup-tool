@@ -1,0 +1,18 @@
+edition = "2023";
+
+option go_package = "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/postgres/v1;postgres_v1";
+
+import "credentials.proto";
+import "google/protobuf/duration.proto";
+
+message DumpAllRequest {
+  EnvironmentCredentials credentials = 1;
+  string output_file_path = 2;
+  DumpAllOptions options = 3;
+}
+
+message DumpAllOptions {
+  google.protobuf.Duration cleanup_timeout = 1;
+}
+
+message DumpAllResponse {}

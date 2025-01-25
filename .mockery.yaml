@@ -1,0 +1,35 @@
+# outpkg: "{{ .PackageName }}"
+filename: "{{ .InterfaceName | lower }}_mock.go"
+dir: "{{ .InterfaceDir }}"
+inpackage: true
+packages:
+  github.com/solidDoWant/backup-tool/pkg/files: &baseline_config
+    config: &config
+      issue-845-fix: true
+      resolve-type-alias: false
+    interfaces:
+      Runtime:
+  github.com/solidDoWant/backup-tool/pkg/grpc/clients:
+    <<: *baseline_config
+    interfaces:
+      ClientInterface:
+  github.com/solidDoWant/backup-tool/pkg/kubernetes/helpers:
+    <<: *baseline_config
+    interfaces:
+      metaResource:
+      ListerWatcher:
+  github.com/solidDoWant/backup-tool/pkg/kubernetes:
+    <<: *baseline_config
+    interfaces:
+      ClientInterface:
+      ClonedClusterInterface:
+      BackupToolInstanceInterface:
+  github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/certmanager: &kube_primative_config
+    <<: *baseline_config
+    interfaces:
+      ClientInterface:
+  github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/cnpg: *kube_primative_config
+  github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/externalsnapshotter: *kube_primative_config
+  github.com/solidDoWant/backup-tool/pkg/kubernetes/primatives/core: *kube_primative_config
+  github.com/solidDoWant/backup-tool/pkg/postgres: *baseline_config
+ 

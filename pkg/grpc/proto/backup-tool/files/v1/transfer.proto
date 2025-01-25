@@ -1,0 +1,17 @@
+edition = "2023";
+
+option go_package = "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/files/v1;files_v1";
+
+message CopyFilesRequest {
+  string source = 1;
+  string dest = 2;
+}
+
+message CopyFilesResponse {}
+
+message SyncFilesRequest {
+  string source = 1;
+  string dest = 2;
+}
+
+message SyncFilesResponse {}
