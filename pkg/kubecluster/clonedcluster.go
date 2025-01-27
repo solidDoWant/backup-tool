@@ -37,16 +37,16 @@ type ClonedCluster struct {
 }
 
 type CloneClusterOptions struct {
-	WaitForBackupTimeout      helpers.MaxWaitTime
-	ServingCertSubject        *certmanagerv1.X509Subject
-	ServingCertIssuerKind     string
-	WaitForServingCertTimeout helpers.MaxWaitTime
-	ClientCertSubject         *certmanagerv1.X509Subject
-	ClientCertIssuerKind      string
-	WaitForClientCertTimeout  helpers.MaxWaitTime
-	RecoveryTargetTime        string
-	WaitForClusterTimeout     helpers.MaxWaitTime
-	CleanupTimeout            helpers.MaxWaitTime
+	WaitForBackupTimeout      helpers.MaxWaitTime        `yaml:"waitForBackupTimeout,omitempty"`
+	ServingCertSubject        *certmanagerv1.X509Subject `yaml:"servingCertSubject,omitempty"`
+	ServingCertIssuerKind     string                     `yaml:"servingCertIssuerKind,omitempty"`
+	WaitForServingCertTimeout helpers.MaxWaitTime        `yaml:"waitForServingCertTimeout,omitempty"`
+	ClientCertSubject         *certmanagerv1.X509Subject `yaml:"clientCertSubject,omitempty"`
+	ClientCertIssuerKind      string                     `yaml:"clientCertIssuerKind,omitempty"`
+	WaitForClientCertTimeout  helpers.MaxWaitTime        `yaml:"waitForClientCertTimeout,omitempty"`
+	RecoveryTargetTime        string                     `yaml:"recoveryTargetTime,omitempty"`
+	WaitForClusterTimeout     helpers.MaxWaitTime        `yaml:"waitForClusterTimeout,omitempty"`
+	CleanupTimeout            helpers.MaxWaitTime        `yaml:"cleanupTimeout,omitempty"`
 	// TODO maybe provide an option for additional client auth CAs?
 	// TODO maybe provide an option for CRPs?
 }

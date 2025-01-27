@@ -24,14 +24,14 @@ const baseMountPath = string(os.PathListSeparator) + "mnt"
 
 // TODO plumb a lot more options through to here
 type VaultWardenBackupOptions struct {
-	VolumeSize                   resource.Quantity
-	VolumeStorageClass           string
-	CloneClusterOptions          kubecluster.CloneClusterOptions
-	BackupToolPodCreationTimeout helpers.MaxWaitTime
-	SnapshotReadyTimeout         helpers.MaxWaitTime
-	RemoteBackupToolOptions      kubecluster.CreateBackupToolInstanceOptions
-	ClusterServiceSearchDomains  []string
-	CleanupTimeout               helpers.MaxWaitTime
+	VolumeSize                   resource.Quantity                           `yaml:"volumeSize,omitempty"`
+	VolumeStorageClass           string                                      `yaml:"volumeStorageClass,omitempty"`
+	CloneClusterOptions          kubecluster.CloneClusterOptions             `yaml:"clusterCloning,omitempty"`
+	BackupToolPodCreationTimeout helpers.MaxWaitTime                         `yaml:"backupToolPodCreationTimeout,omitempty"`
+	SnapshotReadyTimeout         helpers.MaxWaitTime                         `yaml:"snapshotReadyTimeout,omitempty"`
+	RemoteBackupToolOptions      kubecluster.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
+	ClusterServiceSearchDomains  []string                                    `yaml:"clusterServiceSearchDomains,omitempty"`
+	CleanupTimeout               helpers.MaxWaitTime                         `yaml:"cleanupTimeout,omitempty"`
 }
 
 type VaultWarden struct {

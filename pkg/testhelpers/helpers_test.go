@@ -67,3 +67,18 @@ func TestValOrDefault(t *testing.T) {
 	assert.Equal(t, &defaultTestVal, ValOrDefault(nil, &defaultTestVal))
 	assert.Equal(t, (*string)(nil), ValOrDefault[*string](nil, nil))
 }
+
+func TestOptStructTest(t *testing.T) {
+	type InlineStruct struct {
+		InlineField string
+	}
+
+	type BasicTestCase struct {
+		InlineStruct    `yaml:",inline"`
+		ExportedField   string `yaml:"exportedField"`
+		unexportedField string //lint:ignore U1000 unused, unexported field is required for testing
+		JSONSchemaField bool   `yaml:"jsonSchemaField" jsonschema:"someval"`
+	}
+
+	OptStructTest[BasicTestCase](t)
+}

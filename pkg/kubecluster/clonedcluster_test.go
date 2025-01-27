@@ -151,7 +151,11 @@ func TestNewClonedCluster(t *testing.T) {
 	})
 }
 
-func TestClonedCluster(t *testing.T) {
+func TestCloneClusterOptions(t *testing.T) {
+	th.OptStructTest[CloneClusterOptions](t)
+}
+
+func TestCloneCluster(t *testing.T) {
 	tests := []struct {
 		desc                             string
 		opts                             CloneClusterOptions

@@ -33,6 +33,10 @@ func TestNewVaultWarden(t *testing.T) {
 	assert.Equal(t, mockClient, vw.kubernetesClient)
 }
 
+func TestVaultWardenBackupOptions(t *testing.T) {
+	th.OptStructTest[VaultWardenBackupOptions](t)
+}
+
 func TestVaultWardenBackup(t *testing.T) {
 	namespace := "test-ns"
 	backupName := "test-backup"

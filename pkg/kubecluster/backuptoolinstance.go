@@ -39,9 +39,9 @@ type BackupToolInstance struct {
 
 // Represents a volume that is mounted in a single container.
 type SingleContainerVolume struct {
-	Name         string
-	MountPath    string
-	VolumeSource corev1.VolumeSource
+	Name         string              `yaml:"name" jsonschema:"required"`
+	MountPath    string              `yaml:"mountPath" jsonschema:"required"`
+	VolumeSource corev1.VolumeSource `yaml:"volumeSource" jsonschema:"required"`
 }
 
 func NewSingleContainerPVC(pvcName, mountPath string) SingleContainerVolume {
@@ -69,15 +69,6 @@ func NewSingleContainerSecret(secretName, mountPath string) SingleContainerVolum
 	}
 }
 
-type CreateBackupToolInstanceOptions struct {
-	NamePrefix         string
-	Volumes            []SingleContainerVolume
-	CleanupTimeout     helpers.MaxWaitTime
-	ServiceType        corev1.ServiceType
-	PodWaitTimeout     helpers.MaxWaitTime
-	ServiceWaitTimeout helpers.MaxWaitTime
-}
-
 func newBackupToolInstance(c ClientInterface) BackupToolInstanceInterface {
 	return &BackupToolInstance{
 		c: c,
@@ -93,6 +84,15 @@ func newBackupToolInstance(c ClientInterface) BackupToolInstanceInterface {
 		},
 		lookupIP: net.LookupIP,
 	}
+}
+
+type CreateBackupToolInstanceOptions struct {
+	NamePrefix         string                  `yaml:"namePrefix,omitempty"`
+	Volumes            []SingleContainerVolume `yaml:"volumes,omitempty"`
+	CleanupTimeout     helpers.MaxWaitTime     `yaml:"cleanupTimeout,omitempty"`
+	ServiceType        corev1.ServiceType      `yaml:"serviceType,omitempty"`
+	PodWaitTimeout     helpers.MaxWaitTime     `yaml:"podWaitTimeout,omitempty"`
+	ServiceWaitTimeout helpers.MaxWaitTime     `yaml:"serviceWaitTimeout,omitempty"`
 }
 
 func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instance string, opts CreateBackupToolInstanceOptions) (btInstance BackupToolInstanceInterface, err error) {

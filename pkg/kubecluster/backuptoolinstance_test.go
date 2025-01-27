@@ -119,6 +119,10 @@ func TestNewBackupToolInstance(t *testing.T) {
 	assert.True(t, casted.testConnection("localhost"))
 }
 
+func TestCreateBackupToolInstanceOptions(t *testing.T) {
+	th.OptStructTest[CreateBackupToolInstanceOptions](t)
+}
+
 func TestCreateBackupToolInstance(t *testing.T) {
 	namespace := "test-namespace"
 
