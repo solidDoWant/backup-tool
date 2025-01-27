@@ -27,3 +27,10 @@ RUN go install \
 # Mockery
 RUN go install github.com/vektra/mockery/v2@latest \
     mockery completion bash | sudo tee /etc/bash_completion.d/mockery.bash > /dev/null
+
+# Misc. development tools
+COPY --from=registry.k8s.io/kubectl:v1.31.2 /bin/kubectl /usr/local/bin/kubectl
+
+# Autocomplete
+RUN \
+    kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl.bash > /dev/null
