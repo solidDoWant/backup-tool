@@ -77,7 +77,7 @@ func TestGenerateNameSetName(t *testing.T) {
 			desc:         "with generate name true",
 			generateName: true,
 			name:         "test",
-			wantGenName:  "test-",
+			wantGenName:  "test",
 		},
 		{
 			desc:     "with generate name false",
@@ -297,6 +297,56 @@ func TestWaitForResourceCondition(t *testing.T) {
 
 			assert.NoError(t, waitErr)
 			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
+
+func TestCleanName(t *testing.T) {
+	tests := []struct {
+		desc  string
+		input string
+		want  string
+	}{
+		{
+			desc:  "should handle valid name",
+			input: "test-name",
+			want:  "test-name",
+		},
+		{
+			desc:  "should replace underscores with hyphens",
+			input: "test_name",
+			want:  "test-name",
+		},
+		{
+			desc:  "should replace colons with hyphens",
+			input: "test:name",
+			want:  "test-name",
+		},
+		{
+			desc:  "should replace dots with hyphens",
+			input: "test.name",
+			want:  "test-name",
+		},
+		{
+			desc:  "should convert to lowercase",
+			input: "TestName",
+			want:  "testname",
+		},
+		{
+			desc:  "should handle multiple replacements",
+			input: "Test_Name:Suffix",
+			want:  "test-name-suffix",
+		},
+		{
+			desc:  "should handle empty string",
+			input: "",
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			assert.Equal(t, tt.want, CleanName(tt.input))
 		})
 	}
 }

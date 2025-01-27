@@ -103,7 +103,7 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 	}
 
 	// 2. Create the serving certificate (short lived)
-	servingCertName := newClusterName + "-serving-cert"
+	servingCertName := helpers.CleanName(newClusterName + "-serving-cert")
 	certOptions := certmanager.CreateCertificateOptions{
 		CommonName: servingCertName,
 		Subject:    opts.ServingCertSubject,
@@ -132,7 +132,7 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 
 	// 3. Create the client certificate (short lived). This is the only certificate that the cluster will trust for client auth.
 	clientUserName := "postgres" // Postgres superuser, which has access to all databases
-	clientCertName := fmt.Sprintf("%s-%s-user", newClusterName, clientUserName)
+	clientCertName := helpers.CleanName(fmt.Sprintf("%s-%s-user", newClusterName, clientUserName))
 	certOptions = certmanager.CreateCertificateOptions{
 		CommonName: clientUserName,
 		Subject:    opts.ClientCertSubject,
@@ -146,7 +146,7 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 		certOptions.IssuerKind = opts.ClientCertIssuerKind
 	}
 
-	clientCert, err := c.CM().CreateCertificate(ctx, clientCertName, namespace, clientCertIssuerName, certOptions)
+	clientCert, err := c.CM().CreateCertificate(ctx, helpers.CleanName(clientCertName), namespace, clientCertIssuerName, certOptions)
 	if err != nil {
 		return errHandler(err, "failed to create %q user cert %q", clientUserName, helpers.FullNameStr(namespace, clientCertName))
 	}

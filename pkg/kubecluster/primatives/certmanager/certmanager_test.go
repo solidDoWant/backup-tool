@@ -87,7 +87,7 @@ func TestCreateCertificate(t *testing.T) {
 			},
 			expected: &certmanagerv1.Certificate{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: certName + "-",
+					GenerateName: certName,
 				},
 				Spec: certmanagerv1.CertificateSpec{
 					CommonName: "test.example.com",

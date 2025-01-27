@@ -66,7 +66,7 @@ func TestCreatePVC(t *testing.T) {
 			},
 			expectedPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: pvcName + "-",
+					GenerateName: pvcName,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					StorageClassName: ptr.To("custom-class"),
@@ -254,7 +254,7 @@ func TestEnsurePVCExists(t *testing.T) {
 			opts: CreatePVCOptions{GenerateName: true, StorageClassName: "custom-class"},
 			expectedPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: pvcName + "-",
+					GenerateName: pvcName,
 					Namespace:    namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{

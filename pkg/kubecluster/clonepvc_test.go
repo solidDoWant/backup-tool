@@ -63,7 +63,7 @@ func TestClonePVC(t *testing.T) {
 			},
 			expectedPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: pvcName + "-",
+					GenerateName: pvcName,
 					Namespace:    namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
@@ -72,7 +72,7 @@ func TestClonePVC(t *testing.T) {
 						corev1.ReadWriteOnce,
 					},
 					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Identifier()),
+						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},
@@ -89,7 +89,7 @@ func TestClonePVC(t *testing.T) {
 			},
 			expectedPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: pvcName + "-",
+					GenerateName: pvcName,
 					Namespace:    namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
@@ -97,7 +97,7 @@ func TestClonePVC(t *testing.T) {
 						corev1.ReadWriteOnce,
 					},
 					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Identifier()),
+						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},
@@ -130,7 +130,7 @@ func TestClonePVC(t *testing.T) {
 						corev1.ReadWriteOnce,
 					},
 					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Identifier()),
+						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},
@@ -273,7 +273,7 @@ func TestClonePVC(t *testing.T) {
 				opts := core.CreatePVCOptions{
 					GenerateName: true,
 					Source: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Identifier()),
+						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},

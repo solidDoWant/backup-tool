@@ -69,7 +69,7 @@ func TestCreateBackup(t *testing.T) {
 			},
 			expected: &apiv1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: backupName + "-",
+					GenerateName: backupName,
 				},
 				Spec: apiv1.BackupSpec{
 					Method: apiv1.BackupMethodBarmanObjectStore,
@@ -319,7 +319,7 @@ func TestCreateCluster(t *testing.T) {
 			},
 			expected: &apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: clusterName + "-",
+					GenerateName: clusterName,
 				},
 			},
 		},

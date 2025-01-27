@@ -348,7 +348,7 @@ func TestCloneCluster(t *testing.T) {
 					return
 				}
 
-				c.cmClient.EXPECT().CreateCertificate(ctx, createdServingCert.Name, namespace, servingIssuerName, certmanager.CreateCertificateOptions{
+				c.cmClient.EXPECT().CreateCertificate(ctx, helpers.CleanName(createdServingCert.Name), namespace, servingIssuerName, certmanager.CreateCertificateOptions{
 					CommonName: createdServingCert.Name,
 					DNSNames:   getClusterDomainNames(newClusterName, namespace),
 					SecretLabels: map[string]string{
@@ -370,7 +370,7 @@ func TestCloneCluster(t *testing.T) {
 				}
 				c.clonedCluster.EXPECT().setServingCert(createdServingCert).Return()
 
-				c.cmClient.EXPECT().CreateCertificate(ctx, createdClientCert.Name, namespace, clientIssuerName, certmanager.CreateCertificateOptions{
+				c.cmClient.EXPECT().CreateCertificate(ctx, helpers.CleanName(createdClientCert.Name), namespace, clientIssuerName, certmanager.CreateCertificateOptions{
 					CommonName: "postgres",
 					SecretLabels: map[string]string{
 						"cnpg.io/reload": "true",

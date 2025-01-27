@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/gravitational/trace"
@@ -33,7 +34,7 @@ type GenerateName bool
 
 func (gn GenerateName) SetName(metadata *metav1.ObjectMeta, name string) {
 	if gn {
-		metadata.GenerateName = name + "-"
+		metadata.GenerateName = CleanName(name)
 	} else {
 		metadata.Name = name
 	}
@@ -135,4 +136,16 @@ func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interfac
 	)
 
 	return result, trace.Wrap(err, "failed while waiting for condition to become true")
+}
+
+// Do a best-effort cleanup of the provided value to make it a valid k8s generated resource name.
+func CleanName(generateName string) string {
+	// TODO regex
+	replaceChars := "_:."
+	replacerStrings := make([]string, 0, len(replaceChars)*2)
+	for _, char := range replaceChars {
+		replacerStrings = append(replacerStrings, string(char), "-")
+	}
+
+	return strings.NewReplacer(replacerStrings...).Replace(strings.ToLower(generateName))
 }

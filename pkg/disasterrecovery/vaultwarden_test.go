@@ -220,7 +220,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				mockClient.EXPECT().CloneCluster(ctx, namespace, clusterName, mock.Anything, servingIssuerName, clientIssuerName, mock.Anything).
 					RunAndReturn(func(ctx context.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts kubecluster.CloneClusterOptions) (kubecluster.ClonedClusterInterface, error) {
 						require.True(t, strings.Contains(newClusterName, existingClusterName))
-						require.True(t, strings.Contains(newClusterName, fullBackupName))
+						require.True(t, strings.Contains(newClusterName, helpers.CleanName(fullBackupName)))
 
 						return th.ErrOr1Val(clonedCluster, tt.simulateCloneClusterErr)
 					})

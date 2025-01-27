@@ -100,7 +100,7 @@ func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instan
 
 	namePrefix := opts.NamePrefix
 	if namePrefix == "" {
-		namePrefix = constants.ToolName + "-"
+		namePrefix = constants.ToolName
 	}
 
 	// Prepare to handle resource cleanup in the event of an error
@@ -134,7 +134,7 @@ func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instan
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: namePrefix,
+			GenerateName: helpers.CleanName(namePrefix),
 			Labels: map[string]string{
 				"app.kubernetes.io/name":     constants.ToolName,
 				"app.kubernetes.io/instance": instance,
@@ -171,7 +171,7 @@ func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instan
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: namePrefix,
+			GenerateName: helpers.CleanName(namePrefix),
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: readyPod.Labels,

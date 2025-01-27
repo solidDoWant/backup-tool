@@ -27,7 +27,7 @@ func (c *Client) SnapshotVolume(ctx context.Context, namespace, pvcName string, 
 	}
 
 	if opts.Name == "" {
-		snapshot.ObjectMeta.GenerateName = pvcName + "-"
+		snapshot.ObjectMeta.GenerateName = helpers.CleanName(pvcName)
 	} else {
 		snapshot.ObjectMeta.Name = opts.Name
 	}

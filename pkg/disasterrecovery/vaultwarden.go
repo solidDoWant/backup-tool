@@ -84,7 +84,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	}
 
 	// 3. Clone the CNPG cluster
-	clonedClusterName := fmt.Sprintf("%s-%s", cnpgClusterName, backup.GetFullName())
+	clonedClusterName := helpers.CleanName(fmt.Sprintf("%s-%s", cnpgClusterName, backup.GetFullName()))
 	if backupOptions.CloneClusterOptions.CleanupTimeout == 0 {
 		backupOptions.CloneClusterOptions.CleanupTimeout = backupOptions.CleanupTimeout
 	}

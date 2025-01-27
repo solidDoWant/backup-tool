@@ -74,7 +74,7 @@ func (c *Client) ClonePVC(ctx context.Context, namespace, pvcName string, opts C
 		GenerateName:     true,
 		StorageClassName: storageClassName,
 		Source: &corev1.TypedObjectReference{
-			APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Identifier()),
+			APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
 			Kind:     externalsnapshotter.VolumeSnapshotKind,
 			Name:     readySnapshot.Name,
 		},
