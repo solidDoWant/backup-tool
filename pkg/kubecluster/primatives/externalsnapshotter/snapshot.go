@@ -46,6 +46,14 @@ type WaitForReadySnapshotOpts struct {
 
 func (c *Client) WaitForReadySnapshot(ctx context.Context, namespace, name string, opts WaitForReadySnapshotOpts) error {
 	_, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(10*time.Minute), c.client.SnapshotV1().VolumeSnapshots(namespace), name, func(_ context.Context, snapshot *volumesnapshotv1.VolumeSnapshot) (interface{}, bool, error) {
+		if snapshot.Status == nil {
+			return nil, false, nil
+		}
+
+		if snapshot.Status.Error != nil {
+			return nil, false, trace.Errorf("snapshot %q failed: %v", helpers.FullNameStr(namespace, name), *snapshot.Status.Error.Message)
+		}
+
 		if snapshot.Status == nil || snapshot.Status.ReadyToUse == nil {
 			return nil, false, nil
 		}
@@ -54,7 +62,7 @@ func (c *Client) WaitForReadySnapshot(ctx context.Context, namespace, name strin
 	})
 
 	if err != nil {
-		return trace.Wrap(err, "failed waiting for pod to become ready")
+		return trace.Wrap(err, "failed waiting for snapshot to become ready")
 	}
 
 	return nil

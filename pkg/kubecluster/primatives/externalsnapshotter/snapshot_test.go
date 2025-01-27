@@ -82,6 +82,11 @@ func TestWaitForReadySnapshot(t *testing.T) {
 	readySnapshot := notReadySnapshot.DeepCopy()
 	readySnapshot.Status.ReadyToUse = ptr.To(true)
 
+	failedSnapshot := noReadyToUseSnapshot.DeepCopy()
+	failedSnapshot.Status.Error = &volumesnapshotv1.VolumeSnapshotError{
+		Message: ptr.To("snapshot failed"),
+	}
+
 	tests := []struct {
 		desc                string
 		initialSnapshot     *volumesnapshotv1.VolumeSnapshot
@@ -118,6 +123,15 @@ func TestWaitForReadySnapshot(t *testing.T) {
 				_, err := client.SnapshotV1().VolumeSnapshots(podNamespace).Update(ctx, readySnapshot, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
+		},
+		{
+			desc:            "snapshot errors after creation",
+			initialSnapshot: noStatusSnapshot,
+			afterStartedWaiting: func(t *testing.T, ctx context.Context, client versioned.Interface) {
+				_, err := client.SnapshotV1().VolumeSnapshots(podNamespace).Update(ctx, failedSnapshot, metav1.UpdateOptions{})
+				require.NoError(t, err)
+			},
+			shouldError: true,
 		},
 	}
 
