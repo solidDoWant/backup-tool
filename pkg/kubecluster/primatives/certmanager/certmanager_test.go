@@ -308,3 +308,241 @@ func TestDeleteCertificate(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateIssuer(t *testing.T) {
+	namespace := "test-ns"
+	issuerName := "test-issuer"
+	caCertSecretName := "test-ca-secret"
+
+	standardIssuer := &certmanagerv1.Issuer{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+		},
+		Spec: certmanagerv1.IssuerSpec{
+			IssuerConfig: certmanagerv1.IssuerConfig{
+				CA: &certmanagerv1.CAIssuer{
+					SecretName: caCertSecretName,
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		desc                  string
+		opts                  CreateIssuerOptions
+		expected              *certmanagerv1.Issuer
+		simulateClientFailure bool
+	}{
+		{
+			desc: "no options",
+			expected: &certmanagerv1.Issuer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: issuerName,
+				},
+			},
+		},
+		{
+			desc: "with generate name",
+			opts: CreateIssuerOptions{
+				GenerateName: true,
+			},
+			expected: &certmanagerv1.Issuer{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: issuerName,
+				},
+			},
+		},
+		{
+			desc:                  "simulate client failure",
+			simulateClientFailure: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			client, fakeClientset := createTestClient()
+			if tt.simulateClientFailure {
+				fakeClientset.PrependReactor("create", "issuers", func(action kubetesting.Action) (bool, runtime.Object, error) {
+					return true, nil, assert.AnError
+				})
+			}
+
+			ctx := context.Background()
+			issuer, err := client.CreateIssuer(ctx, namespace, issuerName, caCertSecretName, tt.opts)
+
+			if tt.simulateClientFailure {
+				assert.Error(t, err)
+				assert.Nil(t, issuer)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, issuer)
+
+			expectedIssuer := standardIssuer.DeepCopy()
+			require.NoError(t, mergo.MergeWithOverwrite(expectedIssuer, tt.expected))
+			assert.Equal(t, expectedIssuer, issuer)
+
+			retrievedIssuer, err := client.client.CertmanagerV1().Issuers(namespace).Get(ctx, issuer.Name, metav1.GetOptions{})
+			assert.NoError(t, err)
+			assert.Equal(t, expectedIssuer, retrievedIssuer)
+		})
+	}
+}
+
+func TestWaitForReadyIssuer(t *testing.T) {
+	issuerName := "test-issuer"
+	issuerNamespace := "test-ns"
+
+	noStatusIssuer := &certmanagerv1.Issuer{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: issuerNamespace,
+			Name:      issuerName,
+		},
+	}
+
+	notReadyIssuer := noStatusIssuer.DeepCopy()
+	notReadyCondition := certmanagerv1.IssuerCondition{Type: certmanagerv1.IssuerConditionReady, Status: cmmeta.ConditionFalse}
+	notReadyIssuer.Status.Conditions = append(notReadyIssuer.Status.Conditions, notReadyCondition)
+
+	readyIssuer := notReadyIssuer.DeepCopy()
+	readyCondition := notReadyCondition.DeepCopy()
+	readyCondition.Status = cmmeta.ConditionTrue
+	readyIssuer.Status.Conditions[0] = *readyCondition
+
+	multipleConditionsIssuer := readyIssuer.DeepCopy()
+	// cert manager does not have multiple issuer conditions (yet)
+	acmeCondition := certmanagerv1.IssuerCondition{Type: "DummyCondition", Status: cmmeta.ConditionFalse}
+	multipleConditionsIssuer.Status.Conditions = []certmanagerv1.IssuerCondition{acmeCondition, *readyCondition}
+
+	tests := []struct {
+		desc                string
+		initialIssuer       *certmanagerv1.Issuer
+		shouldError         bool
+		afterStartedWaiting func(*testing.T, context.Context, versioned.Interface)
+	}{
+		{
+			desc:          "issuer starts ready",
+			initialIssuer: readyIssuer,
+		},
+		{
+			desc:          "issuer not ready",
+			initialIssuer: notReadyIssuer,
+			shouldError:   true,
+		},
+		{
+			desc:          "issuer has no status",
+			initialIssuer: noStatusIssuer,
+			shouldError:   true,
+		},
+		{
+			desc:        "issuer does not exist",
+			shouldError: true,
+		},
+		{
+			desc:          "issuer becomes ready",
+			initialIssuer: notReadyIssuer,
+			afterStartedWaiting: func(t *testing.T, ctx context.Context, client versioned.Interface) {
+				_, err := client.CertmanagerV1().Issuers(issuerNamespace).Update(ctx, readyIssuer, metav1.UpdateOptions{})
+				require.NoError(t, err)
+			},
+		},
+		{
+			desc:          "multiple conditions",
+			initialIssuer: notReadyIssuer,
+			afterStartedWaiting: func(t *testing.T, ctx context.Context, client versioned.Interface) {
+				_, err := client.CertmanagerV1().Issuers(issuerNamespace).Update(ctx, multipleConditionsIssuer, metav1.UpdateOptions{})
+				require.NoError(t, err)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			t.Parallel()
+
+			client, fakeClientset := createTestClient()
+			ctx := context.Background()
+
+			if tt.initialIssuer != nil {
+				_, err := fakeClientset.CertmanagerV1().Issuers(issuerNamespace).Create(ctx, tt.initialIssuer, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
+
+			var wg sync.WaitGroup
+			var waitErr error
+			var issuer *certmanagerv1.Issuer
+			wg.Add(1)
+			go func() {
+				issuer, waitErr = client.WaitForReadyIssuer(ctx, issuerNamespace, issuerName, WaitForReadyIssuerOpts{MaxWaitTime: helpers.ShortWaitTime})
+				wg.Done()
+			}()
+
+			if tt.afterStartedWaiting != nil {
+				time.Sleep(10 * time.Millisecond) // Ensure that watcher has been setup
+				tt.afterStartedWaiting(t, ctx, fakeClientset)
+			}
+
+			wg.Wait()
+			if tt.shouldError {
+				assert.Error(t, waitErr)
+				assert.Nil(t, issuer)
+				return
+			}
+			assert.NoError(t, waitErr)
+			assert.NotNil(t, issuer)
+		})
+	}
+}
+
+func TestDeleteIssuer(t *testing.T) {
+	namespace := "test-ns"
+	issuerName := "test-issuer"
+
+	tests := []struct {
+		desc              string
+		shouldSetupIssuer bool
+		wantErr           bool
+	}{
+		{
+			desc:              "delete existing issuer",
+			shouldSetupIssuer: true,
+		},
+		{
+			desc:    "delete non-existent issuer",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			client, _ := createTestClient()
+			ctx := context.Background()
+
+			var existingIssuer *certmanagerv1.Issuer
+			if tt.shouldSetupIssuer {
+				existingIssuer = &certmanagerv1.Issuer{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      issuerName,
+						Namespace: namespace,
+					},
+				}
+				_, err := client.client.CertmanagerV1().Issuers(namespace).Create(ctx, existingIssuer, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
+
+			err := client.DeleteIssuer(ctx, issuerName, namespace)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			// Verify the issuer was deleted
+			issuerList, err := client.client.CertmanagerV1().Issuers(namespace).List(ctx, metav1.SingleObject(metav1.ObjectMeta{Name: issuerName, Namespace: namespace}))
+			assert.NoError(t, err)
+			assert.Empty(t, issuerList.Items)
+		})
+	}
+}

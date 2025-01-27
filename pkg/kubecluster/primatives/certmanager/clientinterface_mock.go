@@ -84,6 +84,67 @@ func (_c *MockClientInterface_CreateCertificate_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// CreateIssuer provides a mock function with given fields: ctx, namespace, name, caCertSecretName, opts
+func (_m *MockClientInterface) CreateIssuer(ctx context.Context, namespace string, name string, caCertSecretName string, opts CreateIssuerOptions) (*v1.Issuer, error) {
+	ret := _m.Called(ctx, namespace, name, caCertSecretName, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateIssuer")
+	}
+
+	var r0 *v1.Issuer
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, CreateIssuerOptions) (*v1.Issuer, error)); ok {
+		return rf(ctx, namespace, name, caCertSecretName, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, CreateIssuerOptions) *v1.Issuer); ok {
+		r0 = rf(ctx, namespace, name, caCertSecretName, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Issuer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, CreateIssuerOptions) error); ok {
+		r1 = rf(ctx, namespace, name, caCertSecretName, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_CreateIssuer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateIssuer'
+type MockClientInterface_CreateIssuer_Call struct {
+	*mock.Call
+}
+
+// CreateIssuer is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - name string
+//   - caCertSecretName string
+//   - opts CreateIssuerOptions
+func (_e *MockClientInterface_Expecter) CreateIssuer(ctx interface{}, namespace interface{}, name interface{}, caCertSecretName interface{}, opts interface{}) *MockClientInterface_CreateIssuer_Call {
+	return &MockClientInterface_CreateIssuer_Call{Call: _e.mock.On("CreateIssuer", ctx, namespace, name, caCertSecretName, opts)}
+}
+
+func (_c *MockClientInterface_CreateIssuer_Call) Run(run func(ctx context.Context, namespace string, name string, caCertSecretName string, opts CreateIssuerOptions)) *MockClientInterface_CreateIssuer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(CreateIssuerOptions))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_CreateIssuer_Call) Return(_a0 *v1.Issuer, _a1 error) *MockClientInterface_CreateIssuer_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_CreateIssuer_Call) RunAndReturn(run func(context.Context, string, string, string, CreateIssuerOptions) (*v1.Issuer, error)) *MockClientInterface_CreateIssuer_Call {
+	_c.Call.Return(run)
+	return _c
+}
 
 // DeleteCertificate provides a mock function with given fields: ctx, namespace, name
 func (_m *MockClientInterface) DeleteCertificate(ctx context.Context, namespace string, name string) error {
@@ -129,6 +190,54 @@ func (_c *MockClientInterface_DeleteCertificate_Call) Return(_a0 error) *MockCli
 }
 
 func (_c *MockClientInterface_DeleteCertificate_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClientInterface_DeleteCertificate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteIssuer provides a mock function with given fields: ctx, namespace, name
+func (_m *MockClientInterface) DeleteIssuer(ctx context.Context, namespace string, name string) error {
+	ret := _m.Called(ctx, namespace, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteIssuer")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, namespace, name)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClientInterface_DeleteIssuer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteIssuer'
+type MockClientInterface_DeleteIssuer_Call struct {
+	*mock.Call
+}
+
+// DeleteIssuer is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - name string
+func (_e *MockClientInterface_Expecter) DeleteIssuer(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_DeleteIssuer_Call {
+	return &MockClientInterface_DeleteIssuer_Call{Call: _e.mock.On("DeleteIssuer", ctx, namespace, name)}
+}
+
+func (_c *MockClientInterface_DeleteIssuer_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockClientInterface_DeleteIssuer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_DeleteIssuer_Call) Return(_a0 error) *MockClientInterface_DeleteIssuer_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClientInterface_DeleteIssuer_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClientInterface_DeleteIssuer_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -190,6 +299,67 @@ func (_c *MockClientInterface_WaitForReadyCertificate_Call) Return(_a0 *v1.Certi
 }
 
 func (_c *MockClientInterface_WaitForReadyCertificate_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyCertificateOpts) (*v1.Certificate, error)) *MockClientInterface_WaitForReadyCertificate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WaitForReadyIssuer provides a mock function with given fields: ctx, namespace, name, opts
+func (_m *MockClientInterface) WaitForReadyIssuer(ctx context.Context, namespace string, name string, opts WaitForReadyIssuerOpts) (*v1.Issuer, error) {
+	ret := _m.Called(ctx, namespace, name, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WaitForReadyIssuer")
+	}
+
+	var r0 *v1.Issuer
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyIssuerOpts) (*v1.Issuer, error)); ok {
+		return rf(ctx, namespace, name, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyIssuerOpts) *v1.Issuer); ok {
+		r0 = rf(ctx, namespace, name, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Issuer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyIssuerOpts) error); ok {
+		r1 = rf(ctx, namespace, name, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_WaitForReadyIssuer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForReadyIssuer'
+type MockClientInterface_WaitForReadyIssuer_Call struct {
+	*mock.Call
+}
+
+// WaitForReadyIssuer is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - name string
+//   - opts WaitForReadyIssuerOpts
+func (_e *MockClientInterface_Expecter) WaitForReadyIssuer(ctx interface{}, namespace interface{}, name interface{}, opts interface{}) *MockClientInterface_WaitForReadyIssuer_Call {
+	return &MockClientInterface_WaitForReadyIssuer_Call{Call: _e.mock.On("WaitForReadyIssuer", ctx, namespace, name, opts)}
+}
+
+func (_c *MockClientInterface_WaitForReadyIssuer_Call) Run(run func(ctx context.Context, namespace string, name string, opts WaitForReadyIssuerOpts)) *MockClientInterface_WaitForReadyIssuer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(WaitForReadyIssuerOpts))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_WaitForReadyIssuer_Call) Return(_a0 *v1.Issuer, _a1 error) *MockClientInterface_WaitForReadyIssuer_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_WaitForReadyIssuer_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyIssuerOpts) (*v1.Issuer, error)) *MockClientInterface_WaitForReadyIssuer_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -10,6 +10,11 @@ import (
 )
 
 type ClientInterface interface {
+	// Issuers
+	CreateIssuer(ctx context.Context, namespace, name, caCertSecretName string, opts CreateIssuerOptions) (*certmanagerv1.Issuer, error)
+	WaitForReadyIssuer(ctx context.Context, namespace, name string, opts WaitForReadyIssuerOpts) (*certmanagerv1.Issuer, error)
+	DeleteIssuer(ctx context.Context, namespace, name string) error
+	// Certificates
 	CreateCertificate(ctx context.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error)
 	WaitForReadyCertificate(ctx context.Context, namespace, name string, opts WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error)
 	DeleteCertificate(ctx context.Context, namespace, name string) error

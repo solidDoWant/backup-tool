@@ -118,3 +118,63 @@ func (cmc *Client) DeleteCertificate(ctx context.Context, namespace, name string
 
 	return trace.Wrap(err, "failed to delete certificate %q", helpers.FullNameStr(namespace, name))
 }
+
+type CreateIssuerOptions struct {
+	helpers.GenerateName
+}
+
+func (cmc *Client) CreateIssuer(ctx context.Context, namespace, name, caCertSecretName string, opts CreateIssuerOptions) (*certmanagerv1.Issuer, error) {
+	issuer := &certmanagerv1.Issuer{
+		Spec: certmanagerv1.IssuerSpec{
+			IssuerConfig: certmanagerv1.IssuerConfig{
+				CA: &certmanagerv1.CAIssuer{
+					SecretName: caCertSecretName,
+				},
+			},
+		},
+	}
+
+	opts.SetName(&issuer.ObjectMeta, name)
+
+	issuer, err := cmc.client.CertmanagerV1().Issuers(namespace).Create(ctx, issuer, v1.CreateOptions{})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create issuer %q", helpers.FullNameStr(namespace, name))
+	}
+
+	return issuer, nil
+}
+
+type WaitForReadyIssuerOpts struct {
+	helpers.MaxWaitTime
+}
+
+func (cmc *Client) WaitForReadyIssuer(ctx context.Context, namespace, name string, opts WaitForReadyIssuerOpts) (*certmanagerv1.Issuer, error) {
+	precondition := func(ctx context.Context, issuer *certmanagerv1.Issuer) (*certmanagerv1.Issuer, bool, error) {
+		isReady := false
+		for _, condition := range issuer.Status.Conditions {
+			if condition.Type != certmanagerv1.IssuerConditionReady {
+				continue
+			}
+
+			isReady = condition.Status == cmmeta.ConditionTrue
+			break
+		}
+
+		if isReady {
+			return issuer, true, nil
+		}
+
+		return nil, false, nil
+	}
+	issuer, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), cmc.client.CertmanagerV1().Issuers(namespace), name, precondition)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed waiting for issuer %q to become ready", helpers.FullNameStr(namespace, name))
+	}
+
+	return issuer, nil
+}
+
+func (cmc *Client) DeleteIssuer(ctx context.Context, name, namespace string) error {
+	err := cmc.client.CertmanagerV1().Issuers(namespace).Delete(ctx, name, v1.DeleteOptions{})
+	return trace.Wrap(err, "failed to delete issuer %q", helpers.FullNameStr(namespace, name))
+}
