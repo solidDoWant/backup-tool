@@ -24,24 +24,23 @@ type WaitForReadyEndpointOpts struct {
 }
 
 // Wait for at least one ready endpoint to be available.
-func (c *Client) WaitForReadyEndpoint(ctx context.Context, namespace, name string, opts WaitForReadyEndpointOpts) error {
-	_, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(5*time.Minute), c.client.CoreV1().Endpoints(namespace), name,
-		func(_ context.Context, endpoint *corev1.Endpoints) (interface{}, bool, error) {
-			for _, subset := range endpoint.Subsets {
-				for _, address := range subset.Addresses {
-					if address.IP != "" {
-						return nil, true, nil
-					}
+func (c *Client) WaitForReadyEndpoint(ctx context.Context, namespace, name string, opts WaitForReadyEndpointOpts) (*corev1.Endpoints, error) {
+	processEvent := func(_ context.Context, endpoint *corev1.Endpoints) (*corev1.Endpoints, bool, error) {
+		for _, subset := range endpoint.Subsets {
+			for _, address := range subset.Addresses {
+				if address.IP != "" {
+					return endpoint, true, nil
 				}
 			}
+		}
 
-			return nil, false, nil
-		},
-	)
+		return nil, false, nil
+	}
+	endpoints, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(5*time.Minute), c.client.CoreV1().Endpoints(namespace), name, processEvent)
 
 	if err != nil {
-		return trace.Wrap(err, "failed waiting for endpoint to become ready")
+		return nil, trace.Wrap(err, "failed waiting for endpoint to become ready")
 	}
 
-	return nil
+	return endpoints, nil
 }

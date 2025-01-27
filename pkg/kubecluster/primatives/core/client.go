@@ -13,7 +13,7 @@ import (
 type ClientInterface interface {
 	// Pods
 	CreatePod(ctx context.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) // TODO see if this can be refined further
-	WaitForReadyPod(ctx context.Context, namespace, name string, opts WaitForReadyPodOpts) error
+	WaitForReadyPod(ctx context.Context, namespace, name string, opts WaitForReadyPodOpts) (*corev1.Pod, error)
 	DeletePod(ctx context.Context, namespace, name string) error
 	// PVCs
 	CreatePVC(ctx context.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error)
@@ -23,11 +23,11 @@ type ClientInterface interface {
 	DeleteVolume(ctx context.Context, namespace, volumeName string) error // TODO rename
 	// Services
 	CreateService(ctx context.Context, namespce string, service *corev1.Service) (*corev1.Service, error)
-	WaitForReadyService(ctx context.Context, namespace, name string, opts WaitForReadyServiceOpts) error
+	WaitForReadyService(ctx context.Context, namespace, name string, opts WaitForReadyServiceOpts) (*corev1.Service, error)
 	DeleteService(ctx context.Context, namespace, name string) error
 	// Endpoints
 	GetEndpoint(ctx context.Context, namespace, name string) (*corev1.Endpoints, error)
-	WaitForReadyEndpoint(ctx context.Context, namespace, name string, opts WaitForReadyEndpointOpts) error
+	WaitForReadyEndpoint(ctx context.Context, namespace, name string, opts WaitForReadyEndpointOpts) (*corev1.Endpoints, error)
 }
 
 type Client struct {

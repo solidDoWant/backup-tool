@@ -159,7 +159,7 @@ func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instan
 	}
 	btInstance.setPod(pod)
 
-	err = c.Core().WaitForReadyPod(ctx, namespace, pod.Name, core.WaitForReadyPodOpts{MaxWaitTime: opts.PodWaitTimeout})
+	readyPod, err := c.Core().WaitForReadyPod(ctx, namespace, pod.Name, core.WaitForReadyPodOpts{MaxWaitTime: opts.PodWaitTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for pod %q to become ready", helpers.FullNameStr(namespace, pod.Name))
 	}
@@ -174,7 +174,7 @@ func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instan
 			GenerateName: namePrefix,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: pod.Labels,
+			Selector: readyPod.Labels,
 			Type:     serviceType,
 			Ports: lo.Map(container.Ports, func(port corev1.ContainerPort, _ int) corev1.ServicePort {
 				return core.ContainerPortToServicePort(port)
@@ -188,7 +188,7 @@ func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instan
 	}
 	btInstance.setService(service)
 
-	err = c.Core().WaitForReadyService(ctx, namespace, service.Name, core.WaitForReadyServiceOpts{MaxWaitTime: opts.ServiceWaitTimeout})
+	_, err = c.Core().WaitForReadyService(ctx, namespace, service.Name, core.WaitForReadyServiceOpts{MaxWaitTime: opts.ServiceWaitTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for service %q to become ready", helpers.FullNameStr(namespace, service.Name))
 	}

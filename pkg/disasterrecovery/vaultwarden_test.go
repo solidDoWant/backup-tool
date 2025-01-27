@@ -300,9 +300,9 @@ func TestVaultWardenBackup(t *testing.T) {
 				}
 
 				mockESClient.EXPECT().WaitForReadySnapshot(ctx, namespace, mock.Anything, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: tt.backupOptions.SnapshotReadyTimeout}).
-					RunAndReturn(func(ctx context.Context, namespace, snapsnotName string, wfrso externalsnapshotter.WaitForReadySnapshotOpts) error {
+					RunAndReturn(func(ctx context.Context, namespace, snapsnotName string, wfrso externalsnapshotter.WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error) {
 						require.Equal(t, fullBackupName, snapsnotName)
-						return th.ErrIfTrue(tt.simulateWaitSnapErr)
+						return th.ErrOr1Val(&volumesnapshotv1.VolumeSnapshot{}, tt.simulateWaitSnapErr)
 					})
 			}()
 

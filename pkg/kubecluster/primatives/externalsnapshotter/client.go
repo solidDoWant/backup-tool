@@ -11,7 +11,7 @@ import (
 
 type ClientInterface interface {
 	SnapshotVolume(context.Context, string, string, SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error)
-	WaitForReadySnapshot(ctx context.Context, namespace, name string, opts WaitForReadySnapshotOpts) error
+	WaitForReadySnapshot(ctx context.Context, namespace, name string, opts WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error)
 	DeleteSnapshot(context.Context, string, string) error
 }
 

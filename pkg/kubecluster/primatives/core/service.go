@@ -43,41 +43,43 @@ type WaitForReadyServiceOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (c *Client) WaitForReadyService(ctx context.Context, namespace, name string, opts WaitForReadyServiceOpts) error {
-	_, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), c.client.CoreV1().Services(namespace), name,
-		func(_ context.Context, service *corev1.Service) (interface{}, bool, error) {
-			switch service.Spec.Type {
-			case corev1.ServiceTypeExternalName:
-				fallthrough
-			case corev1.ServiceTypeLoadBalancer:
-				// Ensure that at least one LB IP or hostname has been assigned
-				externallyReady := lo.ContainsBy(service.Status.LoadBalancer.Ingress, func(ingress corev1.LoadBalancerIngress) bool {
-					return ingress.IP != "" || ingress.Hostname != ""
-				})
-				if !externallyReady {
-					return nil, false, nil
-				}
-			case corev1.ServiceTypeNodePort:
-				fallthrough
-			case corev1.ServiceTypeClusterIP:
-				hasClusterIPSet := service.Spec.ClusterIP != "" || len(service.Spec.ClusterIPs) > 0
-				return nil, hasClusterIPSet, nil
+func (c *Client) WaitForReadyService(ctx context.Context, namespace, name string, opts WaitForReadyServiceOpts) (*corev1.Service, error) {
+	processEvent := func(_ context.Context, service *corev1.Service) (*corev1.Service, bool, error) {
+		switch service.Spec.Type {
+		case corev1.ServiceTypeExternalName:
+			fallthrough
+		case corev1.ServiceTypeLoadBalancer:
+			// Ensure that at least one LB IP or hostname has been assigned
+			externallyReady := lo.ContainsBy(service.Status.LoadBalancer.Ingress, func(ingress corev1.LoadBalancerIngress) bool {
+				return ingress.IP != "" || ingress.Hostname != ""
+			})
+			if !externallyReady {
+				return nil, false, nil
 			}
+		case corev1.ServiceTypeNodePort:
+			fallthrough
+		case corev1.ServiceTypeClusterIP:
+			hasClusterIPSet := service.Spec.ClusterIP != "" || len(service.Spec.ClusterIPs) > 0
+			if hasClusterIPSet {
+				return service, true, nil
+			}
+			return nil, false, nil
+		}
 
-			return nil, true, nil
-		},
-	)
+		return service, true, nil
+	}
+	service, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), c.client.CoreV1().Services(namespace), name, processEvent)
 
 	if err != nil {
-		return trace.Wrap(err, "failed waiting for service to become ready")
+		return nil, trace.Wrap(err, "failed waiting for service to become ready")
 	}
 
-	err = c.WaitForReadyEndpoint(ctx, namespace, name, WaitForReadyEndpointOpts(opts))
+	_, err = c.WaitForReadyEndpoint(ctx, namespace, name, WaitForReadyEndpointOpts(opts))
 	if err != nil {
-		return trace.Wrap(err, "failed waiting for at least one service endpoint to become ready")
+		return nil, trace.Wrap(err, "failed waiting for at least one service endpoint to become ready")
 	}
 
-	return nil
+	return service, nil
 }
 
 func (c *Client) DeleteService(ctx context.Context, namespace, name string) error {

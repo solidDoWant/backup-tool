@@ -97,7 +97,7 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 		return cleanupErr
 	}).WithErrMessage("cleanup failed").WithOriginalErr(&err).Run()
 
-	err = c.CNPG().WaitForReadyBackup(ctx, namespace, backup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: opts.WaitForBackupTimeout})
+	readyBackup, err := c.CNPG().WaitForReadyBackup(ctx, namespace, backup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: opts.WaitForBackupTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait forbackup %q to be ready", helpers.FullName(backup))
 	}
@@ -124,10 +124,11 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 	}
 	cluster.setServingCert(servingCert)
 
-	err = c.CM().WaitForReadyCertificate(ctx, namespace, servingCertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.WaitForServingCertTimeout})
+	readyServingCert, err := c.CM().WaitForReadyCertificate(ctx, namespace, servingCertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.WaitForServingCertTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for serving certificate %q to be ready", helpers.FullName(servingCert))
 	}
+	cluster.setServingCert(readyServingCert)
 
 	// 3. Create the client certificate (short lived). This is the only certificate that the cluster will trust for client auth.
 	clientUserName := "postgres" // Postgres superuser, which has access to all databases
@@ -147,18 +148,19 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 
 	clientCert, err := c.CM().CreateCertificate(ctx, clientCertName, namespace, clientCertIssuerName, certOptions)
 	if err != nil {
-		return errHandler(err, "failed to create %q user cert %q", clientUserName, helpers.FullNameStr(namespace, servingCertName))
+		return errHandler(err, "failed to create %q user cert %q", clientUserName, helpers.FullNameStr(namespace, clientCertName))
 	}
 	cluster.setClientCert(clientCert)
 
-	err = c.CM().WaitForReadyCertificate(ctx, namespace, clientCertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.WaitForClientCertTimeout})
+	readyClientCert, err := c.CM().WaitForReadyCertificate(ctx, namespace, clientCertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.WaitForClientCertTimeout})
 	if err != nil {
-		return errHandler(err, "failed to wait for %q user certificate %q to be ready", clientUserName, helpers.FullName(servingCert))
+		return errHandler(err, "failed to wait for %q user certificate %q to be ready", clientUserName, helpers.FullName(readyServingCert))
 	}
+	cluster.setClientCert(readyClientCert)
 
 	// 4. Create a new cluster from the backup
 	clusterOpts := cnpg.CreateClusterOptions{
-		BackupName: backup.Name,
+		BackupName: readyBackup.Name,
 	}
 
 	if opts.RecoveryTargetTime != "" {
@@ -170,14 +172,15 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 	newCluster, err := c.CNPG().CreateCluster(ctx, namespace, newClusterName, clusterVolumeSize, servingCertName, clientCertName, clusterOpts)
 	if err != nil {
 		return errHandler(err, "failed to create new cluster %q from backup %q with serving certificate %q and client certificate %q",
-			helpers.FullNameStr(namespace, newClusterName), helpers.FullName(backup), helpers.FullName(servingCert), helpers.FullName(clientCert))
+			helpers.FullNameStr(namespace, newClusterName), helpers.FullName(readyBackup), helpers.FullName(readyServingCert), helpers.FullName(readyClientCert))
 	}
 	cluster.setCluster(newCluster)
 
-	err = c.CNPG().WaitForReadyCluster(ctx, namespace, newClusterName, cnpg.WaitForReadyClusterOpts{MaxWaitTime: opts.WaitForClusterTimeout})
+	readyCluster, err := c.CNPG().WaitForReadyCluster(ctx, namespace, newClusterName, cnpg.WaitForReadyClusterOpts{MaxWaitTime: opts.WaitForClusterTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for new cluster %q to become ready", helpers.FullNameStr(namespace, newClusterName))
 	}
+	cluster.setCluster(readyCluster)
 
 	return cluster, nil
 }

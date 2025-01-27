@@ -591,21 +591,33 @@ func (_c *MockClientInterface_GetPVC_Call) RunAndReturn(run func(context.Context
 }
 
 // WaitForReadyEndpoint provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyEndpoint(ctx context.Context, namespace string, name string, opts WaitForReadyEndpointOpts) error {
+func (_m *MockClientInterface) WaitForReadyEndpoint(ctx context.Context, namespace string, name string, opts WaitForReadyEndpointOpts) (*v1.Endpoints, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WaitForReadyEndpoint")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyEndpointOpts) error); ok {
+	var r0 *v1.Endpoints
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyEndpointOpts) (*v1.Endpoints, error)); ok {
+		return rf(ctx, namespace, name, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyEndpointOpts) *v1.Endpoints); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Endpoints)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyEndpointOpts) error); ok {
+		r1 = rf(ctx, namespace, name, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockClientInterface_WaitForReadyEndpoint_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForReadyEndpoint'
@@ -629,32 +641,44 @@ func (_c *MockClientInterface_WaitForReadyEndpoint_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyEndpoint_Call) Return(_a0 error) *MockClientInterface_WaitForReadyEndpoint_Call {
-	_c.Call.Return(_a0)
+func (_c *MockClientInterface_WaitForReadyEndpoint_Call) Return(_a0 *v1.Endpoints, _a1 error) *MockClientInterface_WaitForReadyEndpoint_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyEndpoint_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyEndpointOpts) error) *MockClientInterface_WaitForReadyEndpoint_Call {
+func (_c *MockClientInterface_WaitForReadyEndpoint_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyEndpointOpts) (*v1.Endpoints, error)) *MockClientInterface_WaitForReadyEndpoint_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // WaitForReadyPod provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyPod(ctx context.Context, namespace string, name string, opts WaitForReadyPodOpts) error {
+func (_m *MockClientInterface) WaitForReadyPod(ctx context.Context, namespace string, name string, opts WaitForReadyPodOpts) (*v1.Pod, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WaitForReadyPod")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyPodOpts) error); ok {
+	var r0 *v1.Pod
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyPodOpts) (*v1.Pod, error)); ok {
+		return rf(ctx, namespace, name, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyPodOpts) *v1.Pod); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Pod)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyPodOpts) error); ok {
+		r1 = rf(ctx, namespace, name, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockClientInterface_WaitForReadyPod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForReadyPod'
@@ -678,32 +702,44 @@ func (_c *MockClientInterface_WaitForReadyPod_Call) Run(run func(ctx context.Con
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyPod_Call) Return(_a0 error) *MockClientInterface_WaitForReadyPod_Call {
-	_c.Call.Return(_a0)
+func (_c *MockClientInterface_WaitForReadyPod_Call) Return(_a0 *v1.Pod, _a1 error) *MockClientInterface_WaitForReadyPod_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyPod_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyPodOpts) error) *MockClientInterface_WaitForReadyPod_Call {
+func (_c *MockClientInterface_WaitForReadyPod_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyPodOpts) (*v1.Pod, error)) *MockClientInterface_WaitForReadyPod_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // WaitForReadyService provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyService(ctx context.Context, namespace string, name string, opts WaitForReadyServiceOpts) error {
+func (_m *MockClientInterface) WaitForReadyService(ctx context.Context, namespace string, name string, opts WaitForReadyServiceOpts) (*v1.Service, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WaitForReadyService")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyServiceOpts) error); ok {
+	var r0 *v1.Service
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyServiceOpts) (*v1.Service, error)); ok {
+		return rf(ctx, namespace, name, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyServiceOpts) *v1.Service); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Service)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyServiceOpts) error); ok {
+		r1 = rf(ctx, namespace, name, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockClientInterface_WaitForReadyService_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForReadyService'
@@ -727,12 +763,12 @@ func (_c *MockClientInterface_WaitForReadyService_Call) Run(run func(ctx context
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyService_Call) Return(_a0 error) *MockClientInterface_WaitForReadyService_Call {
-	_c.Call.Return(_a0)
+func (_c *MockClientInterface_WaitForReadyService_Call) Return(_a0 *v1.Service, _a1 error) *MockClientInterface_WaitForReadyService_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyService_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyServiceOpts) error) *MockClientInterface_WaitForReadyService_Call {
+func (_c *MockClientInterface_WaitForReadyService_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyServiceOpts) (*v1.Service, error)) *MockClientInterface_WaitForReadyService_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -142,7 +142,7 @@ func TestClonePVC(t *testing.T) {
 			simulateSnapshotErr: true,
 		},
 		{
-			desc:                       "snapshot error",
+			desc:                       "wait for snapshot error",
 			simulateWaitForSnapshotErr: true,
 		},
 		{
@@ -233,8 +233,9 @@ func TestClonePVC(t *testing.T) {
 			// This makes the logic for setting up mocks/expected calls easier, because once an error
 			// becomes expected, the function can be returned from
 			func() {
+				snapshot := th.ValOrDefault(tt.createdSnapshot, createdSnapshot)
 				c.esClient.EXPECT().SnapshotVolume(ctx, namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{}).
-					Return(th.ErrOr1Val(th.ValOrDefault(tt.createdSnapshot, createdSnapshot), tt.simulateSnapshotErr))
+					Return(th.ErrOr1Val(snapshot, tt.simulateSnapshotErr))
 				if tt.simulateSnapshotErr {
 					return
 				}
@@ -245,7 +246,7 @@ func TestClonePVC(t *testing.T) {
 				})
 
 				c.esClient.EXPECT().WaitForReadySnapshot(ctx, namespace, snapshotName, mock.Anything).
-					Return(th.ErrIfTrue(tt.simulateWaitForSnapshotErr))
+					Return(th.ErrOr1Val(snapshot, tt.simulateWaitForSnapshotErr))
 				if tt.simulateWaitForSnapshotErr {
 					return
 				}

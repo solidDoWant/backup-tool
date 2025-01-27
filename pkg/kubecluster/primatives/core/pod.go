@@ -23,23 +23,25 @@ type WaitForReadyPodOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (c *Client) WaitForReadyPod(ctx context.Context, namespace, name string, opts WaitForReadyPodOpts) error {
-	_, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), c.client.CoreV1().Pods(namespace), name,
-		func(_ context.Context, pod *corev1.Pod) (interface{}, bool, error) {
-			for _, condition := range pod.Status.Conditions {
-				if condition.Type == corev1.PodReady {
-					return nil, condition.Status == corev1.ConditionTrue, nil
+func (c *Client) WaitForReadyPod(ctx context.Context, namespace, name string, opts WaitForReadyPodOpts) (*corev1.Pod, error) {
+	processEvent := func(_ context.Context, pod *corev1.Pod) (*corev1.Pod, bool, error) {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodReady {
+				if condition.Status == corev1.ConditionTrue {
+					return pod, true, nil
 				}
+				return nil, false, nil
 			}
-			return nil, false, nil
-		},
-	)
+		}
+		return nil, false, nil
+	}
+	pod, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), c.client.CoreV1().Pods(namespace), name, processEvent)
 
 	if err != nil {
-		return trace.Wrap(err, "failed waiting for pod to become ready")
+		return nil, trace.Wrap(err, "failed waiting for pod to become ready")
 	}
 
-	return nil
+	return pod, nil
 }
 
 func (c *Client) DeletePod(ctx context.Context, namespace, name string) error {

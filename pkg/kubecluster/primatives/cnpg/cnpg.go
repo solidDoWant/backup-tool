@@ -61,11 +61,11 @@ type WaitForReadyBackupOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (cnpgc *Client) WaitForReadyBackup(ctx context.Context, namespace, name string, opts WaitForReadyBackupOpts) error {
-	precondition := func(_ context.Context, backup *apiv1.Backup) (interface{}, bool, error) {
+func (cnpgc *Client) WaitForReadyBackup(ctx context.Context, namespace, name string, opts WaitForReadyBackupOpts) (*apiv1.Backup, error) {
+	precondition := func(_ context.Context, backup *apiv1.Backup) (*apiv1.Backup, bool, error) {
 		switch backup.Status.Phase {
 		case apiv1.BackupPhaseCompleted:
-			return nil, true, nil
+			return backup, true, nil
 		case apiv1.BackupPhaseFailed:
 			fallthrough
 		case apiv1.BackupPhaseWalArchivingFailing:
@@ -74,9 +74,12 @@ func (cnpgc *Client) WaitForReadyBackup(ctx context.Context, namespace, name str
 			return nil, false, nil
 		}
 	}
-	_, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(10*time.Minute), cnpgc.cnpgClient.PostgresqlV1().Backups(namespace), name, precondition)
+	backup, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(10*time.Minute), cnpgc.cnpgClient.PostgresqlV1().Backups(namespace), name, precondition)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed waiting for backup %q to become ready", helpers.FullNameStr(namespace, name))
+	}
 
-	return trace.Wrap(err, "failed waiting for backup %q to become ready", helpers.FullNameStr(namespace, name))
+	return backup, nil
 }
 
 func (cnpgc *Client) DeleteBackup(ctx context.Context, namespace, name string) error {
@@ -176,8 +179,8 @@ type WaitForReadyClusterOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (cnpgc *Client) WaitForReadyCluster(ctx context.Context, namespace, name string, opts WaitForReadyClusterOpts) error {
-	precondition := func(_ context.Context, cluster *apiv1.Cluster) (interface{}, bool, error) {
+func (cnpgc *Client) WaitForReadyCluster(ctx context.Context, namespace, name string, opts WaitForReadyClusterOpts) (*apiv1.Cluster, error) {
+	precondition := func(_ context.Context, cluster *apiv1.Cluster) (*apiv1.Cluster, bool, error) {
 		isReady := false
 		for _, condition := range cluster.Status.Conditions {
 			if condition.Type != string(apiv1.ConditionClusterReady) {
@@ -188,11 +191,17 @@ func (cnpgc *Client) WaitForReadyCluster(ctx context.Context, namespace, name st
 			break
 		}
 
-		return nil, isReady, nil
+		if isReady {
+			return cluster, true, nil
+		}
+		return nil, false, nil
 	}
-	_, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(10*time.Minute), cnpgc.cnpgClient.PostgresqlV1().Clusters(namespace), name, precondition)
+	cluster, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(10*time.Minute), cnpgc.cnpgClient.PostgresqlV1().Clusters(namespace), name, precondition)
 
-	return trace.Wrap(err, "failed waiting for cluster %q to become ready", helpers.FullNameStr(namespace, name))
+	if err != nil {
+		return nil, trace.Wrap(err, "failed waiting for cluster %q to become ready", helpers.FullNameStr(namespace, name))
+	}
+	return cluster, nil
 }
 
 func (cnpgc *Client) GetCluster(ctx context.Context, namespace, name string) (*apiv1.Cluster, error) {

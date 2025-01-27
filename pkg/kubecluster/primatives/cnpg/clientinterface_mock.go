@@ -307,21 +307,33 @@ func (_c *MockClientInterface_GetCluster_Call) RunAndReturn(run func(context.Con
 }
 
 // WaitForReadyBackup provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyBackup(ctx context.Context, namespace string, name string, opts WaitForReadyBackupOpts) error {
+func (_m *MockClientInterface) WaitForReadyBackup(ctx context.Context, namespace string, name string, opts WaitForReadyBackupOpts) (*v1.Backup, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WaitForReadyBackup")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyBackupOpts) error); ok {
+	var r0 *v1.Backup
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyBackupOpts) (*v1.Backup, error)); ok {
+		return rf(ctx, namespace, name, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyBackupOpts) *v1.Backup); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Backup)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyBackupOpts) error); ok {
+		r1 = rf(ctx, namespace, name, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockClientInterface_WaitForReadyBackup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForReadyBackup'
@@ -345,32 +357,44 @@ func (_c *MockClientInterface_WaitForReadyBackup_Call) Run(run func(ctx context.
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyBackup_Call) Return(_a0 error) *MockClientInterface_WaitForReadyBackup_Call {
-	_c.Call.Return(_a0)
+func (_c *MockClientInterface_WaitForReadyBackup_Call) Return(_a0 *v1.Backup, _a1 error) *MockClientInterface_WaitForReadyBackup_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyBackup_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyBackupOpts) error) *MockClientInterface_WaitForReadyBackup_Call {
+func (_c *MockClientInterface_WaitForReadyBackup_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyBackupOpts) (*v1.Backup, error)) *MockClientInterface_WaitForReadyBackup_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // WaitForReadyCluster provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyCluster(ctx context.Context, namespace string, name string, opts WaitForReadyClusterOpts) error {
+func (_m *MockClientInterface) WaitForReadyCluster(ctx context.Context, namespace string, name string, opts WaitForReadyClusterOpts) (*v1.Cluster, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WaitForReadyCluster")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyClusterOpts) error); ok {
+	var r0 *v1.Cluster
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyClusterOpts) (*v1.Cluster, error)); ok {
+		return rf(ctx, namespace, name, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyClusterOpts) *v1.Cluster); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Cluster)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyClusterOpts) error); ok {
+		r1 = rf(ctx, namespace, name, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockClientInterface_WaitForReadyCluster_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForReadyCluster'
@@ -394,12 +418,12 @@ func (_c *MockClientInterface_WaitForReadyCluster_Call) Run(run func(ctx context
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyCluster_Call) Return(_a0 error) *MockClientInterface_WaitForReadyCluster_Call {
-	_c.Call.Return(_a0)
+func (_c *MockClientInterface_WaitForReadyCluster_Call) Return(_a0 *v1.Cluster, _a1 error) *MockClientInterface_WaitForReadyCluster_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyCluster_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyClusterOpts) error) *MockClientInterface_WaitForReadyCluster_Call {
+func (_c *MockClientInterface_WaitForReadyCluster_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyClusterOpts) (*v1.Cluster, error)) *MockClientInterface_WaitForReadyCluster_Call {
 	_c.Call.Return(run)
 	return _c
 }

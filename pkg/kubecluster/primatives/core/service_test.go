@@ -244,9 +244,10 @@ func TestWaitForReadyService(t *testing.T) {
 
 			var wg sync.WaitGroup
 			var waitErr error
+			var service *corev1.Service
 			wg.Add(1)
 			go func() {
-				waitErr = c.WaitForReadyService(ctx, namespace, serviceName, WaitForReadyServiceOpts{MaxWaitTime: helpers.ShortWaitTime})
+				service, waitErr = c.WaitForReadyService(ctx, namespace, serviceName, WaitForReadyServiceOpts{MaxWaitTime: helpers.ShortWaitTime})
 				wg.Done()
 			}()
 
@@ -258,9 +259,11 @@ func TestWaitForReadyService(t *testing.T) {
 			wg.Wait()
 			if tt.shouldError {
 				assert.Error(t, waitErr)
+				assert.Nil(t, service)
 				return
 			}
 			assert.NoError(t, waitErr)
+			assert.NotNil(t, service)
 		})
 	}
 }

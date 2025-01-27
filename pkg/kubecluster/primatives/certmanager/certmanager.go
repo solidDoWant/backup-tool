@@ -84,8 +84,8 @@ type WaitForReadyCertificateOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (cmc *Client) WaitForReadyCertificate(ctx context.Context, namespace, name string, opts WaitForReadyCertificateOpts) error {
-	precondition := func(ctx context.Context, certificate *certmanagerv1.Certificate) (interface{}, bool, error) {
+func (cmc *Client) WaitForReadyCertificate(ctx context.Context, namespace, name string, opts WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error) {
+	precondition := func(ctx context.Context, certificate *certmanagerv1.Certificate) (*certmanagerv1.Certificate, bool, error) {
 		isReady := false
 		for _, condition := range certificate.Status.Conditions {
 			if condition.Type != certmanagerv1.CertificateConditionReady {
@@ -96,11 +96,18 @@ func (cmc *Client) WaitForReadyCertificate(ctx context.Context, namespace, name 
 			break
 		}
 
-		return nil, isReady, nil
-	}
-	_, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), cmc.client.CertmanagerV1().Certificates(namespace), name, precondition)
+		if isReady {
+			return certificate, true, nil
+		}
 
-	return trace.Wrap(err, "failed waiting for certificate %q to become ready", helpers.FullNameStr(namespace, name))
+		return nil, false, nil
+	}
+	certificate, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), cmc.client.CertmanagerV1().Certificates(namespace), name, precondition)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed waiting for certificate %q to become ready", helpers.FullNameStr(namespace, name))
+	}
+
+	return certificate, nil
 }
 
 func (cmc *Client) DeleteCertificate(ctx context.Context, name, namespace string) error {

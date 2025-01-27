@@ -33,7 +33,7 @@ func (c *Client) ClonePVC(ctx context.Context, namespace, pvcName string, opts C
 		return c.ES().DeleteSnapshot(ctx, namespace, snapshot.Name)
 	}).WithErrMessage("failed to delete created snapshot for PVC %q", helpers.FullNameStr(namespace, pvcName)).WithOriginalErr(&err).Run()
 
-	err = c.ES().WaitForReadySnapshot(ctx, namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: helpers.ShortWaitTime})
+	readySnapshot, err := c.ES().WaitForReadySnapshot(ctx, namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: opts.WaitForSnapshotTimeout})
 	if err != nil {
 		err = trace.Wrap(err, "failed to wait for snapshot %q to become ready", helpers.FullName(snapshot))
 		return
@@ -63,10 +63,10 @@ func (c *Client) ClonePVC(ctx context.Context, namespace, pvcName string, opts C
 
 	// TODO add an override option for this
 	var size resource.Quantity
-	if snapshot.Status != nil && snapshot.Status.RestoreSize != nil {
-		size = *snapshot.Status.RestoreSize
+	if readySnapshot.Status != nil && readySnapshot.Status.RestoreSize != nil {
+		size = *readySnapshot.Status.RestoreSize
 	} else {
-		err = trace.Errorf("snapshot %q does not have a restore size", helpers.FullName(snapshot))
+		err = trace.Errorf("snapshot %q does not have a restore size", helpers.FullName(readySnapshot))
 		return
 	}
 
@@ -76,11 +76,11 @@ func (c *Client) ClonePVC(ctx context.Context, namespace, pvcName string, opts C
 		Source: &corev1.TypedObjectReference{
 			APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Identifier()),
 			Kind:     externalsnapshotter.VolumeSnapshotKind,
-			Name:     snapshot.Name,
+			Name:     readySnapshot.Name,
 		},
 	})
 	if err != nil {
-		err = trace.Wrap(err, "failed to create volume from created snapshot %q", helpers.FullName(snapshot))
+		err = trace.Wrap(err, "failed to create volume from created snapshot %q", helpers.FullName(readySnapshot))
 		return
 	}
 

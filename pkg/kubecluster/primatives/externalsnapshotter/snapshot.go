@@ -44,8 +44,8 @@ type WaitForReadySnapshotOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (c *Client) WaitForReadySnapshot(ctx context.Context, namespace, name string, opts WaitForReadySnapshotOpts) error {
-	_, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(10*time.Minute), c.client.SnapshotV1().VolumeSnapshots(namespace), name, func(_ context.Context, snapshot *volumesnapshotv1.VolumeSnapshot) (interface{}, bool, error) {
+func (c *Client) WaitForReadySnapshot(ctx context.Context, namespace, name string, opts WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error) {
+	processEvent := func(_ context.Context, snapshot *volumesnapshotv1.VolumeSnapshot) (*volumesnapshotv1.VolumeSnapshot, bool, error) {
 		if snapshot.Status == nil {
 			return nil, false, nil
 		}
@@ -58,14 +58,19 @@ func (c *Client) WaitForReadySnapshot(ctx context.Context, namespace, name strin
 			return nil, false, nil
 		}
 
-		return nil, *snapshot.Status.ReadyToUse, nil
-	})
-
-	if err != nil {
-		return trace.Wrap(err, "failed waiting for snapshot to become ready")
+		if *snapshot.Status.ReadyToUse {
+			return snapshot, true, nil
+		}
+		return nil, false, nil
 	}
 
-	return nil
+	snapshot, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(10*time.Minute), c.client.SnapshotV1().VolumeSnapshots(namespace), name, processEvent)
+
+	if err != nil {
+		return nil, trace.Wrap(err, "failed waiting for snapshot to become ready")
+	}
+
+	return snapshot, nil
 }
 
 func (c *Client) DeleteSnapshot(ctx context.Context, namespace, snapshotName string) error {

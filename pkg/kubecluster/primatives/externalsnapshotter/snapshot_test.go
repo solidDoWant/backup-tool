@@ -149,9 +149,10 @@ func TestWaitForReadySnapshot(t *testing.T) {
 
 			var wg sync.WaitGroup
 			var waitErr error
+			var snapshot *volumesnapshotv1.VolumeSnapshot
 			wg.Add(1)
 			go func() {
-				waitErr = c.WaitForReadySnapshot(ctx, podNamespace, snapshotName, WaitForReadySnapshotOpts{MaxWaitTime: helpers.ShortWaitTime})
+				snapshot, waitErr = c.WaitForReadySnapshot(ctx, podNamespace, snapshotName, WaitForReadySnapshotOpts{MaxWaitTime: helpers.ShortWaitTime})
 				wg.Done()
 			}()
 
@@ -163,9 +164,11 @@ func TestWaitForReadySnapshot(t *testing.T) {
 			wg.Wait()
 			if tt.shouldError {
 				assert.Error(t, waitErr)
+				assert.Nil(t, snapshot)
 				return
 			}
 			assert.NoError(t, waitErr)
+			assert.NotNil(t, snapshot)
 		})
 	}
 }

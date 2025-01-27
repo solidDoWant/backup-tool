@@ -343,7 +343,7 @@ func TestCloneCluster(t *testing.T) {
 
 				c.cnpgClient.EXPECT().DeleteBackup(mock.Anything, namespace, createdBackup.Name).Return(th.ErrIfTrue(tt.simulateBackupCleanupError))
 				c.cnpgClient.EXPECT().WaitForReadyBackup(ctx, namespace, createdBackup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: tt.opts.WaitForBackupTimeout}).
-					Return(th.ErrIfTrue(tt.simulateWaitingForBackupError))
+					Return(th.ErrOr1Val(createdBackup, tt.simulateWaitingForBackupError))
 				if tt.simulateWaitingForBackupError {
 					return
 				}
@@ -364,10 +364,11 @@ func TestCloneCluster(t *testing.T) {
 
 				c.clonedCluster.EXPECT().setServingCert(createdServingCert).Return()
 				c.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdServingCert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.WaitForServingCertTimeout}).
-					Return(th.ErrIfTrue(tt.simulateWaitForServingCertError))
+					Return(th.ErrOr1Val(createdServingCert, tt.simulateWaitForServingCertError))
 				if tt.simulateWaitForServingCertError {
 					return
 				}
+				c.clonedCluster.EXPECT().setServingCert(createdServingCert).Return()
 
 				c.cmClient.EXPECT().CreateCertificate(ctx, createdClientCert.Name, namespace, clientIssuerName, certmanager.CreateCertificateOptions{
 					CommonName: "postgres",
@@ -384,10 +385,11 @@ func TestCloneCluster(t *testing.T) {
 
 				c.clonedCluster.EXPECT().setClientCert(createdClientCert).Return()
 				c.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdClientCert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.WaitForClientCertTimeout}).
-					Return(th.ErrIfTrue(tt.simulateWaitForClientCertError))
+					Return(th.ErrOr1Val(createdClientCert, tt.simulateWaitForClientCertError))
 				if tt.simulateWaitForClientCertError {
 					return
 				}
+				c.clonedCluster.EXPECT().setClientCert(createdClientCert).Return()
 
 				c.cnpgClient.EXPECT().CreateCluster(ctx, namespace, newCluster.Name, resource.MustParse(existingCluster.Spec.StorageConfiguration.Size), createdServingCert.Name, createdClientCert.Name, clusterOpts).
 					Return(th.ErrOr1Val(newCluster, tt.simulateClusterCreationError))
@@ -397,7 +399,12 @@ func TestCloneCluster(t *testing.T) {
 
 				c.clonedCluster.EXPECT().setCluster(newCluster).Return()
 				c.cnpgClient.EXPECT().WaitForReadyCluster(ctx, namespace, newCluster.Name, cnpg.WaitForReadyClusterOpts{MaxWaitTime: tt.opts.WaitForClusterTimeout}).
-					Return(th.ErrIfTrue(tt.simulateWaitForClusterError))
+					Return(th.ErrOr1Val(newCluster, tt.simulateWaitForClusterError))
+				if tt.simulateWaitForClusterError {
+					return
+				}
+
+				c.clonedCluster.EXPECT().setCluster(newCluster).Return()
 			}()
 
 			// Run the function

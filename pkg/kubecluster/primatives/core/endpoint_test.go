@@ -144,9 +144,10 @@ func TestWaitForReadyEndpoint(t *testing.T) {
 
 			var wg sync.WaitGroup
 			var waitErr error
+			var endpoints *corev1.Endpoints
 			wg.Add(1)
 			go func() {
-				waitErr = c.WaitForReadyEndpoint(ctx, namespace, endpointName, WaitForReadyEndpointOpts{MaxWaitTime: helpers.ShortWaitTime})
+				endpoints, waitErr = c.WaitForReadyEndpoint(ctx, namespace, endpointName, WaitForReadyEndpointOpts{MaxWaitTime: helpers.ShortWaitTime})
 				wg.Done()
 			}()
 
@@ -158,9 +159,11 @@ func TestWaitForReadyEndpoint(t *testing.T) {
 			wg.Wait()
 			if tt.shouldError {
 				assert.Error(t, waitErr)
+				assert.Nil(t, endpoints)
 				return
 			}
 			assert.NoError(t, waitErr)
+			assert.NotNil(t, endpoints)
 		})
 	}
 }

@@ -132,21 +132,33 @@ func (_c *MockClientInterface_SnapshotVolume_Call) RunAndReturn(run func(context
 }
 
 // WaitForReadySnapshot provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadySnapshot(ctx context.Context, namespace string, name string, opts WaitForReadySnapshotOpts) error {
+func (_m *MockClientInterface) WaitForReadySnapshot(ctx context.Context, namespace string, name string, opts WaitForReadySnapshotOpts) (*v1.VolumeSnapshot, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WaitForReadySnapshot")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadySnapshotOpts) error); ok {
+	var r0 *v1.VolumeSnapshot
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadySnapshotOpts) (*v1.VolumeSnapshot, error)); ok {
+		return rf(ctx, namespace, name, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadySnapshotOpts) *v1.VolumeSnapshot); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.VolumeSnapshot)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadySnapshotOpts) error); ok {
+		r1 = rf(ctx, namespace, name, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockClientInterface_WaitForReadySnapshot_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForReadySnapshot'
@@ -170,12 +182,12 @@ func (_c *MockClientInterface_WaitForReadySnapshot_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadySnapshot_Call) Return(_a0 error) *MockClientInterface_WaitForReadySnapshot_Call {
-	_c.Call.Return(_a0)
+func (_c *MockClientInterface_WaitForReadySnapshot_Call) Return(_a0 *v1.VolumeSnapshot, _a1 error) *MockClientInterface_WaitForReadySnapshot_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadySnapshot_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadySnapshotOpts) error) *MockClientInterface_WaitForReadySnapshot_Call {
+func (_c *MockClientInterface_WaitForReadySnapshot_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadySnapshotOpts) (*v1.VolumeSnapshot, error)) *MockClientInterface_WaitForReadySnapshot_Call {
 	_c.Call.Return(run)
 	return _c
 }

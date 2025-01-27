@@ -11,7 +11,7 @@ import (
 
 type ClientInterface interface {
 	CreateCertificate(ctx context.Context, name, namespace, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error)
-	WaitForReadyCertificate(ctx context.Context, namespace, name string, opts WaitForReadyCertificateOpts) error
+	WaitForReadyCertificate(ctx context.Context, namespace, name string, opts WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error)
 	DeleteCertificate(ctx context.Context, name, namespace string) error
 }
 

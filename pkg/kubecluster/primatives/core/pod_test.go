@@ -144,9 +144,10 @@ func TestWaitForReadyPod(t *testing.T) {
 
 			var wg sync.WaitGroup
 			var waitErr error
+			var pod *corev1.Pod
 			wg.Add(1)
 			go func() {
-				waitErr = kc.WaitForReadyPod(ctx, podNamespace, podName, WaitForReadyPodOpts{MaxWaitTime: helpers.ShortWaitTime})
+				pod, waitErr = kc.WaitForReadyPod(ctx, podNamespace, podName, WaitForReadyPodOpts{MaxWaitTime: helpers.ShortWaitTime})
 				wg.Done()
 			}()
 
@@ -158,9 +159,11 @@ func TestWaitForReadyPod(t *testing.T) {
 			wg.Wait()
 			if tt.shouldError {
 				assert.Error(t, waitErr)
+				assert.Nil(t, pod)
 				return
 			}
 			assert.NoError(t, waitErr)
+			assert.NotNil(t, pod)
 		})
 	}
 }

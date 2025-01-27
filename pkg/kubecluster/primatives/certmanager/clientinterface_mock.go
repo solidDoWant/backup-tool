@@ -133,21 +133,33 @@ func (_c *MockClientInterface_DeleteCertificate_Call) RunAndReturn(run func(cont
 }
 
 // WaitForReadyCertificate provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyCertificate(ctx context.Context, namespace string, name string, opts WaitForReadyCertificateOpts) error {
+func (_m *MockClientInterface) WaitForReadyCertificate(ctx context.Context, namespace string, name string, opts WaitForReadyCertificateOpts) (*v1.Certificate, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WaitForReadyCertificate")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyCertificateOpts) error); ok {
+	var r0 *v1.Certificate
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyCertificateOpts) (*v1.Certificate, error)); ok {
+		return rf(ctx, namespace, name, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyCertificateOpts) *v1.Certificate); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Certificate)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyCertificateOpts) error); ok {
+		r1 = rf(ctx, namespace, name, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockClientInterface_WaitForReadyCertificate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForReadyCertificate'
@@ -171,12 +183,12 @@ func (_c *MockClientInterface_WaitForReadyCertificate_Call) Run(run func(ctx con
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyCertificate_Call) Return(_a0 error) *MockClientInterface_WaitForReadyCertificate_Call {
-	_c.Call.Return(_a0)
+func (_c *MockClientInterface_WaitForReadyCertificate_Call) Return(_a0 *v1.Certificate, _a1 error) *MockClientInterface_WaitForReadyCertificate_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyCertificate_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyCertificateOpts) error) *MockClientInterface_WaitForReadyCertificate_Call {
+func (_c *MockClientInterface_WaitForReadyCertificate_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyCertificateOpts) (*v1.Certificate, error)) *MockClientInterface_WaitForReadyCertificate_Call {
 	_c.Call.Return(run)
 	return _c
 }

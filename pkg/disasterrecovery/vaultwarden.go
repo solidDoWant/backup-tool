@@ -147,7 +147,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 		return backup, trace.Wrap(err, "failed to snapshot backup volume %q", helpers.FullName(drPVC))
 	}
 
-	err = vw.kubernetesClient.ES().WaitForReadySnapshot(ctx, namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: backupOptions.SnapshotReadyTimeout})
+	_, err = vw.kubernetesClient.ES().WaitForReadySnapshot(ctx, namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: backupOptions.SnapshotReadyTimeout})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to wait for backup snapshot %q to become ready", helpers.FullName(snapshot))
 	}

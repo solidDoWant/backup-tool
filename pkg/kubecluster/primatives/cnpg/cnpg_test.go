@@ -194,9 +194,10 @@ func TestWaitForReadyBackup(t *testing.T) {
 
 			var wg sync.WaitGroup
 			var waitErr error
+			var backup *apiv1.Backup
 			wg.Add(1)
 			go func() {
-				waitErr = client.WaitForReadyBackup(ctx, backupNamespace, backupName, WaitForReadyBackupOpts{MaxWaitTime: helpers.ShortWaitTime})
+				backup, waitErr = client.WaitForReadyBackup(ctx, backupNamespace, backupName, WaitForReadyBackupOpts{MaxWaitTime: helpers.ShortWaitTime})
 				wg.Done()
 			}()
 
@@ -208,9 +209,11 @@ func TestWaitForReadyBackup(t *testing.T) {
 			wg.Wait()
 			if tt.shouldError {
 				assert.Error(t, waitErr)
+				assert.Nil(t, backup)
 				return
 			}
 			assert.NoError(t, waitErr)
+			assert.NotNil(t, backup)
 		})
 	}
 }
@@ -553,9 +556,10 @@ func TestWaitForReadyCluster(t *testing.T) {
 
 			var wg sync.WaitGroup
 			var waitErr error
+			var cluster *apiv1.Cluster
 			wg.Add(1)
 			go func() {
-				waitErr = client.WaitForReadyCluster(ctx, clusterNamespace, clusterName, WaitForReadyClusterOpts{MaxWaitTime: helpers.ShortWaitTime})
+				cluster, waitErr = client.WaitForReadyCluster(ctx, clusterNamespace, clusterName, WaitForReadyClusterOpts{MaxWaitTime: helpers.ShortWaitTime})
 				wg.Done()
 			}()
 
@@ -567,9 +571,11 @@ func TestWaitForReadyCluster(t *testing.T) {
 			wg.Wait()
 			if tt.shouldError {
 				assert.Error(t, waitErr)
+				assert.Nil(t, cluster)
 				return
 			}
 			assert.NoError(t, waitErr)
+			assert.NotNil(t, cluster)
 		})
 	}
 }

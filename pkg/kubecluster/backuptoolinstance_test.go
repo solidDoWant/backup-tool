@@ -256,7 +256,9 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				})
 
 				c.coreClient.EXPECT().WaitForReadyPod(ctx, namespace, mock.Anything, core.WaitForReadyPodOpts{MaxWaitTime: tt.opts.PodWaitTimeout}).
-					Return(th.ErrIfTrue(tt.simulateWaitForPodError))
+					RunAndReturn(func(ctx context.Context, s1, s2 string, wfrpo core.WaitForReadyPodOpts) (*corev1.Pod, error) {
+						return th.ErrOr1Val(createdPod, tt.simulateWaitForPodError)
+					})
 				if tt.simulateWaitForPodError {
 					return
 				}
@@ -283,7 +285,7 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				})
 
 				c.coreClient.EXPECT().WaitForReadyService(ctx, namespace, mock.Anything, core.WaitForReadyServiceOpts{MaxWaitTime: tt.opts.ServiceWaitTimeout}).
-					Return(th.ErrIfTrue(tt.simulateWaitForServiceError))
+					Return(th.ErrOr1Val(&corev1.Service{}, tt.simulateWaitForServiceError))
 			}()
 
 			btInstance, err := c.CreateBackupToolInstance(ctx, namespace, "unique-instance-name", tt.opts)

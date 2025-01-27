@@ -233,9 +233,10 @@ func TestWaitForReadyCertificate(t *testing.T) {
 
 			var wg sync.WaitGroup
 			var waitErr error
+			var cert *certmanagerv1.Certificate
 			wg.Add(1)
 			go func() {
-				waitErr = client.WaitForReadyCertificate(ctx, certNamespace, certName, WaitForReadyCertificateOpts{MaxWaitTime: helpers.ShortWaitTime})
+				cert, waitErr = client.WaitForReadyCertificate(ctx, certNamespace, certName, WaitForReadyCertificateOpts{MaxWaitTime: helpers.ShortWaitTime})
 				wg.Done()
 			}()
 
@@ -247,9 +248,11 @@ func TestWaitForReadyCertificate(t *testing.T) {
 			wg.Wait()
 			if tt.shouldError {
 				assert.Error(t, waitErr)
+				assert.Nil(t, cert)
 				return
 			}
 			assert.NoError(t, waitErr)
+			assert.NotNil(t, cert)
 		})
 	}
 }
