@@ -4,6 +4,7 @@ import (
 	"context"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg/gen/clientset/versioned"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -25,9 +26,19 @@ type Client struct {
 	apiExtensionsClient apiextensionsclientset.Interface
 }
 
-func NewClient(k8sRESTClient rest.Interface) *Client {
-	return &Client{
-		cnpgClient:          versioned.New(k8sRESTClient),
-		apiExtensionsClient: apiextensionsclientset.New(k8sRESTClient),
+func NewClient(config *rest.Config) (*Client, error) {
+	underlyingCNPGClient, err := versioned.NewForConfig(config)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create cloudnative-pg client")
 	}
+
+	underlyingAPIExtensionsClient, err := apiextensionsclientset.NewForConfig(config)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create apiextensions client")
+	}
+
+	return &Client{
+		cnpgClient:          underlyingCNPGClient,
+		apiExtensionsClient: underlyingAPIExtensionsClient,
+	}, nil
 }

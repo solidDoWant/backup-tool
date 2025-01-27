@@ -6,12 +6,12 @@ import (
 	cnpgfake "github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg/gen/clientset/versioned/fake"
 	"github.com/stretchr/testify/assert"
 	apiextensionsfake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
-	restfake "k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/rest"
 )
 
 func TestNewClient(t *testing.T) {
-	mockRESTClient := &restfake.RESTClient{}
-	client := NewClient(mockRESTClient)
+	client, err := NewClient(&rest.Config{})
+	assert.NoError(t, err)
 
 	assert.NotNil(t, client)
 	assert.NotNil(t, client.cnpgClient)

@@ -5,6 +5,7 @@ import (
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/cert-manager/cert-manager/pkg/client/clientset/versioned"
+	"github.com/gravitational/trace"
 	"k8s.io/client-go/rest"
 )
 
@@ -18,8 +19,13 @@ type Client struct {
 	client versioned.Interface
 }
 
-func NewClient(k8sRESTClient rest.Interface) *Client {
-	return &Client{
-		client: versioned.New(k8sRESTClient),
+func NewClient(config *rest.Config) (*Client, error) {
+	underlyingClient, err := versioned.NewForConfig(config)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create cert-manager client")
 	}
+
+	return &Client{
+		client: underlyingClient,
+	}, nil
 }

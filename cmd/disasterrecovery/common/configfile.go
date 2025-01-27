@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"reflect"
 	"slices"
@@ -90,7 +89,6 @@ func processField(field reflect.StructField) (reflect.StructField, error) {
 		return field, trace.Wrap(err, "failed to set validate tag for field %q", field.Name)
 	}
 
-	fmt.Printf("updating field %q\n", field.Name)
 	field.Tag = reflect.StructTag(tags.String())
 	return field, nil
 }

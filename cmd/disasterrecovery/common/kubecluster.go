@@ -7,7 +7,6 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
-	"k8s.io/client-go/kubernetes"
 )
 
 type KubeClusterCommand struct {
@@ -20,16 +19,30 @@ func (kc *KubernetesCommand) NewKubeClusterClient() (kubecluster.ClientInterface
 		return nil, trace.Wrap(err, "failed to get kubernetes config")
 	}
 
-	k8sClient, err := kubernetes.NewForConfig(config)
+	cmClient, err := certmanager.NewClient(config)
 	if err != nil {
-		return nil, trace.Wrap(err, "failed to create new kubernetes client")
+		return nil, trace.Wrap(err, "failed to create cert-manager client")
 	}
-	restClient := k8sClient.RESTClient()
+
+	cnpgClient, err := cnpg.NewClient(config)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create cloudnative-pg client")
+	}
+
+	externalsnapshotterClient, err := externalsnapshotter.NewClient(config)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create external-snapshotter client")
+	}
+
+	coreClient, err := core.NewClient(config)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create core client")
+	}
 
 	return kubecluster.NewClient(
-		certmanager.NewClient(restClient),
-		cnpg.NewClient(restClient),
-		externalsnapshotter.NewClient(restClient),
-		core.NewClient(restClient),
+		cmClient,
+		cnpgClient,
+		externalsnapshotterClient,
+		coreClient,
 	), nil
 }

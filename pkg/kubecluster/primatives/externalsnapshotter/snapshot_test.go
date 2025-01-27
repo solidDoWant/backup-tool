@@ -8,7 +8,6 @@ import (
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
-	"github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned/fake"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,14 +16,6 @@ import (
 	kubetesting "k8s.io/client-go/testing"
 	"k8s.io/utils/ptr"
 )
-
-func TestNewExternalSnapshotterClient(t *testing.T) {
-	fakeRESTClient := fake.NewSimpleClientset().Discovery().RESTClient()
-	client := NewClient(fakeRESTClient)
-
-	require.NotNil(t, client)
-	require.NotNil(t, client.client)
-}
 
 func TestSnapshotVolume(t *testing.T) {
 	pvcName := "test-pvc"

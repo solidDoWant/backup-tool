@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	"github.com/gravitational/trace"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
@@ -33,8 +34,13 @@ type Client struct {
 	client kubernetes.Interface
 }
 
-func NewClient(k8sRESTClient rest.Interface) *Client {
-	return &Client{
-		client: kubernetes.New(k8sRESTClient),
+func NewClient(config *rest.Config) (*Client, error) {
+	underlyingKubernetesClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create kubernetes client")
 	}
+
+	return &Client{
+		client: underlyingKubernetesClient,
+	}, nil
 }

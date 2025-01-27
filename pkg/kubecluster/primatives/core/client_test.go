@@ -5,12 +5,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes/fake"
-	restfake "k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/rest"
 )
 
 func TestNewClient(t *testing.T) {
-	mockRESTClient := &restfake.RESTClient{}
-	client := NewClient(mockRESTClient)
+	client, err := NewClient(&rest.Config{})
+	assert.NoError(t, err)
 
 	assert.NotNil(t, client)
 	assert.NotNil(t, client.client)
