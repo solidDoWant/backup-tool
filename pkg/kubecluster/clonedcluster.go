@@ -118,7 +118,7 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 		certOptions.IssuerKind = opts.ServingCertIssuerKind
 	}
 
-	servingCert, err := c.CM().CreateCertificate(ctx, servingCertName, namespace, servingCertIssuerName, certOptions)
+	servingCert, err := c.CM().CreateCertificate(ctx, namespace, servingCertName, servingCertIssuerName, certOptions)
 	if err != nil {
 		return errHandler(err, "failed to create cluster serving cert %q", helpers.FullNameStr(namespace, servingCertName))
 	}
@@ -146,7 +146,7 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 		certOptions.IssuerKind = opts.ClientCertIssuerKind
 	}
 
-	clientCert, err := c.CM().CreateCertificate(ctx, helpers.CleanName(clientCertName), namespace, clientCertIssuerName, certOptions)
+	clientCert, err := c.CM().CreateCertificate(ctx, namespace, clientCertName, clientCertIssuerName, certOptions)
 	if err != nil {
 		return errHandler(err, "failed to create %q user cert %q", clientUserName, helpers.FullNameStr(namespace, clientCertName))
 	}
@@ -250,14 +250,14 @@ func (cc *ClonedCluster) Delete(ctx context.Context) error {
 	}
 
 	if cc.clientCertificate != nil {
-		err := cc.c.CM().DeleteCertificate(ctx, cc.clientCertificate.Name, cc.clientCertificate.Namespace)
+		err := cc.c.CM().DeleteCertificate(ctx, cc.clientCertificate.Namespace, cc.clientCertificate.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster client cert %q", helpers.FullName(cc.clientCertificate)))
 		}
 	}
 
 	if cc.servingCertificate != nil {
-		err := cc.c.CM().DeleteCertificate(ctx, cc.servingCertificate.Name, cc.servingCertificate.Namespace)
+		err := cc.c.CM().DeleteCertificate(ctx, cc.clientCertificate.Namespace, cc.servingCertificate.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster serving cert %q", helpers.FullName(cc.servingCertificate)))
 		}

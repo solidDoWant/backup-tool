@@ -348,7 +348,7 @@ func TestCloneCluster(t *testing.T) {
 					return
 				}
 
-				c.cmClient.EXPECT().CreateCertificate(ctx, helpers.CleanName(createdServingCert.Name), namespace, servingIssuerName, certmanager.CreateCertificateOptions{
+				c.cmClient.EXPECT().CreateCertificate(ctx, namespace, helpers.CleanName(createdServingCert.Name), servingIssuerName, certmanager.CreateCertificateOptions{
 					CommonName: createdServingCert.Name,
 					DNSNames:   getClusterDomainNames(newClusterName, namespace),
 					SecretLabels: map[string]string{
@@ -370,7 +370,7 @@ func TestCloneCluster(t *testing.T) {
 				}
 				c.clonedCluster.EXPECT().setServingCert(createdServingCert).Return()
 
-				c.cmClient.EXPECT().CreateCertificate(ctx, helpers.CleanName(createdClientCert.Name), namespace, clientIssuerName, certmanager.CreateCertificateOptions{
+				c.cmClient.EXPECT().CreateCertificate(ctx, namespace, helpers.CleanName(createdClientCert.Name), clientIssuerName, certmanager.CreateCertificateOptions{
 					CommonName: "postgres",
 					SecretLabels: map[string]string{
 						"cnpg.io/reload": "true",
@@ -542,11 +542,11 @@ func TestClonedClusterDelete(t *testing.T) {
 			}
 
 			if tt.cc.clientCertificate != nil {
-				c.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.clientCertificate.Name, tt.cc.clientCertificate.Namespace).Return(th.ErrIfTrue(tt.simulateClientCertDeleteError))
+				c.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.clientCertificate.Namespace, tt.cc.clientCertificate.Name).Return(th.ErrIfTrue(tt.simulateClientCertDeleteError))
 			}
 
 			if tt.cc.servingCertificate != nil {
-				c.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.servingCertificate.Name, tt.cc.servingCertificate.Namespace).Return(th.ErrIfTrue(tt.simulateServingCertDeleteError))
+				c.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.clientCertificate.Namespace, tt.cc.servingCertificate.Name).Return(th.ErrIfTrue(tt.simulateServingCertDeleteError))
 			}
 
 			err := tt.cc.Delete(ctx)

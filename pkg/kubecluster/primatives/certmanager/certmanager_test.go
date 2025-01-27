@@ -133,7 +133,7 @@ func TestCreateCertificate(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			cert, err := client.CreateCertificate(ctx, certName, namespace, issuer, tt.opts)
+			cert, err := client.CreateCertificate(ctx, namespace, certName, issuer, tt.opts)
 
 			if tt.simulateClientFailure {
 				assert.Error(t, err)
@@ -293,7 +293,7 @@ func TestDeleteCertificate(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			err := client.DeleteCertificate(ctx, certName, namespace)
+			err := client.DeleteCertificate(ctx, namespace, certName)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return

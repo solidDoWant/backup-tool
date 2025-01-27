@@ -25,7 +25,7 @@ type CreateCertificateOptions struct {
 	Usages       []certmanagerv1.KeyUsage
 }
 
-func (cmc *Client) CreateCertificate(ctx context.Context, name, namespace, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+func (cmc *Client) CreateCertificate(ctx context.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
 	certificate := &certmanagerv1.Certificate{
 		Spec: certmanagerv1.CertificateSpec{
 			CommonName:            opts.CommonName,
@@ -110,7 +110,7 @@ func (cmc *Client) WaitForReadyCertificate(ctx context.Context, namespace, name 
 	return certificate, nil
 }
 
-func (cmc *Client) DeleteCertificate(ctx context.Context, name, namespace string) error {
+func (cmc *Client) DeleteCertificate(ctx context.Context, namespace, name string) error {
 	err := cmc.client.CertmanagerV1().Certificates(namespace).Delete(ctx, name, v1.DeleteOptions{})
 
 	// TODO delete related requests if needed

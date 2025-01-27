@@ -22,9 +22,9 @@ func (_m *MockClientInterface) EXPECT() *MockClientInterface_Expecter {
 	return &MockClientInterface_Expecter{mock: &_m.Mock}
 }
 
-// CreateCertificate provides a mock function with given fields: ctx, name, namespace, issuerName, opts
-func (_m *MockClientInterface) CreateCertificate(ctx context.Context, name string, namespace string, issuerName string, opts CreateCertificateOptions) (*v1.Certificate, error) {
-	ret := _m.Called(ctx, name, namespace, issuerName, opts)
+// CreateCertificate provides a mock function with given fields: ctx, namespace, name, issuerName, opts
+func (_m *MockClientInterface) CreateCertificate(ctx context.Context, namespace string, name string, issuerName string, opts CreateCertificateOptions) (*v1.Certificate, error) {
+	ret := _m.Called(ctx, namespace, name, issuerName, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateCertificate")
@@ -33,10 +33,10 @@ func (_m *MockClientInterface) CreateCertificate(ctx context.Context, name strin
 	var r0 *v1.Certificate
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, CreateCertificateOptions) (*v1.Certificate, error)); ok {
-		return rf(ctx, name, namespace, issuerName, opts)
+		return rf(ctx, namespace, name, issuerName, opts)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, CreateCertificateOptions) *v1.Certificate); ok {
-		r0 = rf(ctx, name, namespace, issuerName, opts)
+		r0 = rf(ctx, namespace, name, issuerName, opts)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v1.Certificate)
@@ -44,7 +44,7 @@ func (_m *MockClientInterface) CreateCertificate(ctx context.Context, name strin
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, CreateCertificateOptions) error); ok {
-		r1 = rf(ctx, name, namespace, issuerName, opts)
+		r1 = rf(ctx, namespace, name, issuerName, opts)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -59,15 +59,15 @@ type MockClientInterface_CreateCertificate_Call struct {
 
 // CreateCertificate is a helper method to define mock.On call
 //   - ctx context.Context
-//   - name string
 //   - namespace string
+//   - name string
 //   - issuerName string
 //   - opts CreateCertificateOptions
-func (_e *MockClientInterface_Expecter) CreateCertificate(ctx interface{}, name interface{}, namespace interface{}, issuerName interface{}, opts interface{}) *MockClientInterface_CreateCertificate_Call {
-	return &MockClientInterface_CreateCertificate_Call{Call: _e.mock.On("CreateCertificate", ctx, name, namespace, issuerName, opts)}
+func (_e *MockClientInterface_Expecter) CreateCertificate(ctx interface{}, namespace interface{}, name interface{}, issuerName interface{}, opts interface{}) *MockClientInterface_CreateCertificate_Call {
+	return &MockClientInterface_CreateCertificate_Call{Call: _e.mock.On("CreateCertificate", ctx, namespace, name, issuerName, opts)}
 }
 
-func (_c *MockClientInterface_CreateCertificate_Call) Run(run func(ctx context.Context, name string, namespace string, issuerName string, opts CreateCertificateOptions)) *MockClientInterface_CreateCertificate_Call {
+func (_c *MockClientInterface_CreateCertificate_Call) Run(run func(ctx context.Context, namespace string, name string, issuerName string, opts CreateCertificateOptions)) *MockClientInterface_CreateCertificate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(CreateCertificateOptions))
 	})
@@ -84,9 +84,10 @@ func (_c *MockClientInterface_CreateCertificate_Call) RunAndReturn(run func(cont
 	return _c
 }
 
-// DeleteCertificate provides a mock function with given fields: ctx, name, namespace
-func (_m *MockClientInterface) DeleteCertificate(ctx context.Context, name string, namespace string) error {
-	ret := _m.Called(ctx, name, namespace)
+
+// DeleteCertificate provides a mock function with given fields: ctx, namespace, name
+func (_m *MockClientInterface) DeleteCertificate(ctx context.Context, namespace string, name string) error {
+	ret := _m.Called(ctx, namespace, name)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteCertificate")
@@ -94,7 +95,7 @@ func (_m *MockClientInterface) DeleteCertificate(ctx context.Context, name strin
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, name, namespace)
+		r0 = rf(ctx, namespace, name)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -109,13 +110,13 @@ type MockClientInterface_DeleteCertificate_Call struct {
 
 // DeleteCertificate is a helper method to define mock.On call
 //   - ctx context.Context
-//   - name string
 //   - namespace string
-func (_e *MockClientInterface_Expecter) DeleteCertificate(ctx interface{}, name interface{}, namespace interface{}) *MockClientInterface_DeleteCertificate_Call {
-	return &MockClientInterface_DeleteCertificate_Call{Call: _e.mock.On("DeleteCertificate", ctx, name, namespace)}
+//   - name string
+func (_e *MockClientInterface_Expecter) DeleteCertificate(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_DeleteCertificate_Call {
+	return &MockClientInterface_DeleteCertificate_Call{Call: _e.mock.On("DeleteCertificate", ctx, namespace, name)}
 }
 
-func (_c *MockClientInterface_DeleteCertificate_Call) Run(run func(ctx context.Context, name string, namespace string)) *MockClientInterface_DeleteCertificate_Call {
+func (_c *MockClientInterface_DeleteCertificate_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockClientInterface_DeleteCertificate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
