@@ -159,7 +159,7 @@ func TestNewClusterUserCert(t *testing.T) {
 				}
 
 				// 3.
-				c.cmClient.EXPECT().WaitForReadyCertificate(ctx, createdCert.Namespace, mock.Anything, certmanager.WaitForReadyCertificateOpts{}).Return(th.ErrOr1Val(createdCert, tt.simulateWaitForReadyCertError))
+				c.cmClient.EXPECT().WaitForReadyCertificate(ctx, createdCert.Namespace, mock.Anything, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.WaitForCertTimeout}).Return(th.ErrOr1Val(createdCert, tt.simulateWaitForReadyCertError))
 				if tt.simulateWaitForReadyCertError {
 					return
 				}

@@ -94,7 +94,7 @@ func (p *Provider) NewClusterUserCert(ctx context.Context, namespace, username, 
 	}
 
 	// 3. Wait for the certificate to be ready
-	readyCert, err := p.cmClient.WaitForReadyCertificate(ctx, cert.Namespace, cert.Name, certmanager.WaitForReadyCertificateOpts{})
+	readyCert, err := p.cmClient.WaitForReadyCertificate(ctx, cert.Namespace, cert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.WaitForCertTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for user cert %q to be ready", helpers.FullName(cert))
 	}
