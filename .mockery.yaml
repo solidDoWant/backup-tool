@@ -22,7 +22,7 @@ packages:
     <<: *baseline_config
     interfaces:
       ClientInterface:
-  github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforprofile: &kube_composite_config
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate: &kube_composite_config
     <<: *baseline_config
     interfaces:
       ProviderInterface:

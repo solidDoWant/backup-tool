@@ -1,4 +1,4 @@
-package createcrpforprofile
+package createcrpforcertificate
 
 import (
 	"testing"
