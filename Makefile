@@ -49,9 +49,9 @@ generate-cnpg-client: $(CNPG_KUBE_CODEGEN) $(CNPG_GIT_DIR)
 	@# Patch the files until https://github.com/cloudnative-pg/cloudnative-pg/issues/6585 is fixed
 	@find $(CNPG_GEN_DIR) -type f -name '*.go' -exec sed -i 's/SchemeGroupVersion/GroupVersion/' {} \;
 
-# Needed until https://github.com/cert-manager/approver-policy/pull/571 is merged
+# Needed until https://github.com/cert-manager/approver-policy/pull/571 is released
 APPROVER_POLICY_VERSION := main # $(shell go list -f '{{ .Version }}' -m github.com/cert-manager/approver-policy)
-APPROVER_POLICY_REPO = https://github.com/solidDoWant/approver-policy.git
+APPROVER_POLICY_REPO = https://github.com/cert-manager/approver-policy.git
 APPROVER_POLICY_CODEGEN_WORKING_DIR = /tmp/approver-policy-gen
 APPROVER_POLICY_KUBE_CODEGEN = $(APPROVER_POLICY_CODEGEN_WORKING_DIR)/kube_codegen.sh
 APPROVER_POLICY_GIT_DIR = $(APPROVER_POLICY_CODEGEN_WORKING_DIR)/repo
