@@ -18,19 +18,23 @@ import (
 
 type CreateCertificateOptions struct {
 	helpers.GenerateName
-	CommonName   string
-	DNSNames     []string
-	Duration     *time.Duration
-	IssuerKind   string // Default to "Issuer" (namespace-specific)
-	SecretLabels map[string]string
-	SecretName   string
-	Subject      *certmanagerv1.X509Subject
-	Usages       []certmanagerv1.KeyUsage
+	IsCA          bool
+	CAConstraints *certmanagerv1.NameConstraints
+	CommonName    string
+	DNSNames      []string
+	Duration      *time.Duration
+	IssuerKind    string // Default to "Issuer" (namespace-specific)
+	SecretLabels  map[string]string
+	SecretName    string
+	Subject       *certmanagerv1.X509Subject
+	Usages        []certmanagerv1.KeyUsage
 }
 
 func (cmc *Client) CreateCertificate(ctx context.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
 	certificate := &certmanagerv1.Certificate{
 		Spec: certmanagerv1.CertificateSpec{
+			IsCA:                  opts.IsCA,
+			NameConstraints:       opts.CAConstraints,
 			CommonName:            opts.CommonName,
 			DNSNames:              opts.DNSNames,
 			Subject:               opts.Subject,
