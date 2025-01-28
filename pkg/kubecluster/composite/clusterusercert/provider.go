@@ -3,7 +3,7 @@ package clusterusercert
 import (
 	context "context"
 
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforprofile"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 )
@@ -19,15 +19,15 @@ type providerInterfaceInternal interface {
 }
 
 type Provider struct {
-	ccfp               createcrpforprofile.ProviderInterface
+	ccfp               createcrpforcertificate.ProviderInterface
 	apClient           approverpolicy.ClientInterface
 	cmClient           certmanager.ClientInterface
 	newClusterUserCert func() ClusterUserCertInterface
 }
 
-func NewProvider(apClient approverpolicy.ClientInterface, cmClient certmanager.ClientInterface) *Provider {
+func NewProvider(ccfp createcrpforcertificate.ProviderInterface, apClient approverpolicy.ClientInterface, cmClient certmanager.ClientInterface) *Provider {
 	p := &Provider{
-		ccfp:     createcrpforprofile.NewProvider(apClient),
+		ccfp:     ccfp,
 		apClient: apClient,
 		cmClient: cmClient,
 	}

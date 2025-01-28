@@ -10,7 +10,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforprofile"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 )
@@ -78,7 +78,7 @@ func (p *Provider) NewClusterUserCert(ctx context.Context, namespace, username, 
 	// 2. Create the CertificateRequestPolicy, if enabled
 	if opts.CRPOpts.Enabled {
 		crpName := certName
-		crp, err := p.ccfp.CreateCRPForCertificate(ctx, cert, createcrpforprofile.CreateCRPForCertificateOpts{MaxWaitTime: opts.CRPOpts.WaitForCRPTimeout})
+		crp, err := p.ccfp.CreateCRPForCertificate(ctx, cert, createcrpforcertificate.CreateCRPForCertificateOpts{MaxWaitTime: opts.CRPOpts.WaitForCRPTimeout})
 		if err != nil {
 			return errHandler(err, "failed to create CertificateRequestPolicy %q for user cert %q", crpName, helpers.FullName(cert))
 		}

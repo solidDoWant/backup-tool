@@ -22,7 +22,7 @@ import (
 
 	core "github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 
-	createcrpforprofile "github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforprofile"
+	createcrpforprofile "github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 
 	externalsnapshotter "github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 

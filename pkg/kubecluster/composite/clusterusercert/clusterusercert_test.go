@@ -7,7 +7,7 @@ import (
 	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/gravitational/trace"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforprofile"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
@@ -143,7 +143,7 @@ func TestNewClusterUserCert(t *testing.T) {
 
 				// 2.
 				if tt.opts.CRPOpts.Enabled {
-					c.ccfp.EXPECT().CreateCRPForCertificate(ctx, createdCert, createcrpforprofile.CreateCRPForCertificateOpts{MaxWaitTime: tt.opts.CRPOpts.WaitForCRPTimeout}).
+					c.ccfp.EXPECT().CreateCRPForCertificate(ctx, createdCert, createcrpforcertificate.CreateCRPForCertificateOpts{MaxWaitTime: tt.opts.CRPOpts.WaitForCRPTimeout}).
 						Return(th.ErrOr1Val(createdCRP, tt.simulateCreateCRPForCertificateError))
 					if tt.simulateCreateCRPForCertificateError {
 						return
