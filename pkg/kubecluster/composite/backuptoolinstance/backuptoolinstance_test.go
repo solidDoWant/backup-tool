@@ -1,4 +1,4 @@
-package kubecluster
+package backuptoolinstance
 
 import (
 	context "context"
@@ -104,11 +104,11 @@ func TestNewSingleContainerSecret(t *testing.T) {
 }
 
 func TestNewBackupToolInstance(t *testing.T) {
-	c := newMockClient(t)
+	c := newMockProvider(t)
 	btInstance := newBackupToolInstance(c)
 	casted := btInstance.(*BackupToolInstance)
 
-	assert.Equal(t, c, casted.c)
+	assert.Equal(t, c, casted.p)
 	assert.Equal(t, reflect.ValueOf(net.LookupIP), reflect.ValueOf(casted.lookupIP))
 
 	// Test the default testConnection function
@@ -206,7 +206,7 @@ func TestCreateBackupToolInstance(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			c := newMockClient(t)
+			p := newMockProvider(t)
 			ctx := context.Background()
 
 			errExpected := th.ErrExpected(
@@ -219,14 +219,14 @@ func TestCreateBackupToolInstance(t *testing.T) {
 
 			func() {
 				if errExpected {
-					c.backupToolInstance.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx context.Context) error {
+					p.backupToolInstance.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx context.Context) error {
 						require.NotEqual(t, ctx, cleanupCtx)
 						return th.ErrIfTrue(tt.simulateBackupToolInstanceCleanupError)
 					})
 				}
 
 				var createdPod *corev1.Pod
-				c.coreClient.EXPECT().CreatePod(ctx, namespace, mock.Anything).RunAndReturn(func(_ context.Context, _ string, pod *corev1.Pod) (*corev1.Pod, error) {
+				p.coreClient.EXPECT().CreatePod(ctx, namespace, mock.Anything).RunAndReturn(func(_ context.Context, _ string, pod *corev1.Pod) (*corev1.Pod, error) {
 					createdPod = pod
 
 					require.Len(t, pod.Spec.Containers, 1)
@@ -251,11 +251,11 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				if tt.simulateCreatePodError {
 					return
 				}
-				c.backupToolInstance.EXPECT().setPod(mock.Anything).Run(func(pod *corev1.Pod) {
+				p.backupToolInstance.EXPECT().setPod(mock.Anything).Run(func(pod *corev1.Pod) {
 					require.Equal(t, createdPod, pod)
 				})
 
-				c.coreClient.EXPECT().WaitForReadyPod(ctx, namespace, mock.Anything, core.WaitForReadyPodOpts{MaxWaitTime: tt.opts.PodWaitTimeout}).
+				p.coreClient.EXPECT().WaitForReadyPod(ctx, namespace, mock.Anything, core.WaitForReadyPodOpts{MaxWaitTime: tt.opts.PodWaitTimeout}).
 					RunAndReturn(func(ctx context.Context, s1, s2 string, wfrpo core.WaitForReadyPodOpts) (*corev1.Pod, error) {
 						return th.ErrOr1Val(createdPod, tt.simulateWaitForPodError)
 					})
@@ -264,7 +264,7 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				}
 
 				var createdService *corev1.Service
-				c.coreClient.EXPECT().CreateService(ctx, namespace, mock.Anything).RunAndReturn(func(_ context.Context, _ string, service *corev1.Service) (*corev1.Service, error) {
+				p.coreClient.EXPECT().CreateService(ctx, namespace, mock.Anything).RunAndReturn(func(_ context.Context, _ string, service *corev1.Service) (*corev1.Service, error) {
 					createdService = service
 					require.Equal(t, createdPod.ObjectMeta.Labels, service.Spec.Selector)
 
@@ -280,15 +280,15 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				if tt.simulateCreateServiceError {
 					return
 				}
-				c.backupToolInstance.EXPECT().setService(mock.Anything).Run(func(service *corev1.Service) {
+				p.backupToolInstance.EXPECT().setService(mock.Anything).Run(func(service *corev1.Service) {
 					require.Equal(t, createdService, service)
 				})
 
-				c.coreClient.EXPECT().WaitForReadyService(ctx, namespace, mock.Anything, core.WaitForReadyServiceOpts{MaxWaitTime: tt.opts.ServiceWaitTimeout}).
+				p.coreClient.EXPECT().WaitForReadyService(ctx, namespace, mock.Anything, core.WaitForReadyServiceOpts{MaxWaitTime: tt.opts.ServiceWaitTimeout}).
 					Return(th.ErrOr1Val(&corev1.Service{}, tt.simulateWaitForServiceError))
 			}()
 
-			btInstance, err := c.CreateBackupToolInstance(ctx, namespace, "unique-instance-name", tt.opts)
+			btInstance, err := p.CreateBackupToolInstance(ctx, namespace, "unique-instance-name", tt.opts)
 			if errExpected {
 				assert.Error(t, err)
 				assert.Nil(t, btInstance)
@@ -495,15 +495,15 @@ func TestBackupToolInstanceDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			ctx := context.Background()
-			c := newMockClient(t)
-			tt.btInstance.c = c
+			p := newMockProvider(t)
+			tt.btInstance.p = p
 
 			if tt.btInstance.pod != nil {
-				c.coreClient.EXPECT().DeletePod(ctx, tt.btInstance.pod.Namespace, tt.btInstance.pod.Name).Return(th.ErrIfTrue(tt.simulatePodDeleteError))
+				p.coreClient.EXPECT().DeletePod(ctx, tt.btInstance.pod.Namespace, tt.btInstance.pod.Name).Return(th.ErrIfTrue(tt.simulatePodDeleteError))
 			}
 
 			if tt.btInstance.service != nil {
-				c.coreClient.EXPECT().DeleteService(ctx, tt.btInstance.service.Namespace, tt.btInstance.service.Name).Return(th.ErrIfTrue(tt.simulateServiceDeleteError))
+				p.coreClient.EXPECT().DeleteService(ctx, tt.btInstance.service.Namespace, tt.btInstance.service.Name).Return(th.ErrIfTrue(tt.simulateServiceDeleteError))
 			}
 
 			err := tt.btInstance.Delete(ctx)

@@ -12,6 +12,9 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonepvc"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
@@ -24,14 +27,14 @@ const baseMountPath = string(os.PathListSeparator) + "mnt"
 
 // TODO plumb a lot more options through to here
 type VaultWardenBackupOptions struct {
-	VolumeSize                   resource.Quantity                           `yaml:"volumeSize,omitempty"`
-	VolumeStorageClass           string                                      `yaml:"volumeStorageClass,omitempty"`
-	CloneClusterOptions          kubecluster.CloneClusterOptions             `yaml:"clusterCloning,omitempty"`
-	BackupToolPodCreationTimeout helpers.MaxWaitTime                         `yaml:"backupToolPodCreationTimeout,omitempty"`
-	SnapshotReadyTimeout         helpers.MaxWaitTime                         `yaml:"snapshotReadyTimeout,omitempty"`
-	RemoteBackupToolOptions      kubecluster.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
-	ClusterServiceSearchDomains  []string                                    `yaml:"clusterServiceSearchDomains,omitempty"`
-	CleanupTimeout               helpers.MaxWaitTime                         `yaml:"cleanupTimeout,omitempty"`
+	VolumeSize                   resource.Quantity                                  `yaml:"volumeSize,omitempty"`
+	VolumeStorageClass           string                                             `yaml:"volumeStorageClass,omitempty"`
+	CloneClusterOptions          clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
+	BackupToolPodCreationTimeout helpers.MaxWaitTime                                `yaml:"backupToolPodCreationTimeout,omitempty"`
+	SnapshotReadyTimeout         helpers.MaxWaitTime                                `yaml:"snapshotReadyTimeout,omitempty"`
+	RemoteBackupToolOptions      backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
+	ClusterServiceSearchDomains  []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
+	CleanupTimeout               helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
 type VaultWarden struct {
@@ -58,7 +61,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	defer backup.Stop()
 
 	// 1. Snapshot/clone PVC containing data directory
-	clonedPVC, err := vw.kubernetesClient.ClonePVC(ctx, namespace, dataPVC, kubecluster.ClonePVCOptions{DestPvcNamePrefix: backup.GetFullName(), CleanupTimeout: backupOptions.CleanupTimeout})
+	clonedPVC, err := vw.kubernetesClient.ClonePVC(ctx, namespace, dataPVC, clonepvc.ClonePVCOptions{DestPvcNamePrefix: backup.GetFullName(), CleanupTimeout: backupOptions.CleanupTimeout})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to clone data PVC")
 	}
@@ -102,13 +105,13 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	secretsVolumeMountPath := filepath.Join(baseMountPath, "secrets")
 	servingCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "serving-cert")
 	clientCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "client-cert")
-	btOpts := kubecluster.CreateBackupToolInstanceOptions{
+	btOpts := backuptoolinstance.CreateBackupToolInstanceOptions{
 		NamePrefix: backup.GetFullName(),
-		Volumes: []kubecluster.SingleContainerVolume{
-			kubecluster.NewSingleContainerPVC(drPVC.Name, drVolumeMountPath),
-			kubecluster.NewSingleContainerPVC(clonedPVC.Name, clonedVolumeMountPath),
-			kubecluster.NewSingleContainerSecret(clonedCluster.GetServingCert().Name, servingCertVolumeMountPath),
-			kubecluster.NewSingleContainerSecret(clonedCluster.GetClientCert().Name, clientCertVolumeMountPath),
+		Volumes: []backuptoolinstance.SingleContainerVolume{
+			backuptoolinstance.NewSingleContainerPVC(drPVC.Name, drVolumeMountPath),
+			backuptoolinstance.NewSingleContainerPVC(clonedPVC.Name, clonedVolumeMountPath),
+			backuptoolinstance.NewSingleContainerSecret(clonedCluster.GetServingCert().Name, servingCertVolumeMountPath),
+			backuptoolinstance.NewSingleContainerSecret(clonedCluster.GetClientCert().Name, clientCertVolumeMountPath),
 		},
 		CleanupTimeout: backupOptions.CleanupTimeout,
 	}

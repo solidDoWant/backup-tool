@@ -1,15 +1,24 @@
 package kubecluster
 
 import (
-	context "context"
-
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonepvc"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforprofile"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
-	corev1 "k8s.io/api/core/v1"
 )
+
+// Convert types so that they are not exported when embedded
+type backupToolInstanceProvider backuptoolinstance.ProviderInterface
+type clonedClusterProvider clonedcluster.ProviderInterface
+type clonePVCProvider clonepvc.ProviderInterface
+type clusterUserCertProvider clusterusercert.ProviderInterface
+type createCRPForProfileProvider createcrpforprofile.ProviderInterface
 
 type ClientInterface interface {
 	CM() certmanager.ClientInterface
@@ -17,19 +26,24 @@ type ClientInterface interface {
 	ES() externalsnapshotter.ClientInterface
 	Core() core.ClientInterface
 	AP() approverpolicy.ClientInterface
-	CreateBackupToolInstance(ctx context.Context, namespace, instance string, opts CreateBackupToolInstanceOptions) (BackupToolInstanceInterface, error)
-	CloneCluster(ctx context.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error)
-	ClonePVC(ctx context.Context, namespace, pvcName string, opts ClonePVCOptions) (clonedPvc *corev1.PersistentVolumeClaim, err error)
+	backupToolInstanceProvider
+	clonedClusterProvider
+	clonePVCProvider
+	clusterUserCertProvider
+	createCRPForProfileProvider
 }
 
 type Client struct {
-	cmClient              certmanager.ClientInterface
-	cnpgClient            cnpg.ClientInterface
-	esClient              externalsnapshotter.ClientInterface
-	coreClient            core.ClientInterface
-	apClient              approverpolicy.ClientInterface
-	newClonedCluster      func() ClonedClusterInterface
-	newBackupToolInstance func() BackupToolInstanceInterface
+	cmClient   certmanager.ClientInterface
+	cnpgClient cnpg.ClientInterface
+	esClient   externalsnapshotter.ClientInterface
+	coreClient core.ClientInterface
+	apClient   approverpolicy.ClientInterface
+	backupToolInstanceProvider
+	clonedClusterProvider
+	clonePVCProvider
+	clusterUserCertProvider
+	createCRPForProfileProvider
 }
 
 func (c *Client) CM() certmanager.ClientInterface {
@@ -52,20 +66,20 @@ func (c *Client) AP() approverpolicy.ClientInterface {
 	return c.apClient
 }
 
-func NewClient(cm certmanager.ClientInterface, cnpg cnpg.ClientInterface, esClient externalsnapshotter.ClientInterface, sClient core.ClientInterface, apClient approverpolicy.ClientInterface) ClientInterface {
+func NewClient(cm certmanager.ClientInterface, cnpg cnpg.ClientInterface, esClient externalsnapshotter.ClientInterface, coreClient core.ClientInterface, apClient approverpolicy.ClientInterface) *Client {
 	c := &Client{
 		cmClient:   cm,
 		cnpgClient: cnpg,
 		esClient:   esClient,
-		coreClient: sClient,
+		coreClient: coreClient,
 		apClient:   apClient,
 	}
-	c.newClonedCluster = func() ClonedClusterInterface {
-		return newClonedCluster(c)
-	}
-	c.newBackupToolInstance = func() BackupToolInstanceInterface {
-		return newBackupToolInstance(c)
-	}
+
+	c.backupToolInstanceProvider = backuptoolinstance.NewProvider(coreClient)
+	c.clonedClusterProvider = clonedcluster.NewProvider(cm, cnpg)
+	c.clonePVCProvider = clonepvc.NewProvider(coreClient, esClient)
+	c.clusterUserCertProvider = clusterusercert.NewProvider(apClient, cm)
+	c.createCRPForProfileProvider = createcrpforprofile.NewProvider(apClient)
 
 	return c
 }

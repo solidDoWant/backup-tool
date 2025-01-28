@@ -1,4 +1,4 @@
-package kubecluster
+package backuptoolinstance
 
 import (
 	context "context"
@@ -29,7 +29,7 @@ type BackupToolInstanceInterface interface {
 }
 
 type BackupToolInstance struct {
-	c       ClientInterface
+	p       providerInterfaceInternal
 	pod     *corev1.Pod
 	service *corev1.Service
 	// Used to mocking in during tests
@@ -69,9 +69,9 @@ func NewSingleContainerSecret(secretName, mountPath string) SingleContainerVolum
 	}
 }
 
-func newBackupToolInstance(c ClientInterface) BackupToolInstanceInterface {
+func newBackupToolInstance(p providerInterfaceInternal) BackupToolInstanceInterface {
 	return &BackupToolInstance{
-		c: c,
+		p: p,
 		// Standard implementations. These just need to be vars to help with testing.
 		testConnection: func(address string) bool {
 			address = net.JoinHostPort(address, fmt.Sprintf("%d", servers.GRPCPort))
@@ -95,8 +95,8 @@ type CreateBackupToolInstanceOptions struct {
 	ServiceWaitTimeout helpers.MaxWaitTime     `yaml:"serviceWaitTimeout,omitempty"`
 }
 
-func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instance string, opts CreateBackupToolInstanceOptions) (btInstance BackupToolInstanceInterface, err error) {
-	btInstance = c.newBackupToolInstance()
+func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, instance string, opts CreateBackupToolInstanceOptions) (btInstance BackupToolInstanceInterface, err error) {
+	btInstance = p.newBackupToolInstance()
 
 	namePrefix := opts.NamePrefix
 	if namePrefix == "" {
@@ -153,13 +153,13 @@ func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instan
 		},
 	}
 
-	pod, err = c.Core().CreatePod(ctx, namespace, pod)
+	pod, err = p.core().CreatePod(ctx, namespace, pod)
 	if err != nil {
 		return errHandler(err, "failed to create pod %q", helpers.FullNameStr(namespace, namePrefix))
 	}
 	btInstance.setPod(pod)
 
-	readyPod, err := c.Core().WaitForReadyPod(ctx, namespace, pod.Name, core.WaitForReadyPodOpts{MaxWaitTime: opts.PodWaitTimeout})
+	readyPod, err := p.core().WaitForReadyPod(ctx, namespace, pod.Name, core.WaitForReadyPodOpts{MaxWaitTime: opts.PodWaitTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for pod %q to become ready", helpers.FullNameStr(namespace, pod.Name))
 	}
@@ -182,13 +182,13 @@ func (c *Client) CreateBackupToolInstance(ctx context.Context, namespace, instan
 		},
 	}
 
-	service, err = c.Core().CreateService(ctx, namespace, service)
+	service, err = p.core().CreateService(ctx, namespace, service)
 	if err != nil {
 		return errHandler(err, "failed to create service %q", helpers.FullNameStr(namespace, namePrefix))
 	}
 	btInstance.setService(service)
 
-	_, err = c.Core().WaitForReadyService(ctx, namespace, service.Name, core.WaitForReadyServiceOpts{MaxWaitTime: opts.ServiceWaitTimeout})
+	_, err = p.core().WaitForReadyService(ctx, namespace, service.Name, core.WaitForReadyServiceOpts{MaxWaitTime: opts.ServiceWaitTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for service %q to become ready", helpers.FullNameStr(namespace, service.Name))
 	}
@@ -283,14 +283,14 @@ func (b *BackupToolInstance) Delete(ctx context.Context) error {
 	cleanupErrs := make([]error, 0, 2)
 
 	if b.pod != nil {
-		err := b.c.Core().DeletePod(ctx, b.pod.Namespace, b.pod.Name)
+		err := b.p.core().DeletePod(ctx, b.pod.Namespace, b.pod.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, err)
 		}
 	}
 
 	if b.service != nil {
-		err := b.c.Core().DeleteService(ctx, b.service.Namespace, b.service.Name)
+		err := b.p.core().DeleteService(ctx, b.service.Namespace, b.service.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, err)
 		}

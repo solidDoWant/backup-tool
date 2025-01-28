@@ -1,4 +1,4 @@
-package kubecluster
+package clonepvc
 
 import (
 	context "context"
@@ -23,17 +23,17 @@ type ClonePVCOptions struct {
 }
 
 // Snapshots a given volume and clones it. Callers are responsible for ensuring consistency.
-func (c *Client) ClonePVC(ctx context.Context, namespace, pvcName string, opts ClonePVCOptions) (clonedPvc *corev1.PersistentVolumeClaim, err error) {
-	snapshot, err := c.ES().SnapshotVolume(ctx, namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{})
+func (p *Provider) ClonePVC(ctx context.Context, namespace, pvcName string, opts ClonePVCOptions) (clonedPvc *corev1.PersistentVolumeClaim, err error) {
+	snapshot, err := p.esClient.SnapshotVolume(ctx, namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{})
 	if err != nil {
 		err = trace.Wrap(err, "failed to snapshot %q", helpers.FullNameStr(namespace, pvcName))
 		return
 	}
 	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
-		return c.ES().DeleteSnapshot(ctx, namespace, snapshot.Name)
+		return p.esClient.DeleteSnapshot(ctx, namespace, snapshot.Name)
 	}).WithErrMessage("failed to delete created snapshot for PVC %q", helpers.FullNameStr(namespace, pvcName)).WithOriginalErr(&err).Run()
 
-	readySnapshot, err := c.ES().WaitForReadySnapshot(ctx, namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: opts.WaitForSnapshotTimeout})
+	readySnapshot, err := p.esClient.WaitForReadySnapshot(ctx, namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: opts.WaitForSnapshotTimeout})
 	if err != nil {
 		err = trace.Wrap(err, "failed to wait for snapshot %q to become ready", helpers.FullName(snapshot))
 		return
@@ -50,7 +50,7 @@ func (c *Client) ClonePVC(ctx context.Context, namespace, pvcName string, opts C
 	} else {
 		// Default to the original PVC's storage class if none is specified
 		var srcPvc *corev1.PersistentVolumeClaim
-		srcPvc, err = c.Core().GetPVC(ctx, namespace, pvcName)
+		srcPvc, err = p.coreClient.GetPVC(ctx, namespace, pvcName)
 		if err != nil {
 			err = trace.Wrap(err, "failed to get existing PVC %q", helpers.FullNameStr(namespace, pvcName))
 			return
@@ -70,7 +70,7 @@ func (c *Client) ClonePVC(ctx context.Context, namespace, pvcName string, opts C
 		return
 	}
 
-	clonedPvc, err = c.Core().CreatePVC(ctx, namespace, pvcNamePrefix, size, core.CreatePVCOptions{
+	clonedPvc, err = p.coreClient.CreatePVC(ctx, namespace, pvcNamePrefix, size, core.CreatePVCOptions{
 		GenerateName:     true,
 		StorageClassName: storageClassName,
 		Source: &corev1.TypedObjectReference{

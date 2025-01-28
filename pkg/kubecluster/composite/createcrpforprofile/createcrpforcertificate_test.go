@@ -1,4 +1,4 @@
-package kubecluster
+package createcrpforprofile
 
 import (
 	"context"
@@ -21,7 +21,7 @@ func TestCreateCRPForCertificate(t *testing.T) {
 	certName := "test-cert"
 	certNamespace := "test-namespace"
 
-	basicCert := certmanagerv1.Certificate{
+	basicCert := &certmanagerv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: certNamespace,
 			Name:      certName,
@@ -37,7 +37,7 @@ func TestCreateCRPForCertificate(t *testing.T) {
 
 	tests := []struct {
 		desc                                              string
-		cert                                              certmanagerv1.Certificate
+		cert                                              *certmanagerv1.Certificate
 		opts                                              CreateCRPForCertificateOpts
 		simulateCreateCertificateRequestPolicyError       bool
 		simulateWaitForReadyCertificateRequestPolicyError bool
@@ -66,7 +66,7 @@ func TestCreateCRPForCertificate(t *testing.T) {
 		},
 		{
 			desc: "all opts",
-			cert: certmanagerv1.Certificate{
+			cert: &certmanagerv1.Certificate{
 				ObjectMeta: basicCert.ObjectMeta,
 				Spec: certmanagerv1.CertificateSpec{
 					IssuerRef:  basicCert.Spec.IssuerRef,
@@ -209,7 +209,7 @@ func TestCreateCRPForCertificate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			ctx := context.Background()
-			c := newMockClient(t)
+			c := newMockProvider(t)
 
 			func() {
 				var crp *policyv1alpha1.CertificateRequestPolicy

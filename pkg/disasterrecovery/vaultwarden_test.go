@@ -11,6 +11,9 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonepvc"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
@@ -70,7 +73,7 @@ func TestVaultWardenBackup(t *testing.T) {
 			backupOptions: VaultWardenBackupOptions{
 				VolumeSize:         resource.MustParse("10Gi"),
 				VolumeStorageClass: "custom-storage-class",
-				CloneClusterOptions: kubecluster.CloneClusterOptions{
+				CloneClusterOptions: clonedcluster.CloneClusterOptions{
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
 				BackupToolPodCreationTimeout: helpers.MaxWaitTime(1 * time.Second),
@@ -135,7 +138,7 @@ func TestVaultWardenBackup(t *testing.T) {
 					},
 				},
 			}
-			clonedCluster := kubecluster.NewMockClonedClusterInterface(t)
+			clonedCluster := clonedcluster.NewMockClonedClusterInterface(t)
 			servingCert := certmanagerv1.Certificate{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "serving-cert",
@@ -148,7 +151,7 @@ func TestVaultWardenBackup(t *testing.T) {
 					Namespace: namespace,
 				},
 			}
-			btInstance := kubecluster.NewMockBackupToolInstanceInterface(t)
+			btInstance := backuptoolinstance.NewMockBackupToolInstanceInterface(t)
 			credentials := postgres.EnvironmentCredentials{
 				postgres.UserVarName: "postgres",
 			}
@@ -191,7 +194,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				// Step 1
 				var fullBackupName string
 				mockClient.EXPECT().ClonePVC(ctx, namespace, dataPVC, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace, dataPVC string, opts kubecluster.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+					RunAndReturn(func(ctx context.Context, namespace, dataPVC string, opts clonepvc.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error) {
 						fullBackupName = opts.DestPvcNamePrefix
 						require.True(t, strings.HasPrefix(fullBackupName, backupName))
 						require.Equal(t, tt.backupOptions.CleanupTimeout, opts.CleanupTimeout)
@@ -218,7 +221,7 @@ func TestVaultWardenBackup(t *testing.T) {
 
 				// Step 3
 				mockClient.EXPECT().CloneCluster(ctx, namespace, clusterName, mock.Anything, servingIssuerName, clientIssuerName, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts kubecluster.CloneClusterOptions) (kubecluster.ClonedClusterInterface, error) {
+					RunAndReturn(func(ctx context.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
 						require.True(t, strings.Contains(newClusterName, existingClusterName))
 						require.True(t, strings.Contains(newClusterName, helpers.CleanName(fullBackupName)))
 
@@ -236,7 +239,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				clonedCluster.EXPECT().GetServingCert().Return(&servingCert)
 				clonedCluster.EXPECT().GetClientCert().Return(&clientCert)
 				mockClient.EXPECT().CreateBackupToolInstance(ctx, namespace, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace, instance string, opts kubecluster.CreateBackupToolInstanceOptions) (kubecluster.BackupToolInstanceInterface, error) {
+					RunAndReturn(func(ctx context.Context, namespace, instance string, opts backuptoolinstance.CreateBackupToolInstanceOptions) (backuptoolinstance.BackupToolInstanceInterface, error) {
 						require.Equal(t, fullBackupName, opts.NamePrefix)
 						// TODO add test to ensure that the secrets are attached, along with the DR and cloned data PVCs
 						require.Len(t, opts.Volumes, 4)

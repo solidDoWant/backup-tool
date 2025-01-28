@@ -1,4 +1,4 @@
-package kubecluster
+package clonepvc
 
 import (
 	context "context"
@@ -227,31 +227,31 @@ func TestClonePVC(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			c := newMockClient(t)
+			p := newMockProvider(t)
 			ctx := context.Background()
 
 			// This makes the logic for setting up mocks/expected calls easier, because once an error
 			// becomes expected, the function can be returned from
 			func() {
 				snapshot := th.ValOrDefault(tt.createdSnapshot, createdSnapshot)
-				c.esClient.EXPECT().SnapshotVolume(ctx, namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{}).
+				p.esClient.EXPECT().SnapshotVolume(ctx, namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{}).
 					Return(th.ErrOr1Val(snapshot, tt.simulateSnapshotErr))
 				if tt.simulateSnapshotErr {
 					return
 				}
 
-				c.esClient.EXPECT().DeleteSnapshot(mock.Anything, namespace, snapshotName).RunAndReturn(func(cleanupCtx context.Context, _, _ string) error {
+				p.esClient.EXPECT().DeleteSnapshot(mock.Anything, namespace, snapshotName).RunAndReturn(func(cleanupCtx context.Context, _, _ string) error {
 					require.NotEqual(t, ctx, cleanupCtx)
 					return nil
 				})
 
-				c.esClient.EXPECT().WaitForReadySnapshot(ctx, namespace, snapshotName, mock.Anything).
+				p.esClient.EXPECT().WaitForReadySnapshot(ctx, namespace, snapshotName, mock.Anything).
 					Return(th.ErrOr1Val(snapshot, tt.simulateWaitForSnapshotErr))
 				if tt.simulateWaitForSnapshotErr {
 					return
 				}
 
-				c.coreClient.EXPECT().GetPVC(ctx, namespace, pvcName).RunAndReturn(func(ctx context.Context, namespace, pvcName string) (*corev1.PersistentVolumeClaim, error) {
+				p.coreClient.EXPECT().GetPVC(ctx, namespace, pvcName).RunAndReturn(func(ctx context.Context, namespace, pvcName string) (*corev1.PersistentVolumeClaim, error) {
 					if tt.initialPVC != nil {
 						return th.ErrOr1Val(tt.initialPVC, tt.simulateQueryExistingErr)
 					}
@@ -285,10 +285,10 @@ func TestClonePVC(t *testing.T) {
 					opts.StorageClassName = *tt.initialPVC.Spec.StorageClassName
 				}
 
-				c.coreClient.EXPECT().CreatePVC(ctx, namespace, newPVCName, size, opts).Return(th.ErrOr1Val(tt.expectedPVC, tt.simulateCreateErr))
+				p.coreClient.EXPECT().CreatePVC(ctx, namespace, newPVCName, size, opts).Return(th.ErrOr1Val(tt.expectedPVC, tt.simulateCreateErr))
 			}()
 
-			clonedPVC, err := c.ClonePVC(ctx, namespace, pvcName, tt.opts)
+			clonedPVC, err := p.ClonePVC(ctx, namespace, pvcName, tt.opts)
 			if th.ErrExpected(tt.simulateSnapshotErr, tt.simulateWaitForSnapshotErr, tt.simulateQueryExistingErr, tt.simulateCreateErr, tt.expectRestoreSizeErr) {
 				require.Error(t, err)
 				require.Nil(t, clonedPVC)

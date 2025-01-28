@@ -1,4 +1,4 @@
-package kubecluster
+package clonedcluster
 
 import (
 	context "context"
@@ -30,7 +30,7 @@ type ClonedClusterInterface interface {
 }
 
 type ClonedCluster struct {
-	c                  ClientInterface
+	p                  providerInterfaceInternal
 	cluster            *apiv1.Cluster
 	servingCertificate *certmanagerv1.Certificate
 	clientCertificate  *certmanagerv1.Certificate
@@ -51,14 +51,14 @@ type CloneClusterOptions struct {
 	// TODO maybe provide an option for CRPs?
 }
 
-func newClonedCluster(c ClientInterface) ClonedClusterInterface {
-	return &ClonedCluster{c: c}
+func newClonedCluster(p providerInterfaceInternal) ClonedClusterInterface {
+	return &ClonedCluster{p: p}
 }
 
 // Clone an existing CNPG cluster, with separate certificates for authentication.
 // It is assumed that all required resources for approving certificats (such as Certificate Request Policies) are already in place.
-func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
-	cluster = c.newClonedCluster()
+func (p *Provider) CloneCluster(ctx context.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
+	cluster = p.newClonedCluster()
 
 	// Prepare to handle resource cleanup in the event of an error
 	errHandler := func(originalErr error, args ...interface{}) (*ClonedCluster, error) {
@@ -70,7 +70,7 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 	}
 
 	// Perform as many read-only operations as possible now to reduce the number of changes that need to be reverted in case of a failure
-	existingCluster, err := c.CNPG().GetCluster(ctx, namespace, existingClusterName)
+	existingCluster, err := p.cnpgClient.GetCluster(ctx, namespace, existingClusterName)
 	if err != nil {
 		return errHandler(err, "failed to get existing cluster %q", helpers.FullNameStr(namespace, existingClusterName))
 	}
@@ -82,12 +82,12 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 
 	// 1. Create a backup of the current cluster
 	backupNamePrefix := existingClusterName + "-cloned"
-	backup, err := c.CNPG().CreateBackup(ctx, namespace, backupNamePrefix, existingClusterName, cnpg.CreateBackupOptions{GenerateName: true})
+	backup, err := p.cnpgClient.CreateBackup(ctx, namespace, backupNamePrefix, existingClusterName, cnpg.CreateBackupOptions{GenerateName: true})
 	if err != nil {
 		return errHandler(err, "failed to create backup of existing cluster %q", helpers.FullNameStr(namespace, existingClusterName))
 	}
 	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
-		cleanupErr := c.CNPG().DeleteBackup(ctx, namespace, backup.Name)
+		cleanupErr := p.cnpgClient.DeleteBackup(ctx, namespace, backup.Name)
 		if cleanupErr == nil {
 			return nil
 		}
@@ -97,7 +97,7 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 		return cleanupErr
 	}).WithErrMessage("cleanup failed").WithOriginalErr(&err).Run()
 
-	readyBackup, err := c.CNPG().WaitForReadyBackup(ctx, namespace, backup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: opts.WaitForBackupTimeout})
+	readyBackup, err := p.cnpgClient.WaitForReadyBackup(ctx, namespace, backup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: opts.WaitForBackupTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait forbackup %q to be ready", helpers.FullName(backup))
 	}
@@ -118,13 +118,13 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 		certOptions.IssuerKind = opts.ServingCertIssuerKind
 	}
 
-	servingCert, err := c.CM().CreateCertificate(ctx, namespace, servingCertName, servingCertIssuerName, certOptions)
+	servingCert, err := p.cmClient.CreateCertificate(ctx, namespace, servingCertName, servingCertIssuerName, certOptions)
 	if err != nil {
 		return errHandler(err, "failed to create cluster serving cert %q", helpers.FullNameStr(namespace, servingCertName))
 	}
 	cluster.setServingCert(servingCert)
 
-	readyServingCert, err := c.CM().WaitForReadyCertificate(ctx, namespace, servingCertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.WaitForServingCertTimeout})
+	readyServingCert, err := p.cmClient.WaitForReadyCertificate(ctx, namespace, servingCertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.WaitForServingCertTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for serving certificate %q to be ready", helpers.FullName(servingCert))
 	}
@@ -146,13 +146,13 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 		certOptions.IssuerKind = opts.ClientCertIssuerKind
 	}
 
-	clientCert, err := c.CM().CreateCertificate(ctx, namespace, clientCertName, clientCertIssuerName, certOptions)
+	clientCert, err := p.cmClient.CreateCertificate(ctx, namespace, clientCertName, clientCertIssuerName, certOptions)
 	if err != nil {
 		return errHandler(err, "failed to create %q user cert %q", clientUserName, helpers.FullNameStr(namespace, clientCertName))
 	}
 	cluster.setClientCert(clientCert)
 
-	readyClientCert, err := c.CM().WaitForReadyCertificate(ctx, namespace, clientCertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.WaitForClientCertTimeout})
+	readyClientCert, err := p.cmClient.WaitForReadyCertificate(ctx, namespace, clientCertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.WaitForClientCertTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for %q user certificate %q to be ready", clientUserName, helpers.FullName(readyServingCert))
 	}
@@ -169,14 +169,14 @@ func (c *Client) CloneCluster(ctx context.Context, namespace, existingClusterNam
 		}
 	}
 
-	newCluster, err := c.CNPG().CreateCluster(ctx, namespace, newClusterName, clusterVolumeSize, servingCertName, clientCertName, clusterOpts)
+	newCluster, err := p.cnpgClient.CreateCluster(ctx, namespace, newClusterName, clusterVolumeSize, servingCertName, clientCertName, clusterOpts)
 	if err != nil {
 		return errHandler(err, "failed to create new cluster %q from backup %q with serving certificate %q and client certificate %q",
 			helpers.FullNameStr(namespace, newClusterName), helpers.FullName(readyBackup), helpers.FullName(readyServingCert), helpers.FullName(readyClientCert))
 	}
 	cluster.setCluster(newCluster)
 
-	readyCluster, err := c.CNPG().WaitForReadyCluster(ctx, namespace, newClusterName, cnpg.WaitForReadyClusterOpts{MaxWaitTime: opts.WaitForClusterTimeout})
+	readyCluster, err := p.cnpgClient.WaitForReadyCluster(ctx, namespace, newClusterName, cnpg.WaitForReadyClusterOpts{MaxWaitTime: opts.WaitForClusterTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for new cluster %q to become ready", helpers.FullNameStr(namespace, newClusterName))
 	}
@@ -243,21 +243,21 @@ func (cc *ClonedCluster) Delete(ctx context.Context) error {
 	cleanupErrs := make([]error, 0, 3)
 
 	if cc.cluster != nil {
-		err := cc.c.CNPG().DeleteCluster(ctx, cc.cluster.Namespace, cc.cluster.Name)
+		err := cc.p.cnpg().DeleteCluster(ctx, cc.cluster.Namespace, cc.cluster.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster CNPG cluster %q", helpers.FullName(cc.cluster)))
 		}
 	}
 
 	if cc.clientCertificate != nil {
-		err := cc.c.CM().DeleteCertificate(ctx, cc.clientCertificate.Namespace, cc.clientCertificate.Name)
+		err := cc.p.cm().DeleteCertificate(ctx, cc.clientCertificate.Namespace, cc.clientCertificate.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster client cert %q", helpers.FullName(cc.clientCertificate)))
 		}
 	}
 
 	if cc.servingCertificate != nil {
-		err := cc.c.CM().DeleteCertificate(ctx, cc.servingCertificate.Namespace, cc.servingCertificate.Name)
+		err := cc.p.cm().DeleteCertificate(ctx, cc.servingCertificate.Namespace, cc.servingCertificate.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster serving cert %q", helpers.FullName(cc.servingCertificate)))
 		}

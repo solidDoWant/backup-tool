@@ -1,4 +1,4 @@
-package kubecluster
+package clonedcluster
 
 import (
 	context "context"
@@ -142,12 +142,12 @@ func TestGetCredentials(t *testing.T) {
 
 func TestNewClonedCluster(t *testing.T) {
 	t.Run("returns new ClonedCluster with client reference set", func(t *testing.T) {
-		c := NewClient(nil, nil, nil, nil, nil)
-		cc := newClonedCluster(c)
+		p := NewProvider(nil, nil)
+		cc := newClonedCluster(p)
 		casted := cc.(*ClonedCluster)
 
 		require.NotNil(t, cc)
-		assert.Equal(t, c, casted.c)
+		assert.Equal(t, p, casted.p)
 	})
 }
 
@@ -318,37 +318,37 @@ func TestCloneCluster(t *testing.T) {
 			)
 
 			// Setup mocks
-			c := newMockClient(t)
+			p := newMockProvider(t)
 
 			// This makes the logic for setting up mocks/expected calls easier, because once an error
 			// becomes expected, the function can be returned from
 			func() {
 				if errorExpected {
-					c.clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx context.Context) error {
+					p.clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx context.Context) error {
 						require.NotEqual(t, ctx, cleanupCtx) // This should be a different context with a timeout
 						return th.ErrIfTrue(tt.simulateErrorOnClusterCleanup)
 					})
 				}
 
-				c.cnpgClient.EXPECT().GetCluster(ctx, namespace, existingCluster.Name).Return(th.ErrOr1Val(existingCluster, tt.simulateGetExistingClusterError))
+				p.cnpgClient.EXPECT().GetCluster(ctx, namespace, existingCluster.Name).Return(th.ErrOr1Val(existingCluster, tt.simulateGetExistingClusterError))
 				if tt.simulateGetExistingClusterError {
 					return
 				}
 
-				c.cnpgClient.EXPECT().CreateBackup(ctx, namespace, createdBackup.Name, existingCluster.Name, cnpg.CreateBackupOptions{GenerateName: true}).
+				p.cnpgClient.EXPECT().CreateBackup(ctx, namespace, createdBackup.Name, existingCluster.Name, cnpg.CreateBackupOptions{GenerateName: true}).
 					Return(th.ErrOr1Val(createdBackup, tt.simulateBackupError))
 				if tt.simulateBackupError {
 					return
 				}
 
-				c.cnpgClient.EXPECT().DeleteBackup(mock.Anything, namespace, createdBackup.Name).Return(th.ErrIfTrue(tt.simulateBackupCleanupError))
-				c.cnpgClient.EXPECT().WaitForReadyBackup(ctx, namespace, createdBackup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: tt.opts.WaitForBackupTimeout}).
+				p.cnpgClient.EXPECT().DeleteBackup(mock.Anything, namespace, createdBackup.Name).Return(th.ErrIfTrue(tt.simulateBackupCleanupError))
+				p.cnpgClient.EXPECT().WaitForReadyBackup(ctx, namespace, createdBackup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: tt.opts.WaitForBackupTimeout}).
 					Return(th.ErrOr1Val(createdBackup, tt.simulateWaitingForBackupError))
 				if tt.simulateWaitingForBackupError {
 					return
 				}
 
-				c.cmClient.EXPECT().CreateCertificate(ctx, namespace, helpers.CleanName(createdServingCert.Name), servingIssuerName, certmanager.CreateCertificateOptions{
+				p.cmClient.EXPECT().CreateCertificate(ctx, namespace, helpers.CleanName(createdServingCert.Name), servingIssuerName, certmanager.CreateCertificateOptions{
 					CommonName: createdServingCert.Name,
 					DNSNames:   getClusterDomainNames(newClusterName, namespace),
 					SecretLabels: map[string]string{
@@ -362,15 +362,15 @@ func TestCloneCluster(t *testing.T) {
 					return
 				}
 
-				c.clonedCluster.EXPECT().setServingCert(createdServingCert).Return()
-				c.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdServingCert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.WaitForServingCertTimeout}).
+				p.clonedCluster.EXPECT().setServingCert(createdServingCert).Return()
+				p.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdServingCert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.WaitForServingCertTimeout}).
 					Return(th.ErrOr1Val(createdServingCert, tt.simulateWaitForServingCertError))
 				if tt.simulateWaitForServingCertError {
 					return
 				}
-				c.clonedCluster.EXPECT().setServingCert(createdServingCert).Return()
+				p.clonedCluster.EXPECT().setServingCert(createdServingCert).Return()
 
-				c.cmClient.EXPECT().CreateCertificate(ctx, namespace, helpers.CleanName(createdClientCert.Name), clientIssuerName, certmanager.CreateCertificateOptions{
+				p.cmClient.EXPECT().CreateCertificate(ctx, namespace, helpers.CleanName(createdClientCert.Name), clientIssuerName, certmanager.CreateCertificateOptions{
 					CommonName: "postgres",
 					SecretLabels: map[string]string{
 						"cnpg.io/reload": "true",
@@ -383,32 +383,32 @@ func TestCloneCluster(t *testing.T) {
 					return
 				}
 
-				c.clonedCluster.EXPECT().setClientCert(createdClientCert).Return()
-				c.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdClientCert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.WaitForClientCertTimeout}).
+				p.clonedCluster.EXPECT().setClientCert(createdClientCert).Return()
+				p.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdClientCert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.WaitForClientCertTimeout}).
 					Return(th.ErrOr1Val(createdClientCert, tt.simulateWaitForClientCertError))
 				if tt.simulateWaitForClientCertError {
 					return
 				}
-				c.clonedCluster.EXPECT().setClientCert(createdClientCert).Return()
+				p.clonedCluster.EXPECT().setClientCert(createdClientCert).Return()
 
-				c.cnpgClient.EXPECT().CreateCluster(ctx, namespace, newCluster.Name, resource.MustParse(existingCluster.Spec.StorageConfiguration.Size), createdServingCert.Name, createdClientCert.Name, clusterOpts).
+				p.cnpgClient.EXPECT().CreateCluster(ctx, namespace, newCluster.Name, resource.MustParse(existingCluster.Spec.StorageConfiguration.Size), createdServingCert.Name, createdClientCert.Name, clusterOpts).
 					Return(th.ErrOr1Val(newCluster, tt.simulateClusterCreationError))
 				if tt.simulateClusterCreationError {
 					return
 				}
 
-				c.clonedCluster.EXPECT().setCluster(newCluster).Return()
-				c.cnpgClient.EXPECT().WaitForReadyCluster(ctx, namespace, newCluster.Name, cnpg.WaitForReadyClusterOpts{MaxWaitTime: tt.opts.WaitForClusterTimeout}).
+				p.clonedCluster.EXPECT().setCluster(newCluster).Return()
+				p.cnpgClient.EXPECT().WaitForReadyCluster(ctx, namespace, newCluster.Name, cnpg.WaitForReadyClusterOpts{MaxWaitTime: tt.opts.WaitForClusterTimeout}).
 					Return(th.ErrOr1Val(newCluster, tt.simulateWaitForClusterError))
 				if tt.simulateWaitForClusterError {
 					return
 				}
 
-				c.clonedCluster.EXPECT().setCluster(newCluster).Return()
+				p.clonedCluster.EXPECT().setCluster(newCluster).Return()
 			}()
 
 			// Run the function
-			clonedCluster, err := c.CloneCluster(ctx, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName, tt.opts)
+			clonedCluster, err := p.CloneCluster(ctx, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName, tt.opts)
 
 			// Test the results
 			if errorExpected {
@@ -425,19 +425,19 @@ func TestCloneCluster(t *testing.T) {
 }
 
 func TestClonedClusterWhenFailToParseExistingClusterStorageSize(t *testing.T) {
-	c := newMockClient(t)
+	p := newMockProvider(t)
 	ctx := context.Background()
 
-	c.cnpgClient.EXPECT().GetCluster(ctx, "test-ns", "existing-cluster").Return(&apiv1.Cluster{
+	p.cnpgClient.EXPECT().GetCluster(ctx, "test-ns", "existing-cluster").Return(&apiv1.Cluster{
 		Spec: apiv1.ClusterSpec{
 			StorageConfiguration: apiv1.StorageConfiguration{
 				Size: "not-a-size",
 			},
 		},
 	}, nil)
-	c.clonedCluster.EXPECT().Delete(mock.Anything).Return(nil)
+	p.clonedCluster.EXPECT().Delete(mock.Anything).Return(nil)
 
-	clonedCluster, err := c.CloneCluster(ctx, "test-ns", "existing-cluster", "new-cluster", "issuer-1", "issuer-2", CloneClusterOptions{})
+	clonedCluster, err := p.CloneCluster(ctx, "test-ns", "existing-cluster", "new-cluster", "issuer-1", "issuer-2", CloneClusterOptions{})
 	require.Error(t, err)
 	require.Nil(t, clonedCluster)
 }
@@ -534,19 +534,19 @@ func TestClonedClusterDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			ctx := context.Background()
-			c := newMockClient(t)
-			tt.cc.c = c
+			p := newMockProvider(t)
+			tt.cc.p = p
 
 			if tt.cc.cluster != nil {
-				c.cnpgClient.EXPECT().DeleteCluster(ctx, tt.cc.cluster.Namespace, tt.cc.cluster.Name).Return(th.ErrIfTrue(tt.simulateClusterDeleteError))
+				p.cnpgClient.EXPECT().DeleteCluster(ctx, tt.cc.cluster.Namespace, tt.cc.cluster.Name).Return(th.ErrIfTrue(tt.simulateClusterDeleteError))
 			}
 
 			if tt.cc.clientCertificate != nil {
-				c.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.clientCertificate.Namespace, tt.cc.clientCertificate.Name).Return(th.ErrIfTrue(tt.simulateClientCertDeleteError))
+				p.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.clientCertificate.Namespace, tt.cc.clientCertificate.Name).Return(th.ErrIfTrue(tt.simulateClientCertDeleteError))
 			}
 
 			if tt.cc.servingCertificate != nil {
-				c.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.servingCertificate.Namespace, tt.cc.servingCertificate.Name).Return(th.ErrIfTrue(tt.simulateServingCertDeleteError))
+				p.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.servingCertificate.Namespace, tt.cc.servingCertificate.Name).Return(th.ErrIfTrue(tt.simulateServingCertDeleteError))
 			}
 
 			err := tt.cc.Delete(ctx)

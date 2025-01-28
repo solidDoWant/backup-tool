@@ -22,8 +22,13 @@ packages:
     <<: *baseline_config
     interfaces:
       ClientInterface:
-      ClonedClusterInterface:
-      BackupToolInstanceInterface:
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforprofile: &kube_composite_config
+    <<: *baseline_config
+    interfaces:
+      ProviderInterface:
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert: *kube_composite_config
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonepvc: *kube_composite_config
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster: *kube_composite_config
   github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy: &kube_primative_config
     <<: *baseline_config
     interfaces:
@@ -33,4 +38,3 @@ packages:
   github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter: *kube_primative_config
   github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core: *kube_primative_config
   github.com/solidDoWant/backup-tool/pkg/postgres: *baseline_config
- 

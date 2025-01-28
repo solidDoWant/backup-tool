@@ -11,47 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Embeds `Client`, while providing references to the mock implementations of primative clients.
-type mockClient struct {
-	*Client
-	cmClient           *certmanager.MockClientInterface
-	cnpgClient         *cnpg.MockClientInterface
-	esClient           *externalsnapshotter.MockClientInterface
-	coreClient         *core.MockClientInterface
-	apClient           *approverpolicy.MockClientInterface
-	clonedCluster      *MockClonedClusterInterface
-	backupToolInstance *MockBackupToolInstanceInterface
-}
-
-func newMockClient(t *testing.T) *mockClient {
-	cmClient := certmanager.NewMockClientInterface(t)
-	cnpgClient := cnpg.NewMockClientInterface(t)
-	esClient := externalsnapshotter.NewMockClientInterface(t)
-	coreClient := core.NewMockClientInterface(t)
-	clonedCluster := NewMockClonedClusterInterface(t)
-	apClient := approverpolicy.NewMockClientInterface(t)
-	backupToolInstance := NewMockBackupToolInstanceInterface(t)
-	client := NewClient(cmClient, cnpgClient, esClient, coreClient, apClient)
-	casted := client.(*Client)
-	casted.newClonedCluster = func() ClonedClusterInterface {
-		return clonedCluster
-	}
-	casted.newBackupToolInstance = func() BackupToolInstanceInterface {
-		return backupToolInstance
-	}
-
-	return &mockClient{
-		Client:             casted,
-		cmClient:           cmClient,
-		cnpgClient:         cnpgClient,
-		esClient:           esClient,
-		coreClient:         coreClient,
-		apClient:           apClient,
-		clonedCluster:      clonedCluster,
-		backupToolInstance: backupToolInstance,
-	}
-}
-
 func TestNewClient(t *testing.T) {
 	client := NewClient(
 		certmanager.NewMockClientInterface(t),
@@ -66,17 +25,10 @@ func TestNewClient(t *testing.T) {
 	assert.NotNil(t, client.CNPG())
 	assert.NotNil(t, client.ES())
 	assert.NotNil(t, client.Core())
-
-	casted := client.(*Client)
-
-	// Ensure that the `newClonedCluster` function returns a new instance each time.
-	// The mock client does not do this.
-	cc1 := casted.newClonedCluster()
-	cc2 := casted.newClonedCluster()
-	assert.NotSame(t, cc1, cc2)
-
-	// Ensure that the `newBackupToolInstance` function returns a new instance each time.
-	bt1 := casted.newBackupToolInstance()
-	bt2 := casted.newBackupToolInstance()
-	assert.NotSame(t, bt1, bt2)
+	assert.NotNil(t, client.AP())
+	assert.NotNil(t, client.backupToolInstanceProvider)
+	assert.NotNil(t, client.clonedClusterProvider)
+	assert.NotNil(t, client.clonePVCProvider)
+	assert.NotNil(t, client.clusterUserCertProvider)
+	assert.NotNil(t, client.createCRPForProfileProvider)
 }
