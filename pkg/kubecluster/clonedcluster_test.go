@@ -142,7 +142,7 @@ func TestGetCredentials(t *testing.T) {
 
 func TestNewClonedCluster(t *testing.T) {
 	t.Run("returns new ClonedCluster with client reference set", func(t *testing.T) {
-		c := NewClient(nil, nil, nil, nil)
+		c := NewClient(nil, nil, nil, nil, nil)
 		cc := newClonedCluster(c)
 		casted := cc.(*ClonedCluster)
 
@@ -546,7 +546,7 @@ func TestClonedClusterDelete(t *testing.T) {
 			}
 
 			if tt.cc.servingCertificate != nil {
-				c.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.clientCertificate.Namespace, tt.cc.servingCertificate.Name).Return(th.ErrIfTrue(tt.simulateServingCertDeleteError))
+				c.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.servingCertificate.Namespace, tt.cc.servingCertificate.Name).Return(th.ErrIfTrue(tt.simulateServingCertDeleteError))
 			}
 
 			err := tt.cc.Delete(ctx)

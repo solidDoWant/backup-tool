@@ -257,7 +257,7 @@ func (cc *ClonedCluster) Delete(ctx context.Context) error {
 	}
 
 	if cc.servingCertificate != nil {
-		err := cc.c.CM().DeleteCertificate(ctx, cc.clientCertificate.Namespace, cc.servingCertificate.Name)
+		err := cc.c.CM().DeleteCertificate(ctx, cc.servingCertificate.Namespace, cc.servingCertificate.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster serving cert %q", helpers.FullName(cc.servingCertificate)))
 		}
