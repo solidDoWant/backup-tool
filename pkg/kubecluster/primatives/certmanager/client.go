@@ -17,6 +17,7 @@ type ClientInterface interface {
 	// Certificates
 	CreateCertificate(ctx context.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error)
 	WaitForReadyCertificate(ctx context.Context, namespace, name string, opts WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error)
+	ReissueCertificate(ctx context.Context, namespace, name string) (*certmanagerv1.Certificate, error)
 	DeleteCertificate(ctx context.Context, namespace, name string) error
 }
 

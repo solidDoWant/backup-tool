@@ -242,6 +242,66 @@ func (_c *MockClientInterface_DeleteIssuer_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// ReissueCertificate provides a mock function with given fields: ctx, namespace, name
+func (_m *MockClientInterface) ReissueCertificate(ctx context.Context, namespace string, name string) (*v1.Certificate, error) {
+	ret := _m.Called(ctx, namespace, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReissueCertificate")
+	}
+
+	var r0 *v1.Certificate
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*v1.Certificate, error)); ok {
+		return rf(ctx, namespace, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.Certificate); ok {
+		r0 = rf(ctx, namespace, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Certificate)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, namespace, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_ReissueCertificate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReissueCertificate'
+type MockClientInterface_ReissueCertificate_Call struct {
+	*mock.Call
+}
+
+// ReissueCertificate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - name string
+func (_e *MockClientInterface_Expecter) ReissueCertificate(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_ReissueCertificate_Call {
+	return &MockClientInterface_ReissueCertificate_Call{Call: _e.mock.On("ReissueCertificate", ctx, namespace, name)}
+}
+
+func (_c *MockClientInterface_ReissueCertificate_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockClientInterface_ReissueCertificate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_ReissueCertificate_Call) Return(_a0 *v1.Certificate, _a1 error) *MockClientInterface_ReissueCertificate_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_ReissueCertificate_Call) RunAndReturn(run func(context.Context, string, string) (*v1.Certificate, error)) *MockClientInterface_ReissueCertificate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // WaitForReadyCertificate provides a mock function with given fields: ctx, namespace, name, opts
 func (_m *MockClientInterface) WaitForReadyCertificate(ctx context.Context, namespace string, name string, opts WaitForReadyCertificateOpts) (*v1.Certificate, error) {
 	ret := _m.Called(ctx, namespace, name, opts)

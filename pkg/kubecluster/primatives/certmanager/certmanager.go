@@ -2,14 +2,17 @@ package certmanager
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	cmutil "github.com/cert-manager/cert-manager/pkg/api/util"
 	"github.com/cert-manager/cert-manager/pkg/apis/certmanager"
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
 
@@ -54,7 +57,7 @@ func (cmc *Client) CreateCertificate(ctx context.Context, namespace, name, issue
 	if certDuration == nil {
 		certDuration = ptr.To(time.Hour)
 	}
-	certificate.Spec.Duration = &v1.Duration{
+	certificate.Spec.Duration = &metav1.Duration{
 		Duration: *certDuration,
 	}
 
@@ -72,7 +75,7 @@ func (cmc *Client) CreateCertificate(ctx context.Context, namespace, name, issue
 		}
 	}
 
-	certificate, err := cmc.client.CertmanagerV1().Certificates(namespace).Create(ctx, certificate, v1.CreateOptions{})
+	certificate, err := cmc.client.CertmanagerV1().Certificates(namespace).Create(ctx, certificate, metav1.CreateOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create certificate %q", helpers.FullNameStr(namespace, name))
 	}
@@ -110,12 +113,24 @@ func (cmc *Client) WaitForReadyCertificate(ctx context.Context, namespace, name 
 	return certificate, nil
 }
 
+// Trigger an immediate re-issuance of a certificate
+func (cmc *Client) ReissueCertificate(ctx context.Context, namespace, name string) (*certmanagerv1.Certificate, error) {
+	cert, err := cmc.client.CertmanagerV1().Certificates(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to get certificate %q", helpers.FullNameStr(namespace, name))
+	}
+
+	cmutil.SetCertificateCondition(cert, cert.Generation, certmanagerv1.CertificateConditionIssuing, cmmeta.ConditionTrue, "ManuallyTriggered", fmt.Sprintf("Certificate re-issuance triggered by %s", constants.ToolName))
+	updatedCert, err := cmc.client.CertmanagerV1().Certificates(cert.Namespace).UpdateStatus(ctx, cert, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to update status of Certificate %s/%s", cert.Namespace, cert.Name)
+	}
+
+	return updatedCert, nil
+}
+
 func (cmc *Client) DeleteCertificate(ctx context.Context, namespace, name string) error {
-	err := cmc.client.CertmanagerV1().Certificates(namespace).Delete(ctx, name, v1.DeleteOptions{})
-
-	// TODO delete related requests if needed
-	// can't remember if these are handled by CM or not
-
+	err := cmc.client.CertmanagerV1().Certificates(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete certificate %q", helpers.FullNameStr(namespace, name))
 }
 
@@ -136,7 +151,7 @@ func (cmc *Client) CreateIssuer(ctx context.Context, namespace, name, caCertSecr
 
 	opts.SetName(&issuer.ObjectMeta, name)
 
-	issuer, err := cmc.client.CertmanagerV1().Issuers(namespace).Create(ctx, issuer, v1.CreateOptions{})
+	issuer, err := cmc.client.CertmanagerV1().Issuers(namespace).Create(ctx, issuer, metav1.CreateOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create issuer %q", helpers.FullNameStr(namespace, name))
 	}
@@ -175,6 +190,6 @@ func (cmc *Client) WaitForReadyIssuer(ctx context.Context, namespace, name strin
 }
 
 func (cmc *Client) DeleteIssuer(ctx context.Context, name, namespace string) error {
-	err := cmc.client.CertmanagerV1().Issuers(namespace).Delete(ctx, name, v1.DeleteOptions{})
+	err := cmc.client.CertmanagerV1().Issuers(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete issuer %q", helpers.FullNameStr(namespace, name))
 }
