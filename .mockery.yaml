@@ -24,10 +24,11 @@ packages:
       ClientInterface:
       ClonedClusterInterface:
       BackupToolInstanceInterface:
-  github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager: &kube_primative_config
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy: &kube_primative_config
     <<: *baseline_config
     interfaces:
       ClientInterface:
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager: *kube_primative_config
   github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg: *kube_primative_config
   github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter: *kube_primative_config
   github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core: *kube_primative_config

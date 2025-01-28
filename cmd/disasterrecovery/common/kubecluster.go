@@ -3,6 +3,7 @@ package common
 import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
@@ -29,7 +30,7 @@ func (kc *KubernetesCommand) NewKubeClusterClient() (kubecluster.ClientInterface
 		return nil, trace.Wrap(err, "failed to create cloudnative-pg client")
 	}
 
-	externalsnapshotterClient, err := externalsnapshotter.NewClient(config)
+	esClient, err := externalsnapshotter.NewClient(config)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create external-snapshotter client")
 	}
@@ -39,10 +40,16 @@ func (kc *KubernetesCommand) NewKubeClusterClient() (kubecluster.ClientInterface
 		return nil, trace.Wrap(err, "failed to create core client")
 	}
 
+	apClient, err := approverpolicy.NewClient(config)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create approver-policy client")
+	}
+
 	return kubecluster.NewClient(
 		cmClient,
 		cnpgClient,
-		externalsnapshotterClient,
+		esClient,
 		coreClient,
+		apClient,
 	), nil
 }

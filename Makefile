@@ -19,9 +19,9 @@ generate-protobuf-code: $(PROTOBUF_GEN_FILES)
 $(PROTOBUF_GEN_DIR)/%_grpc_mock.pb.go $(PROTOBUF_GEN_DIR)/%_grpc.pb.go $(PROTOBUF_GEN_DIR)/%.pb.go: $(PROTOBUF_SRC_DIR)/%.proto
 	@protoc $(PROTOC_FLAGS) -I $(dir $<) $<
 
-CNPG_VERSION := $(shell go list -f '{{ .Version }}' -m github.com/cloudnative-pg/cloudnative-pg)
 KUBE_CODEGEN_VERSION ?= kubernetes-1.32.0
 
+CNPG_VERSION := $(shell go list -f '{{ .Version }}' -m github.com/cloudnative-pg/cloudnative-pg)
 CNPG_CODEGEN_WORKING_DIR = /tmp/cnpg-gen
 CNPG_KUBE_CODEGEN = $(CNPG_CODEGEN_WORKING_DIR)/kube_codegen.sh
 CNPG_GIT_DIR = $(CNPG_CODEGEN_WORKING_DIR)/repo
@@ -48,6 +48,34 @@ generate-cnpg-client: $(CNPG_KUBE_CODEGEN) $(CNPG_GIT_DIR)
 		kube::codegen::gen_client --output-dir $(CNPG_GEN_DIR) --output-pkg $(MODULE_NAME)/$(CNPG_GEN_DIR:$(PROJECT_DIR)/%=%) --boilerplate /dev/null .
 	@# Patch the files until https://github.com/cloudnative-pg/cloudnative-pg/issues/6585 is fixed
 	@find $(CNPG_GEN_DIR) -type f -name '*.go' -exec sed -i 's/SchemeGroupVersion/GroupVersion/' {} \;
+
+# Needed until https://github.com/cert-manager/approver-policy/pull/571 is merged
+APPROVER_POLICY_VERSION := main # $(shell go list -f '{{ .Version }}' -m github.com/cert-manager/approver-policy)
+APPROVER_POLICY_REPO = https://github.com/solidDoWant/approver-policy.git
+APPROVER_POLICY_CODEGEN_WORKING_DIR = /tmp/approver-policy-gen
+APPROVER_POLICY_KUBE_CODEGEN = $(APPROVER_POLICY_CODEGEN_WORKING_DIR)/kube_codegen.sh
+APPROVER_POLICY_GIT_DIR = $(APPROVER_POLICY_CODEGEN_WORKING_DIR)/repo
+APPROVER_POLICY_GEN_DIR = $(PROJECT_DIR)/pkg/kubecluster/primatives/approverpolicy/gen
+
+$(APPROVER_POLICY_KUBE_CODEGEN):
+	@mkdir -p $(shell dirname "$(APPROVER_POLICY_KUBE_CODEGEN)")
+	@ # Deps are already installed via devcontainer, and this logic is flawed
+	@ # (https://github.com/kubernetes/code-generator/issues/184), so remove it
+	@curl -fsSL https://raw.githubusercontent.com/kubernetes/code-generator/refs/tags/$(KUBE_CODEGEN_VERSION)/kube_codegen.sh | \
+		sed 's/^[^#]*go install.*//' > $(APPROVER_POLICY_KUBE_CODEGEN)
+
+$(APPROVER_POLICY_GIT_DIR):
+	@mkdir -p $(shell dirname "$(APPROVER_POLICY_GIT_DIR)")
+	@git -c advice.detachedHead=false \
+		clone --quiet --branch $(APPROVER_POLICY_VERSION) --single-branch $(APPROVER_POLICY_REPO) $(APPROVER_POLICY_GIT_DIR)
+
+PHONY += (generate-approver-policy-client)
+GENERATORS += generate-approver-policy-client
+generate-approver-policy-client: SHELL := bash
+generate-approver-policy-client: $(APPROVER_POLICY_KUBE_CODEGEN) $(APPROVER_POLICY_GIT_DIR)
+	@cd $(APPROVER_POLICY_GIT_DIR)/pkg/apis && \
+		. $(APPROVER_POLICY_KUBE_CODEGEN) && \
+		kube::codegen::gen_client --output-dir $(APPROVER_POLICY_GEN_DIR) --output-pkg $(MODULE_NAME)/$(APPROVER_POLICY_GEN_DIR:$(PROJECT_DIR)/%=%) --boilerplate /dev/null .
 
 PHONY += (generate-mocks)
 GENERATORS += generate-mocks

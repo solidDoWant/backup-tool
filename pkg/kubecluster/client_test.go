@@ -3,6 +3,7 @@ package kubecluster
 import (
 	"testing"
 
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
@@ -17,6 +18,7 @@ type mockClient struct {
 	cnpgClient         *cnpg.MockClientInterface
 	esClient           *externalsnapshotter.MockClientInterface
 	coreClient         *core.MockClientInterface
+	apClient           *approverpolicy.MockClientInterface
 	clonedCluster      *MockClonedClusterInterface
 	backupToolInstance *MockBackupToolInstanceInterface
 }
@@ -27,8 +29,9 @@ func newMockClient(t *testing.T) *mockClient {
 	esClient := externalsnapshotter.NewMockClientInterface(t)
 	coreClient := core.NewMockClientInterface(t)
 	clonedCluster := NewMockClonedClusterInterface(t)
+	apClient := approverpolicy.NewMockClientInterface(t)
 	backupToolInstance := NewMockBackupToolInstanceInterface(t)
-	client := NewClient(cmClient, cnpgClient, esClient, coreClient)
+	client := NewClient(cmClient, cnpgClient, esClient, coreClient, apClient)
 	casted := client.(*Client)
 	casted.newClonedCluster = func() ClonedClusterInterface {
 		return clonedCluster
@@ -43,6 +46,7 @@ func newMockClient(t *testing.T) *mockClient {
 		cnpgClient:         cnpgClient,
 		esClient:           esClient,
 		coreClient:         coreClient,
+		apClient:           apClient,
 		clonedCluster:      clonedCluster,
 		backupToolInstance: backupToolInstance,
 	}
@@ -54,6 +58,7 @@ func TestNewClient(t *testing.T) {
 		cnpg.NewMockClientInterface(t),
 		externalsnapshotter.NewMockClientInterface(t),
 		core.NewMockClientInterface(t),
+		approverpolicy.NewMockClientInterface(t),
 	)
 
 	assert.NotNil(t, client)

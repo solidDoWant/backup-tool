@@ -3,7 +3,9 @@
 package kubecluster
 
 import (
+	approverpolicy "github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
 	certmanager "github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
+
 	cnpg "github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 
 	context "context"
@@ -28,6 +30,53 @@ type MockClientInterface_Expecter struct {
 
 func (_m *MockClientInterface) EXPECT() *MockClientInterface_Expecter {
 	return &MockClientInterface_Expecter{mock: &_m.Mock}
+}
+
+// AP provides a mock function with no fields
+func (_m *MockClientInterface) AP() approverpolicy.ClientInterface {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for AP")
+	}
+
+	var r0 approverpolicy.ClientInterface
+	if rf, ok := ret.Get(0).(func() approverpolicy.ClientInterface); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(approverpolicy.ClientInterface)
+		}
+	}
+
+	return r0
+}
+
+// MockClientInterface_AP_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AP'
+type MockClientInterface_AP_Call struct {
+	*mock.Call
+}
+
+// AP is a helper method to define mock.On call
+func (_e *MockClientInterface_Expecter) AP() *MockClientInterface_AP_Call {
+	return &MockClientInterface_AP_Call{Call: _e.mock.On("AP")}
+}
+
+func (_c *MockClientInterface_AP_Call) Run(run func()) *MockClientInterface_AP_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_AP_Call) Return(_a0 approverpolicy.ClientInterface) *MockClientInterface_AP_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClientInterface_AP_Call) RunAndReturn(run func() approverpolicy.ClientInterface) *MockClientInterface_AP_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // CM provides a mock function with no fields
