@@ -100,7 +100,7 @@ func (p *Provider) NewClusterUserCert(ctx context.Context, namespace, username, 
 	}
 	cuc.setCertificate(readyCert)
 
-	return &ClusterUserCert{}, nil
+	return cuc, nil
 }
 
 func (cuc *ClusterUserCert) setCertificate(cert *certmanagerv1.Certificate) {
