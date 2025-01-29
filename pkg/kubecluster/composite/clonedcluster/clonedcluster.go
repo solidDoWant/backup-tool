@@ -241,6 +241,10 @@ func (p *Provider) CloneCluster(ctx context.Context, namespace, existingClusterN
 		BackupName: readyBackup.Name,
 	}
 
+	if existingCluster.Spec.StorageConfiguration.StorageClass != nil {
+		clusterOpts.StorageClass = *existingCluster.Spec.StorageConfiguration.StorageClass
+	}
+
 	if opts.RecoveryTargetTime != "" {
 		clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{
 			TargetTime: opts.RecoveryTargetTime,

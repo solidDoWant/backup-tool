@@ -145,10 +145,10 @@ func (cnpgc *Client) CreateCluster(ctx context.Context, namespace, clusterName s
 				Owner:    opts.OwnerName,
 			}
 		}
+	}
 
-		if opts.StorageClass != "" {
-			cluster.Spec.StorageConfiguration.StorageClass = &opts.StorageClass
-		}
+	if opts.StorageClass != "" {
+		cluster.Spec.StorageConfiguration.StorageClass = &opts.StorageClass
 	}
 
 	if opts.OwnerName != "" {

@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestGetClusterDomainNames(t *testing.T) {
@@ -320,7 +321,8 @@ func TestCloneCluster(t *testing.T) {
 				},
 				Spec: apiv1.ClusterSpec{
 					StorageConfiguration: apiv1.StorageConfiguration{
-						Size: "10Gi",
+						Size:         "10Gi",
+						StorageClass: ptr.To("specified-storage-class"),
 					},
 				},
 			}
@@ -370,7 +372,8 @@ func TestCloneCluster(t *testing.T) {
 
 			// Setup parameters for mocks that may vary depending on the test
 			clusterOpts := cnpg.CreateClusterOptions{
-				BackupName: createdBackup.Name,
+				BackupName:   createdBackup.Name,
+				StorageClass: "specified-storage-class",
 			}
 			if tt.opts.RecoveryTargetTime != "" {
 				clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{
