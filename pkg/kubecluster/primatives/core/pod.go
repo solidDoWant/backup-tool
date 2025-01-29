@@ -8,6 +8,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func (c *Client) CreatePod(ctx context.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
@@ -47,4 +48,51 @@ func (c *Client) WaitForReadyPod(ctx context.Context, namespace, name string, op
 func (c *Client) DeletePod(ctx context.Context, namespace, name string) error {
 	err := c.client.CoreV1().Pods(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete pod %q", helpers.FullNameStr(namespace, name))
+}
+
+// Helpers
+// Represents a volume that is mounted in a single container.
+type SingleContainerVolume struct {
+	Name         string              `yaml:"name" jsonschema:"required"`
+	MountPath    string              `yaml:"mountPath" jsonschema:"required"`
+	VolumeSource corev1.VolumeSource `yaml:"volumeSource" jsonschema:"required"`
+}
+
+func NewSingleContainerPVC(pvcName, mountPath string) SingleContainerVolume {
+	return SingleContainerVolume{
+		Name:      pvcName,
+		MountPath: mountPath,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: pvcName,
+			},
+		},
+	}
+}
+
+func NewSingleContainerSecret(secretName, mountPath string) SingleContainerVolume {
+	return SingleContainerVolume{
+		Name:      secretName,
+		MountPath: mountPath,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName:  secretName,
+				DefaultMode: ptr.To(int32(0400)), // Read only by owner
+			},
+		},
+	}
+}
+
+func (scv *SingleContainerVolume) ToVolume() corev1.Volume {
+	return corev1.Volume{
+		Name:         scv.Name,
+		VolumeSource: scv.VolumeSource,
+	}
+}
+
+func (svc *SingleContainerVolume) ToVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      svc.Name,
+		MountPath: svc.MountPath,
+	}
 }

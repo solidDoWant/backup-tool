@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8s "k8s.io/client-go/kubernetes"
 	kubetesting "k8s.io/client-go/testing"
+	"k8s.io/utils/ptr"
 )
 
 func TestCreatePod(t *testing.T) {
@@ -216,6 +217,175 @@ func TestDeletePod(t *testing.T) {
 			podList, err := mockK8s.CoreV1().Pods(namespace).List(ctx, metav1.SingleObject(existingPod.ObjectMeta))
 			assert.NoError(t, err)
 			assert.Empty(t, podList.Items)
+		})
+	}
+}
+
+func TestNewSingleContainerPVC(t *testing.T) {
+	tests := []struct {
+		name      string
+		pvcName   string
+		mountPath string
+		want      SingleContainerVolume
+	}{
+		{
+			name:      "basic pvc volume",
+			pvcName:   "test-pvc",
+			mountPath: "/data",
+			want: SingleContainerVolume{
+				Name:      "test-pvc",
+				MountPath: "/data",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "test-pvc",
+					},
+				},
+			},
+		},
+		{
+			name: "empty paths",
+			want: SingleContainerVolume{
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NewSingleContainerPVC(tt.pvcName, tt.mountPath)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestNewSingleContainerSecret(t *testing.T) {
+	tests := []struct {
+		name       string
+		secretName string
+		mountPath  string
+		want       SingleContainerVolume
+	}{
+		{
+			name:       "basic secret volume",
+			secretName: "test-secret",
+			mountPath:  "/secrets",
+			want: SingleContainerVolume{
+				Name:      "test-secret",
+				MountPath: "/secrets",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName:  "test-secret",
+						DefaultMode: ptr.To(int32(0400)),
+					},
+				},
+			},
+		},
+		{
+			name: "empty paths",
+			want: SingleContainerVolume{
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						DefaultMode: ptr.To(int32(0400)),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NewSingleContainerSecret(tt.secretName, tt.mountPath)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSingleContainerVolumeToVolume(t *testing.T) {
+	tests := []struct {
+		name string
+		scv  SingleContainerVolume
+		want corev1.Volume
+	}{
+		{
+			name: "pvc volume",
+			scv: SingleContainerVolume{
+				Name: "test-pvc",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "test-pvc",
+					},
+				},
+			},
+			want: corev1.Volume{
+				Name: "test-pvc",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "test-pvc",
+					},
+				},
+			},
+		},
+		{
+			name: "secret volume",
+			scv: SingleContainerVolume{
+				Name: "test-secret",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName:  "test-secret",
+						DefaultMode: ptr.To(int32(0400)),
+					},
+				},
+			},
+			want: corev1.Volume{
+				Name: "test-secret",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName:  "test-secret",
+						DefaultMode: ptr.To(int32(0400)),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.scv.ToVolume()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSingleContainerVolumeToVolumeMount(t *testing.T) {
+	tests := []struct {
+		name string
+		scv  SingleContainerVolume
+		want corev1.VolumeMount
+	}{
+		{
+			name: "basic volume mount",
+			scv: SingleContainerVolume{
+				Name:      "test-volume",
+				MountPath: "/mnt/data",
+			},
+			want: corev1.VolumeMount{
+				Name:      "test-volume",
+				MountPath: "/mnt/data",
+			},
+		},
+		{
+			name: "empty paths",
+			scv:  SingleContainerVolume{},
+			want: corev1.VolumeMount{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.scv.ToVolumeMount()
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

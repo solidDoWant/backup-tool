@@ -16,7 +16,6 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 type BackupToolInstanceInterface interface {
@@ -37,38 +36,6 @@ type BackupToolInstance struct {
 	lookupIP       func(host string) ([]net.IP, error)
 }
 
-// Represents a volume that is mounted in a single container.
-type SingleContainerVolume struct {
-	Name         string              `yaml:"name" jsonschema:"required"`
-	MountPath    string              `yaml:"mountPath" jsonschema:"required"`
-	VolumeSource corev1.VolumeSource `yaml:"volumeSource" jsonschema:"required"`
-}
-
-func NewSingleContainerPVC(pvcName, mountPath string) SingleContainerVolume {
-	return SingleContainerVolume{
-		Name:      pvcName,
-		MountPath: mountPath,
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: pvcName,
-			},
-		},
-	}
-}
-
-func NewSingleContainerSecret(secretName, mountPath string) SingleContainerVolume {
-	return SingleContainerVolume{
-		Name:      secretName,
-		MountPath: mountPath,
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName:  secretName,
-				DefaultMode: ptr.To(int32(0400)), // Read only by owner
-			},
-		},
-	}
-}
-
 func newBackupToolInstance(p providerInterfaceInternal) BackupToolInstanceInterface {
 	return &BackupToolInstance{
 		p: p,
@@ -87,12 +54,12 @@ func newBackupToolInstance(p providerInterfaceInternal) BackupToolInstanceInterf
 }
 
 type CreateBackupToolInstanceOptions struct {
-	NamePrefix         string                  `yaml:"namePrefix,omitempty"`
-	Volumes            []SingleContainerVolume `yaml:"volumes,omitempty"`
-	CleanupTimeout     helpers.MaxWaitTime     `yaml:"cleanupTimeout,omitempty"`
-	ServiceType        corev1.ServiceType      `yaml:"serviceType,omitempty"`
-	PodWaitTimeout     helpers.MaxWaitTime     `yaml:"podWaitTimeout,omitempty"`
-	ServiceWaitTimeout helpers.MaxWaitTime     `yaml:"serviceWaitTimeout,omitempty"`
+	NamePrefix         string                       `yaml:"namePrefix,omitempty"`
+	Volumes            []core.SingleContainerVolume `yaml:"volumes,omitempty"`
+	CleanupTimeout     helpers.MaxWaitTime          `yaml:"cleanupTimeout,omitempty"`
+	ServiceType        corev1.ServiceType           `yaml:"serviceType,omitempty"`
+	PodWaitTimeout     helpers.MaxWaitTime          `yaml:"podWaitTimeout,omitempty"`
+	ServiceWaitTimeout helpers.MaxWaitTime          `yaml:"serviceWaitTimeout,omitempty"`
 }
 
 func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, instance string, opts CreateBackupToolInstanceOptions) (btInstance BackupToolInstanceInterface, err error) {
@@ -113,16 +80,11 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 	}
 
 	container := corev1.Container{
-		Name:    constants.ToolName,
-		Image:   constants.FullImageName,
-		Command: []string{constants.ToolName},
-		Args:    []string{"grpc"},
-		VolumeMounts: lo.Map(opts.Volumes, func(vol SingleContainerVolume, _ int) corev1.VolumeMount {
-			return corev1.VolumeMount{
-				Name:      vol.Name,
-				MountPath: vol.MountPath,
-			}
-		}),
+		Name:         constants.ToolName,
+		Image:        constants.FullImageName,
+		Command:      []string{constants.ToolName},
+		Args:         []string{"grpc"},
+		VolumeMounts: lo.Map(opts.Volumes, func(vol core.SingleContainerVolume, _ int) corev1.VolumeMount { return vol.ToVolumeMount() }),
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "grpc",
@@ -144,12 +106,7 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 		Spec: corev1.PodSpec{
 			Containers:    []corev1.Container{container},
 			RestartPolicy: corev1.RestartPolicyNever,
-			Volumes: lo.Map(opts.Volumes, func(vol SingleContainerVolume, _ int) corev1.Volume {
-				return corev1.Volume{
-					Name:         vol.Name,
-					VolumeSource: vol.VolumeSource,
-				}
-			}),
+			Volumes:       lo.Map(opts.Volumes, func(vol core.SingleContainerVolume, _ int) corev1.Volume { return vol.ToVolume() }),
 		},
 	}
 

@@ -22,87 +22,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func TestNewSingleContainerPVC(t *testing.T) {
-	tests := []struct {
-		name      string
-		pvcName   string
-		mountPath string
-		want      SingleContainerVolume
-	}{
-		{
-			name:      "basic pvc volume",
-			pvcName:   "test-pvc",
-			mountPath: "/data",
-			want: SingleContainerVolume{
-				Name:      "test-pvc",
-				MountPath: "/data",
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: "test-pvc",
-					},
-				},
-			},
-		},
-		{
-			name: "empty paths",
-			want: SingleContainerVolume{
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{},
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := NewSingleContainerPVC(tt.pvcName, tt.mountPath)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestNewSingleContainerSecret(t *testing.T) {
-	tests := []struct {
-		name       string
-		secretName string
-		mountPath  string
-		want       SingleContainerVolume
-	}{
-		{
-			name:       "basic secret volume",
-			secretName: "test-secret",
-			mountPath:  "/secrets",
-			want: SingleContainerVolume{
-				Name:      "test-secret",
-				MountPath: "/secrets",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName:  "test-secret",
-						DefaultMode: ptr.To(int32(0400)),
-					},
-				},
-			},
-		},
-		{
-			name: "empty paths",
-			want: SingleContainerVolume{
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						DefaultMode: ptr.To(int32(0400)),
-					},
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := NewSingleContainerSecret(tt.secretName, tt.mountPath)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestNewBackupToolInstance(t *testing.T) {
 	c := newMockProvider(t)
 	btInstance := newBackupToolInstance(c)
@@ -142,7 +61,7 @@ func TestCreateBackupToolInstance(t *testing.T) {
 			name: "basic instance creation with all options set",
 			opts: CreateBackupToolInstanceOptions{
 				NamePrefix: "test-prefix-",
-				Volumes: []SingleContainerVolume{
+				Volumes: []core.SingleContainerVolume{
 					{
 						Name:      "vol1",
 						MountPath: "/data1",
