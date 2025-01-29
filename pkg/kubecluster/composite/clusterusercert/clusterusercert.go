@@ -46,7 +46,7 @@ func newClusterUserCert(p providerInterfaceInternal) ClusterUserCertInterface {
 	return &ClusterUserCert{p: p}
 }
 
-func (p *Provider) NewClusterUserCert(ctx context.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (*ClusterUserCert, error) {
+func (p *Provider) NewClusterUserCert(ctx context.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error) {
 	cuc := p.newClusterUserCert()
 
 	errHandler := func(originalErr error, args ...interface{}) (*ClusterUserCert, error) {

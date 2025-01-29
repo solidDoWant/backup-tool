@@ -86,9 +86,9 @@ func (_c *MockClientInterface_CreateBackup_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// CreateCluster provides a mock function with given fields: ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, opts
-func (_m *MockClientInterface) CreateCluster(ctx context.Context, namespace string, clusterName string, volumeSize resource.Quantity, servingCertificateSecretName string, clientCASecretName string, opts CreateClusterOptions) (*v1.Cluster, error) {
-	ret := _m.Called(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, opts)
+// CreateCluster provides a mock function with given fields: ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts
+func (_m *MockClientInterface) CreateCluster(ctx context.Context, namespace string, clusterName string, volumeSize resource.Quantity, servingCertificateSecretName string, clientCASecretName string, replicationUserCertName string, opts CreateClusterOptions) (*v1.Cluster, error) {
+	ret := _m.Called(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateCluster")
@@ -96,19 +96,19 @@ func (_m *MockClientInterface) CreateCluster(ctx context.Context, namespace stri
 
 	var r0 *v1.Cluster
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, resource.Quantity, string, string, CreateClusterOptions) (*v1.Cluster, error)); ok {
-		return rf(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, opts)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) (*v1.Cluster, error)); ok {
+		return rf(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, resource.Quantity, string, string, CreateClusterOptions) *v1.Cluster); ok {
-		r0 = rf(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, opts)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) *v1.Cluster); ok {
+		r0 = rf(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v1.Cluster)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, resource.Quantity, string, string, CreateClusterOptions) error); ok {
-		r1 = rf(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, opts)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) error); ok {
+		r1 = rf(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -128,14 +128,15 @@ type MockClientInterface_CreateCluster_Call struct {
 //   - volumeSize resource.Quantity
 //   - servingCertificateSecretName string
 //   - clientCASecretName string
+//   - replicationUserCertName string
 //   - opts CreateClusterOptions
-func (_e *MockClientInterface_Expecter) CreateCluster(ctx interface{}, namespace interface{}, clusterName interface{}, volumeSize interface{}, servingCertificateSecretName interface{}, clientCASecretName interface{}, opts interface{}) *MockClientInterface_CreateCluster_Call {
-	return &MockClientInterface_CreateCluster_Call{Call: _e.mock.On("CreateCluster", ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, opts)}
+func (_e *MockClientInterface_Expecter) CreateCluster(ctx interface{}, namespace interface{}, clusterName interface{}, volumeSize interface{}, servingCertificateSecretName interface{}, clientCASecretName interface{}, replicationUserCertName interface{}, opts interface{}) *MockClientInterface_CreateCluster_Call {
+	return &MockClientInterface_CreateCluster_Call{Call: _e.mock.On("CreateCluster", ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts)}
 }
 
-func (_c *MockClientInterface_CreateCluster_Call) Run(run func(ctx context.Context, namespace string, clusterName string, volumeSize resource.Quantity, servingCertificateSecretName string, clientCASecretName string, opts CreateClusterOptions)) *MockClientInterface_CreateCluster_Call {
+func (_c *MockClientInterface_CreateCluster_Call) Run(run func(ctx context.Context, namespace string, clusterName string, volumeSize resource.Quantity, servingCertificateSecretName string, clientCASecretName string, replicationUserCertName string, opts CreateClusterOptions)) *MockClientInterface_CreateCluster_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(resource.Quantity), args[4].(string), args[5].(string), args[6].(CreateClusterOptions))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(resource.Quantity), args[4].(string), args[5].(string), args[6].(string), args[7].(CreateClusterOptions))
 	})
 	return _c
 }
@@ -145,7 +146,7 @@ func (_c *MockClientInterface_CreateCluster_Call) Return(_a0 *v1.Cluster, _a1 er
 	return _c
 }
 
-func (_c *MockClientInterface_CreateCluster_Call) RunAndReturn(run func(context.Context, string, string, resource.Quantity, string, string, CreateClusterOptions) (*v1.Cluster, error)) *MockClientInterface_CreateCluster_Call {
+func (_c *MockClientInterface_CreateCluster_Call) RunAndReturn(run func(context.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) (*v1.Cluster, error)) *MockClientInterface_CreateCluster_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -217,11 +217,11 @@ func (p *Provider) CloneCluster(ctx context.Context, namespace, existingClusterN
 		WaitForCertTimeout: opts.Certificates.PostgresUserCert.WaitForReadyTimeout,
 		CleanupTimeout:     opts.CleanupTimeout,
 	}
-	cuc, err := p.cucp.NewClusterUserCert(ctx, namespace, "postgres", clientCAIssuerName, newClusterName, cucOptions)
+	postgresUserCert, err := p.cucp.NewClusterUserCert(ctx, namespace, "postgres", clientCAIssuerName, newClusterName, cucOptions)
 	if err != nil {
 		return errHandler(err, "failed to create postgres user cert resources")
 	}
-	cluster.setPostgresUserCert(cuc)
+	cluster.setPostgresUserCert(postgresUserCert)
 
 	// 5. Create the streaming_replica user certificate
 	cucOptions = clusterusercert.NewClusterUserCertOpts{
@@ -230,11 +230,11 @@ func (p *Provider) CloneCluster(ctx context.Context, namespace, existingClusterN
 		WaitForCertTimeout: opts.Certificates.StreamingReplicaUserCert.WaitForReadyTimeout,
 		CleanupTimeout:     opts.CleanupTimeout,
 	}
-	cuc, err = p.cucp.NewClusterUserCert(ctx, namespace, "streaming_replica", clientCAIssuerName, newClusterName, cucOptions)
+	replicationUserCert, err := p.cucp.NewClusterUserCert(ctx, namespace, "streaming_replica", clientCAIssuerName, newClusterName, cucOptions)
 	if err != nil {
 		return errHandler(err, "failed to create streaming_replica user cert resources")
 	}
-	cluster.setStreamingReplicaUserCert(cuc)
+	cluster.setStreamingReplicaUserCert(replicationUserCert)
 
 	// 6. Create a new cluster from the backup
 	clusterOpts := cnpg.CreateClusterOptions{
@@ -247,7 +247,7 @@ func (p *Provider) CloneCluster(ctx context.Context, namespace, existingClusterN
 		}
 	}
 
-	newCluster, err := p.cnpgClient.CreateCluster(ctx, namespace, newClusterName, clusterVolumeSize, servingCertName, clientCACertName, clusterOpts)
+	newCluster, err := p.cnpgClient.CreateCluster(ctx, namespace, newClusterName, clusterVolumeSize, readyServingCert.Name, readyClientCACert.Name, replicationUserCert.GetCertificate().Name, clusterOpts)
 	if err != nil {
 		return errHandler(err, "failed to create new cluster %q from backup %q with serving certificate %q and client certificate %q",
 			helpers.FullNameStr(namespace, newClusterName), helpers.FullName(readyBackup), helpers.FullName(readyServingCert), helpers.FullName(readyClientCACert))

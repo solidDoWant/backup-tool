@@ -22,23 +22,23 @@ func (_m *MockProviderInterface) EXPECT() *MockProviderInterface_Expecter {
 }
 
 // NewClusterUserCert provides a mock function with given fields: ctx, namespace, username, issuerName, clusterName, opts
-func (_m *MockProviderInterface) NewClusterUserCert(ctx context.Context, namespace string, username string, issuerName string, clusterName string, opts NewClusterUserCertOpts) (*ClusterUserCert, error) {
+func (_m *MockProviderInterface) NewClusterUserCert(ctx context.Context, namespace string, username string, issuerName string, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error) {
 	ret := _m.Called(ctx, namespace, username, issuerName, clusterName, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NewClusterUserCert")
 	}
 
-	var r0 *ClusterUserCert
+	var r0 ClusterUserCertInterface
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, NewClusterUserCertOpts) (*ClusterUserCert, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, NewClusterUserCertOpts) (ClusterUserCertInterface, error)); ok {
 		return rf(ctx, namespace, username, issuerName, clusterName, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, NewClusterUserCertOpts) *ClusterUserCert); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, NewClusterUserCertOpts) ClusterUserCertInterface); ok {
 		r0 = rf(ctx, namespace, username, issuerName, clusterName, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ClusterUserCert)
+			r0 = ret.Get(0).(ClusterUserCertInterface)
 		}
 	}
 
@@ -74,12 +74,12 @@ func (_c *MockProviderInterface_NewClusterUserCert_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockProviderInterface_NewClusterUserCert_Call) Return(_a0 *ClusterUserCert, _a1 error) *MockProviderInterface_NewClusterUserCert_Call {
+func (_c *MockProviderInterface_NewClusterUserCert_Call) Return(_a0 ClusterUserCertInterface, _a1 error) *MockProviderInterface_NewClusterUserCert_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockProviderInterface_NewClusterUserCert_Call) RunAndReturn(run func(context.Context, string, string, string, string, NewClusterUserCertOpts) (*ClusterUserCert, error)) *MockProviderInterface_NewClusterUserCert_Call {
+func (_c *MockProviderInterface_NewClusterUserCert_Call) RunAndReturn(run func(context.Context, string, string, string, string, NewClusterUserCertOpts) (ClusterUserCertInterface, error)) *MockProviderInterface_NewClusterUserCert_Call {
 	_c.Call.Return(run)
 	return _c
 }

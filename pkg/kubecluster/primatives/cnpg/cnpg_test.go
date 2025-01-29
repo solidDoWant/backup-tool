@@ -276,6 +276,7 @@ func TestCreateCluster(t *testing.T) {
 	volumeSize := resource.MustParse("1Gi")
 	servingCertName := "serving-cert"
 	clientCAName := "client-ca"
+	replicationUserCertName := "replication-user-cert"
 
 	standardClusterOptions := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -288,9 +289,10 @@ func TestCreateCluster(t *testing.T) {
 				Size: volumeSize.String(),
 			},
 			Certificates: &apiv1.CertificatesConfiguration{
-				ServerTLSSecret: servingCertName,
-				ServerCASecret:  servingCertName,
-				ClientCASecret:  clientCAName,
+				ServerTLSSecret:      servingCertName,
+				ServerCASecret:       servingCertName,
+				ClientCASecret:       clientCAName,
+				ReplicationTLSSecret: replicationUserCertName,
 			},
 		},
 	}
@@ -460,7 +462,7 @@ func TestCreateCluster(t *testing.T) {
 				// require.NoError(t, err)
 			}
 
-			createdCluster, err := client.CreateCluster(ctx, namespace, clusterName, volumeSize, servingCertName, clientCAName, tt.opts)
+			createdCluster, err := client.CreateCluster(ctx, namespace, clusterName, volumeSize, servingCertName, clientCAName, replicationUserCertName, tt.opts)
 			if tt.simulateClientFailure || tt.shouldFailToQueryForMetrics {
 				require.Error(t, err)
 				require.Nil(t, createdCluster)

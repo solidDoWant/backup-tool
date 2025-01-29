@@ -528,23 +528,23 @@ func (_c *MockClientInterface_ES_Call) RunAndReturn(run func() externalsnapshott
 }
 
 // NewClusterUserCert provides a mock function with given fields: ctx, namespace, username, issuerName, clusterName, opts
-func (_m *MockClientInterface) NewClusterUserCert(ctx context.Context, namespace string, username string, issuerName string, clusterName string, opts clusterusercert.NewClusterUserCertOpts) (*clusterusercert.ClusterUserCert, error) {
+func (_m *MockClientInterface) NewClusterUserCert(ctx context.Context, namespace string, username string, issuerName string, clusterName string, opts clusterusercert.NewClusterUserCertOpts) (clusterusercert.ClusterUserCertInterface, error) {
 	ret := _m.Called(ctx, namespace, username, issuerName, clusterName, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NewClusterUserCert")
 	}
 
-	var r0 *clusterusercert.ClusterUserCert
+	var r0 clusterusercert.ClusterUserCertInterface
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, clusterusercert.NewClusterUserCertOpts) (*clusterusercert.ClusterUserCert, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, clusterusercert.NewClusterUserCertOpts) (clusterusercert.ClusterUserCertInterface, error)); ok {
 		return rf(ctx, namespace, username, issuerName, clusterName, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, clusterusercert.NewClusterUserCertOpts) *clusterusercert.ClusterUserCert); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, clusterusercert.NewClusterUserCertOpts) clusterusercert.ClusterUserCertInterface); ok {
 		r0 = rf(ctx, namespace, username, issuerName, clusterName, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*clusterusercert.ClusterUserCert)
+			r0 = ret.Get(0).(clusterusercert.ClusterUserCertInterface)
 		}
 	}
 
@@ -580,12 +580,12 @@ func (_c *MockClientInterface_NewClusterUserCert_Call) Run(run func(ctx context.
 	return _c
 }
 
-func (_c *MockClientInterface_NewClusterUserCert_Call) Return(_a0 *clusterusercert.ClusterUserCert, _a1 error) *MockClientInterface_NewClusterUserCert_Call {
+func (_c *MockClientInterface_NewClusterUserCert_Call) Return(_a0 clusterusercert.ClusterUserCertInterface, _a1 error) *MockClientInterface_NewClusterUserCert_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClientInterface_NewClusterUserCert_Call) RunAndReturn(run func(context.Context, string, string, string, string, clusterusercert.NewClusterUserCertOpts) (*clusterusercert.ClusterUserCert, error)) *MockClientInterface_NewClusterUserCert_Call {
+func (_c *MockClientInterface_NewClusterUserCert_Call) RunAndReturn(run func(context.Context, string, string, string, string, clusterusercert.NewClusterUserCertOpts) (clusterusercert.ClusterUserCertInterface, error)) *MockClientInterface_NewClusterUserCert_Call {
 	_c.Call.Return(run)
 	return _c
 }

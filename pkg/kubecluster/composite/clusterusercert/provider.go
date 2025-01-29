@@ -9,7 +9,7 @@ import (
 )
 
 type ProviderInterface interface {
-	NewClusterUserCert(ctx context.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (*ClusterUserCert, error)
+	NewClusterUserCert(ctx context.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error)
 }
 
 type providerInterfaceInternal interface {

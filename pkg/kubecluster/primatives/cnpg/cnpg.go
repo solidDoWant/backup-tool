@@ -106,7 +106,7 @@ type CreateClusterOptions struct {
 // Create a cluster for backup/recovery purposes specifically. Not intended for use general use. The created cluster should not be used by applications.
 // Created cluster contains a single database server instance. Cluster can optionally be created from a backup. TLS authentication is required.
 func (cnpgc *Client) CreateCluster(ctx context.Context, namespace, clusterName string,
-	volumeSize resource.Quantity, servingCertificateSecretName, clientCASecretName string,
+	volumeSize resource.Quantity, servingCertificateSecretName, clientCASecretName, replicationUserCertName string,
 	opts CreateClusterOptions) (*apiv1.Cluster, error) {
 	cluster := &apiv1.Cluster{
 		Spec: apiv1.ClusterSpec{
@@ -117,9 +117,10 @@ func (cnpgc *Client) CreateCluster(ctx context.Context, namespace, clusterName s
 			},
 			Resources: opts.ResourceRequirements,
 			Certificates: &apiv1.CertificatesConfiguration{
-				ServerTLSSecret: servingCertificateSecretName,
-				ServerCASecret:  servingCertificateSecretName,
-				ClientCASecret:  clientCASecretName,
+				ServerTLSSecret:      servingCertificateSecretName,
+				ServerCASecret:       servingCertificateSecretName,
+				ClientCASecret:       clientCASecretName,
+				ReplicationTLSSecret: replicationUserCertName,
 			},
 		},
 	}

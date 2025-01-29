@@ -349,7 +349,13 @@ func TestCloneCluster(t *testing.T) {
 				},
 			}
 			postgresUserCert := &clusterusercert.ClusterUserCert{}
-			streamingReplicaUserCert := &clusterusercert.ClusterUserCert{}
+			streamingReplicaUserCert := clusterusercert.NewMockClusterUserCertInterface(t)
+			streamingReplicaUserCert.EXPECT().GetCertificate().Return(&certmanagerv1.Certificate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      newClusterName + "-streaming-replica-user-cert",
+					Namespace: namespace,
+				},
+			}).Maybe()
 			newCluster := &apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      newClusterName,
@@ -523,7 +529,7 @@ func TestCloneCluster(t *testing.T) {
 				p.clonedCluster.EXPECT().setStreamingReplicaUserCert(streamingReplicaUserCert)
 
 				// 6.
-				p.cnpgClient.EXPECT().CreateCluster(ctx, namespace, newCluster.Name, resource.MustParse(existingCluster.Spec.StorageConfiguration.Size), createdServingCert.Name, createdClientCACert.Name, clusterOpts).
+				p.cnpgClient.EXPECT().CreateCluster(ctx, namespace, newCluster.Name, resource.MustParse(existingCluster.Spec.StorageConfiguration.Size), createdServingCert.Name, createdClientCACert.Name, streamingReplicaUserCert.GetCertificate().Name, clusterOpts).
 					Return(th.ErrOr1Val(newCluster, tt.simulateClusterCreationError))
 				if tt.simulateClusterCreationError {
 					return
