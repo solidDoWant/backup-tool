@@ -145,7 +145,7 @@ func TestVaultWardenBackup(t *testing.T) {
 					Namespace: namespace,
 				},
 			}
-			clientCert := certmanagerv1.Certificate{
+			clientCACert := certmanagerv1.Certificate{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "client-cert",
 					Namespace: namespace,
@@ -237,7 +237,7 @@ func TestVaultWardenBackup(t *testing.T) {
 
 				// Step 4
 				clonedCluster.EXPECT().GetServingCert().Return(&servingCert)
-				clonedCluster.EXPECT().GetClientCert().Return(&clientCert)
+				clonedCluster.EXPECT().GetClientCACert().Return(&clientCACert)
 				mockClient.EXPECT().CreateBackupToolInstance(ctx, namespace, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, namespace, instance string, opts backuptoolinstance.CreateBackupToolInstanceOptions) (backuptoolinstance.BackupToolInstanceInterface, error) {
 						require.Equal(t, fullBackupName, opts.NamePrefix)

@@ -6,6 +6,7 @@ import (
 	context "context"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	clusterusercert "github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -73,12 +74,12 @@ func (_c *MockClonedClusterInterface_Delete_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// GetClientCert provides a mock function with no fields
-func (_m *MockClonedClusterInterface) GetClientCert() *v1.Certificate {
+// GetClientCACert provides a mock function with no fields
+func (_m *MockClonedClusterInterface) GetClientCACert() *v1.Certificate {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetClientCert")
+		panic("no return value specified for GetClientCACert")
 	}
 
 	var r0 *v1.Certificate
@@ -93,29 +94,76 @@ func (_m *MockClonedClusterInterface) GetClientCert() *v1.Certificate {
 	return r0
 }
 
-// MockClonedClusterInterface_GetClientCert_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClientCert'
-type MockClonedClusterInterface_GetClientCert_Call struct {
+// MockClonedClusterInterface_GetClientCACert_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClientCACert'
+type MockClonedClusterInterface_GetClientCACert_Call struct {
 	*mock.Call
 }
 
-// GetClientCert is a helper method to define mock.On call
-func (_e *MockClonedClusterInterface_Expecter) GetClientCert() *MockClonedClusterInterface_GetClientCert_Call {
-	return &MockClonedClusterInterface_GetClientCert_Call{Call: _e.mock.On("GetClientCert")}
+// GetClientCACert is a helper method to define mock.On call
+func (_e *MockClonedClusterInterface_Expecter) GetClientCACert() *MockClonedClusterInterface_GetClientCACert_Call {
+	return &MockClonedClusterInterface_GetClientCACert_Call{Call: _e.mock.On("GetClientCACert")}
 }
 
-func (_c *MockClonedClusterInterface_GetClientCert_Call) Run(run func()) *MockClonedClusterInterface_GetClientCert_Call {
+func (_c *MockClonedClusterInterface_GetClientCACert_Call) Run(run func()) *MockClonedClusterInterface_GetClientCACert_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockClonedClusterInterface_GetClientCert_Call) Return(_a0 *v1.Certificate) *MockClonedClusterInterface_GetClientCert_Call {
+func (_c *MockClonedClusterInterface_GetClientCACert_Call) Return(_a0 *v1.Certificate) *MockClonedClusterInterface_GetClientCACert_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockClonedClusterInterface_GetClientCert_Call) RunAndReturn(run func() *v1.Certificate) *MockClonedClusterInterface_GetClientCert_Call {
+func (_c *MockClonedClusterInterface_GetClientCACert_Call) RunAndReturn(run func() *v1.Certificate) *MockClonedClusterInterface_GetClientCACert_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetClientCAIssuer provides a mock function with no fields
+func (_m *MockClonedClusterInterface) GetClientCAIssuer() *v1.Issuer {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClientCAIssuer")
+	}
+
+	var r0 *v1.Issuer
+	if rf, ok := ret.Get(0).(func() *v1.Issuer); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Issuer)
+		}
+	}
+
+	return r0
+}
+
+// MockClonedClusterInterface_GetClientCAIssuer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClientCAIssuer'
+type MockClonedClusterInterface_GetClientCAIssuer_Call struct {
+	*mock.Call
+}
+
+// GetClientCAIssuer is a helper method to define mock.On call
+func (_e *MockClonedClusterInterface_Expecter) GetClientCAIssuer() *MockClonedClusterInterface_GetClientCAIssuer_Call {
+	return &MockClonedClusterInterface_GetClientCAIssuer_Call{Call: _e.mock.On("GetClientCAIssuer")}
+}
+
+func (_c *MockClonedClusterInterface_GetClientCAIssuer_Call) Run(run func()) *MockClonedClusterInterface_GetClientCAIssuer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_GetClientCAIssuer_Call) Return(_a0 *v1.Issuer) *MockClonedClusterInterface_GetClientCAIssuer_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_GetClientCAIssuer_Call) RunAndReturn(run func() *v1.Issuer) *MockClonedClusterInterface_GetClientCAIssuer_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -216,6 +264,53 @@ func (_c *MockClonedClusterInterface_GetCredentials_Call) RunAndReturn(run func(
 	return _c
 }
 
+// GetPostgresUserCert provides a mock function with no fields
+func (_m *MockClonedClusterInterface) GetPostgresUserCert() clusterusercert.ClusterUserCertInterface {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPostgresUserCert")
+	}
+
+	var r0 clusterusercert.ClusterUserCertInterface
+	if rf, ok := ret.Get(0).(func() clusterusercert.ClusterUserCertInterface); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(clusterusercert.ClusterUserCertInterface)
+		}
+	}
+
+	return r0
+}
+
+// MockClonedClusterInterface_GetPostgresUserCert_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPostgresUserCert'
+type MockClonedClusterInterface_GetPostgresUserCert_Call struct {
+	*mock.Call
+}
+
+// GetPostgresUserCert is a helper method to define mock.On call
+func (_e *MockClonedClusterInterface_Expecter) GetPostgresUserCert() *MockClonedClusterInterface_GetPostgresUserCert_Call {
+	return &MockClonedClusterInterface_GetPostgresUserCert_Call{Call: _e.mock.On("GetPostgresUserCert")}
+}
+
+func (_c *MockClonedClusterInterface_GetPostgresUserCert_Call) Run(run func()) *MockClonedClusterInterface_GetPostgresUserCert_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_GetPostgresUserCert_Call) Return(_a0 clusterusercert.ClusterUserCertInterface) *MockClonedClusterInterface_GetPostgresUserCert_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_GetPostgresUserCert_Call) RunAndReturn(run func() clusterusercert.ClusterUserCertInterface) *MockClonedClusterInterface_GetPostgresUserCert_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetServingCert provides a mock function with no fields
 func (_m *MockClonedClusterInterface) GetServingCert() *v1.Certificate {
 	ret := _m.Called()
@@ -263,35 +358,115 @@ func (_c *MockClonedClusterInterface_GetServingCert_Call) RunAndReturn(run func(
 	return _c
 }
 
-// setClientCert provides a mock function with given fields: cert
-func (_m *MockClonedClusterInterface) setClientCert(cert *v1.Certificate) {
-	_m.Called(cert)
+// GetStreamingReplicaUserCert provides a mock function with no fields
+func (_m *MockClonedClusterInterface) GetStreamingReplicaUserCert() clusterusercert.ClusterUserCertInterface {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStreamingReplicaUserCert")
+	}
+
+	var r0 clusterusercert.ClusterUserCertInterface
+	if rf, ok := ret.Get(0).(func() clusterusercert.ClusterUserCertInterface); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(clusterusercert.ClusterUserCertInterface)
+		}
+	}
+
+	return r0
 }
 
-// MockClonedClusterInterface_setClientCert_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'setClientCert'
-type MockClonedClusterInterface_setClientCert_Call struct {
+// MockClonedClusterInterface_GetStreamingReplicaUserCert_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetStreamingReplicaUserCert'
+type MockClonedClusterInterface_GetStreamingReplicaUserCert_Call struct {
 	*mock.Call
 }
 
-// setClientCert is a helper method to define mock.On call
-//   - cert *v1.Certificate
-func (_e *MockClonedClusterInterface_Expecter) setClientCert(cert interface{}) *MockClonedClusterInterface_setClientCert_Call {
-	return &MockClonedClusterInterface_setClientCert_Call{Call: _e.mock.On("setClientCert", cert)}
+// GetStreamingReplicaUserCert is a helper method to define mock.On call
+func (_e *MockClonedClusterInterface_Expecter) GetStreamingReplicaUserCert() *MockClonedClusterInterface_GetStreamingReplicaUserCert_Call {
+	return &MockClonedClusterInterface_GetStreamingReplicaUserCert_Call{Call: _e.mock.On("GetStreamingReplicaUserCert")}
 }
 
-func (_c *MockClonedClusterInterface_setClientCert_Call) Run(run func(cert *v1.Certificate)) *MockClonedClusterInterface_setClientCert_Call {
+func (_c *MockClonedClusterInterface_GetStreamingReplicaUserCert_Call) Run(run func()) *MockClonedClusterInterface_GetStreamingReplicaUserCert_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_GetStreamingReplicaUserCert_Call) Return(_a0 clusterusercert.ClusterUserCertInterface) *MockClonedClusterInterface_GetStreamingReplicaUserCert_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_GetStreamingReplicaUserCert_Call) RunAndReturn(run func() clusterusercert.ClusterUserCertInterface) *MockClonedClusterInterface_GetStreamingReplicaUserCert_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// setClientCACert provides a mock function with given fields: cert
+func (_m *MockClonedClusterInterface) setClientCACert(cert *v1.Certificate) {
+	_m.Called(cert)
+}
+
+// MockClonedClusterInterface_setClientCACert_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'setClientCACert'
+type MockClonedClusterInterface_setClientCACert_Call struct {
+	*mock.Call
+}
+
+// setClientCACert is a helper method to define mock.On call
+//   - cert *v1.Certificate
+func (_e *MockClonedClusterInterface_Expecter) setClientCACert(cert interface{}) *MockClonedClusterInterface_setClientCACert_Call {
+	return &MockClonedClusterInterface_setClientCACert_Call{Call: _e.mock.On("setClientCACert", cert)}
+}
+
+func (_c *MockClonedClusterInterface_setClientCACert_Call) Run(run func(cert *v1.Certificate)) *MockClonedClusterInterface_setClientCACert_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(*v1.Certificate))
 	})
 	return _c
 }
 
-func (_c *MockClonedClusterInterface_setClientCert_Call) Return() *MockClonedClusterInterface_setClientCert_Call {
+func (_c *MockClonedClusterInterface_setClientCACert_Call) Return() *MockClonedClusterInterface_setClientCACert_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockClonedClusterInterface_setClientCert_Call) RunAndReturn(run func(*v1.Certificate)) *MockClonedClusterInterface_setClientCert_Call {
+func (_c *MockClonedClusterInterface_setClientCACert_Call) RunAndReturn(run func(*v1.Certificate)) *MockClonedClusterInterface_setClientCACert_Call {
+	_c.Run(run)
+	return _c
+}
+
+// setClientCAIssuer provides a mock function with given fields: issuer
+func (_m *MockClonedClusterInterface) setClientCAIssuer(issuer *v1.Issuer) {
+	_m.Called(issuer)
+}
+
+// MockClonedClusterInterface_setClientCAIssuer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'setClientCAIssuer'
+type MockClonedClusterInterface_setClientCAIssuer_Call struct {
+	*mock.Call
+}
+
+// setClientCAIssuer is a helper method to define mock.On call
+//   - issuer *v1.Issuer
+func (_e *MockClonedClusterInterface_Expecter) setClientCAIssuer(issuer interface{}) *MockClonedClusterInterface_setClientCAIssuer_Call {
+	return &MockClonedClusterInterface_setClientCAIssuer_Call{Call: _e.mock.On("setClientCAIssuer", issuer)}
+}
+
+func (_c *MockClonedClusterInterface_setClientCAIssuer_Call) Run(run func(issuer *v1.Issuer)) *MockClonedClusterInterface_setClientCAIssuer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*v1.Issuer))
+	})
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_setClientCAIssuer_Call) Return() *MockClonedClusterInterface_setClientCAIssuer_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_setClientCAIssuer_Call) RunAndReturn(run func(*v1.Issuer)) *MockClonedClusterInterface_setClientCAIssuer_Call {
 	_c.Run(run)
 	return _c
 }
@@ -329,6 +504,39 @@ func (_c *MockClonedClusterInterface_setCluster_Call) RunAndReturn(run func(*api
 	return _c
 }
 
+// setPostgresUserCert provides a mock function with given fields: cuc
+func (_m *MockClonedClusterInterface) setPostgresUserCert(cuc clusterusercert.ClusterUserCertInterface) {
+	_m.Called(cuc)
+}
+
+// MockClonedClusterInterface_setPostgresUserCert_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'setPostgresUserCert'
+type MockClonedClusterInterface_setPostgresUserCert_Call struct {
+	*mock.Call
+}
+
+// setPostgresUserCert is a helper method to define mock.On call
+//   - cuc clusterusercert.ClusterUserCertInterface
+func (_e *MockClonedClusterInterface_Expecter) setPostgresUserCert(cuc interface{}) *MockClonedClusterInterface_setPostgresUserCert_Call {
+	return &MockClonedClusterInterface_setPostgresUserCert_Call{Call: _e.mock.On("setPostgresUserCert", cuc)}
+}
+
+func (_c *MockClonedClusterInterface_setPostgresUserCert_Call) Run(run func(cuc clusterusercert.ClusterUserCertInterface)) *MockClonedClusterInterface_setPostgresUserCert_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(clusterusercert.ClusterUserCertInterface))
+	})
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_setPostgresUserCert_Call) Return() *MockClonedClusterInterface_setPostgresUserCert_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_setPostgresUserCert_Call) RunAndReturn(run func(clusterusercert.ClusterUserCertInterface)) *MockClonedClusterInterface_setPostgresUserCert_Call {
+	_c.Run(run)
+	return _c
+}
+
 // setServingCert provides a mock function with given fields: cert
 func (_m *MockClonedClusterInterface) setServingCert(cert *v1.Certificate) {
 	_m.Called(cert)
@@ -358,6 +566,39 @@ func (_c *MockClonedClusterInterface_setServingCert_Call) Return() *MockClonedCl
 }
 
 func (_c *MockClonedClusterInterface_setServingCert_Call) RunAndReturn(run func(*v1.Certificate)) *MockClonedClusterInterface_setServingCert_Call {
+	_c.Run(run)
+	return _c
+}
+
+// setStreamingReplicaUserCert provides a mock function with given fields: cuc
+func (_m *MockClonedClusterInterface) setStreamingReplicaUserCert(cuc clusterusercert.ClusterUserCertInterface) {
+	_m.Called(cuc)
+}
+
+// MockClonedClusterInterface_setStreamingReplicaUserCert_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'setStreamingReplicaUserCert'
+type MockClonedClusterInterface_setStreamingReplicaUserCert_Call struct {
+	*mock.Call
+}
+
+// setStreamingReplicaUserCert is a helper method to define mock.On call
+//   - cuc clusterusercert.ClusterUserCertInterface
+func (_e *MockClonedClusterInterface_Expecter) setStreamingReplicaUserCert(cuc interface{}) *MockClonedClusterInterface_setStreamingReplicaUserCert_Call {
+	return &MockClonedClusterInterface_setStreamingReplicaUserCert_Call{Call: _e.mock.On("setStreamingReplicaUserCert", cuc)}
+}
+
+func (_c *MockClonedClusterInterface_setStreamingReplicaUserCert_Call) Run(run func(cuc clusterusercert.ClusterUserCertInterface)) *MockClonedClusterInterface_setStreamingReplicaUserCert_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(clusterusercert.ClusterUserCertInterface))
+	})
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_setStreamingReplicaUserCert_Call) Return() *MockClonedClusterInterface_setStreamingReplicaUserCert_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockClonedClusterInterface_setStreamingReplicaUserCert_Call) RunAndReturn(run func(clusterusercert.ClusterUserCertInterface)) *MockClonedClusterInterface_setStreamingReplicaUserCert_Call {
 	_c.Run(run)
 	return _c
 }

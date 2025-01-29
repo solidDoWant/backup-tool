@@ -2,12 +2,15 @@ package clonedcluster
 
 import (
 	context "context"
+	"fmt"
 	"testing"
 	"time"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
@@ -142,7 +145,7 @@ func TestGetCredentials(t *testing.T) {
 
 func TestNewClonedCluster(t *testing.T) {
 	t.Run("returns new ClonedCluster with client reference set", func(t *testing.T) {
-		p := NewProvider(nil, nil)
+		p := NewProvider(nil, nil, nil)
 		cc := newClonedCluster(p)
 		casted := cc.(*ClonedCluster)
 
@@ -157,19 +160,23 @@ func TestCloneClusterOptions(t *testing.T) {
 
 func TestCloneCluster(t *testing.T) {
 	tests := []struct {
-		desc                             string
-		opts                             CloneClusterOptions
-		simulateErrorOnClusterCleanup    bool
-		simulateGetExistingClusterError  bool
-		simulateBackupError              bool
-		simulateBackupCleanupError       bool
-		simulateWaitingForBackupError    bool
-		simulateServingCertCreationError bool
-		simulateWaitForServingCertError  bool
-		simulateClientCertCreationError  bool
-		simulateWaitForClientCertError   bool
-		simulateClusterCreationError     bool
-		simulateWaitForClusterError      bool
+		desc                                          string
+		opts                                          CloneClusterOptions
+		simulateErrorOnClusterCleanup                 bool
+		simulateGetExistingClusterError               bool
+		simulateBackupError                           bool
+		simulateBackupCleanupError                    bool
+		simulateWaitingForBackupError                 bool
+		simulateServingCertCreationError              bool
+		simulateWaitForServingCertError               bool
+		simulateClientCACertCreationError             bool
+		simulateWaitForClientCACertError              bool
+		simulateClientCAIssuerCreationError           bool
+		simulateWaitForClientCAIssuerError            bool
+		simulatePostgresUserCertCreationError         bool
+		simulateStreamingReplicaUserCertCreationError bool
+		simulateClusterCreationError                  bool
+		simulateWaitForClusterError                   bool
 	}{
 		{
 			desc: "basic clone",
@@ -178,18 +185,56 @@ func TestCloneCluster(t *testing.T) {
 			desc: "all opts set except for generate name",
 			opts: CloneClusterOptions{
 				WaitForBackupTimeout: helpers.MaxWaitTime(time.Minute),
-				ServingCertSubject: &certmanagerv1.X509Subject{
-					Organizations: []string{"test-org"},
+				Certificates: CloneClusterOptionsCertificates{
+					ServingCert: CloneClusterOptionsExternallyIssuedCertificate{
+						IssuerKind: "ClusterIssuer",
+						CloneClusterOptionsCertificate: CloneClusterOptionsCertificate{
+							Subject: &certmanagerv1.X509Subject{
+								Organizations: []string{"test-org"},
+							},
+							WaitForReadyTimeout: helpers.MaxWaitTime(2 * time.Minute),
+						},
+					},
+					ClientCACert: CloneClusterOptionsExternallyIssuedCertificate{
+						IssuerKind: "ClusterIssuer2",
+						CloneClusterOptionsCertificate: CloneClusterOptionsCertificate{
+							Subject: &certmanagerv1.X509Subject{
+								OrganizationalUnits: []string{"test-ou"},
+							},
+							WaitForReadyTimeout: helpers.MaxWaitTime(3 * time.Minute),
+						},
+					},
+					PostgresUserCert: CloneClusterOptionsInternallyIssuedCertificate{
+						CloneClusterOptionsCertificate: CloneClusterOptionsCertificate{
+							Subject: &certmanagerv1.X509Subject{
+								Countries: []string{"test-country"},
+							},
+							WaitForReadyTimeout: helpers.MaxWaitTime(4 * time.Minute),
+						},
+						CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{
+							Enabled:           true,
+							WaitForCRPTimeout: helpers.MaxWaitTime(5 * time.Minute),
+						},
+					},
+					StreamingReplicaUserCert: CloneClusterOptionsInternallyIssuedCertificate{
+						CloneClusterOptionsCertificate: CloneClusterOptionsCertificate{
+							Subject: &certmanagerv1.X509Subject{
+								Provinces: []string{"test-province"},
+							},
+							WaitForReadyTimeout: helpers.MaxWaitTime(6 * time.Minute),
+						},
+						CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{
+							Enabled:           true,
+							WaitForCRPTimeout: helpers.MaxWaitTime(7 * time.Minute),
+						},
+					},
 				},
-				ServingCertIssuerKind:     "ClusterIssuer",
-				WaitForServingCertTimeout: helpers.MaxWaitTime(2 * time.Minute),
-				ClientCertSubject: &certmanagerv1.X509Subject{
-					Organizations: []string{"test-org"},
+				RecoveryTargetTime:    time.Now().Add(-time.Hour).Format(time.RFC3339),
+				WaitForClusterTimeout: helpers.MaxWaitTime(8 * time.Minute),
+				CleanupTimeout:        helpers.MaxWaitTime(9 * time.Minute),
+				ClientCAIssuer: CloneClusterOptionsCAIssuer{
+					WaitForReadyTimeout: helpers.MaxWaitTime(10 * time.Minute),
 				},
-				ClientCertIssuerKind:     "ClusterIssuer",
-				WaitForClientCertTimeout: helpers.MaxWaitTime(3 * time.Minute),
-				RecoveryTargetTime:       time.Now().Add(-time.Hour).Format(time.RFC3339),
-				WaitForClusterTimeout:    helpers.MaxWaitTime(4 * time.Minute),
 			},
 		},
 		{
@@ -222,12 +267,28 @@ func TestCloneCluster(t *testing.T) {
 			simulateWaitForServingCertError: true,
 		},
 		{
-			desc:                            "simulate error creating client cert",
-			simulateClientCertCreationError: true,
+			desc:                              "simulate error creating client cert",
+			simulateClientCACertCreationError: true,
 		},
 		{
-			desc:                           "simulate error waiting for client cert",
-			simulateWaitForClientCertError: true,
+			desc:                             "simulate error waiting for client cert",
+			simulateWaitForClientCACertError: true,
+		},
+		{
+			desc:                                "simulate error creating client CA issuer",
+			simulateClientCAIssuerCreationError: true,
+		},
+		{
+			desc:                               "simulate error waiting for client CA issuer",
+			simulateWaitForClientCAIssuerError: true,
+		},
+		{
+			desc:                                  "simulate error creating postgres user cert",
+			simulatePostgresUserCertCreationError: true,
+		},
+		{
+			desc: "simulate error creating streaming replica user cert",
+			simulateStreamingReplicaUserCertCreationError: true,
 		},
 		{
 			desc:                         "simulate error creating cluster",
@@ -249,7 +310,7 @@ func TestCloneCluster(t *testing.T) {
 			existingClusterName := "existing-cluster"
 			newClusterName := "new-cluster"
 			servingIssuerName := "test-serving-issuer"
-			clientIssuerName := "test-client-issuer"
+			clientIssuerName := "test-client-ca-cert-issuer"
 
 			// Setup response values for mocks
 			existingCluster := &apiv1.Cluster{
@@ -275,12 +336,20 @@ func TestCloneCluster(t *testing.T) {
 					Namespace: namespace,
 				},
 			}
-			createdClientCert := &certmanagerv1.Certificate{
+			createdClientCACert := &certmanagerv1.Certificate{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      newClusterName + "-postgres-user",
+					Name:      newClusterName + "-client-ca",
 					Namespace: namespace,
 				},
 			}
+			createdClientCAIssuer := &certmanagerv1.Issuer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      newClusterName + "-client-ca-issuer",
+					Namespace: namespace,
+				},
+			}
+			postgresUserCert := &clusterusercert.ClusterUserCert{}
+			streamingReplicaUserCert := &clusterusercert.ClusterUserCert{}
 			newCluster := &apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      newClusterName,
@@ -311,8 +380,12 @@ func TestCloneCluster(t *testing.T) {
 				tt.simulateWaitingForBackupError,
 				tt.simulateServingCertCreationError,
 				tt.simulateWaitForServingCertError,
-				tt.simulateClientCertCreationError,
-				tt.simulateWaitForClientCertError,
+				tt.simulateClientCACertCreationError,
+				tt.simulateWaitForClientCACertError,
+				tt.simulateClientCAIssuerCreationError,
+				tt.simulateWaitForClientCAIssuerError,
+				tt.simulatePostgresUserCertCreationError,
+				tt.simulateStreamingReplicaUserCertCreationError,
 				tt.simulateClusterCreationError,
 				tt.simulateWaitForClusterError,
 			)
@@ -323,6 +396,7 @@ func TestCloneCluster(t *testing.T) {
 			// This makes the logic for setting up mocks/expected calls easier, because once an error
 			// becomes expected, the function can be returned from
 			func() {
+				// 0. Setup
 				if errorExpected {
 					p.clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx context.Context) error {
 						require.NotEqual(t, ctx, cleanupCtx) // This should be a different context with a timeout
@@ -335,6 +409,7 @@ func TestCloneCluster(t *testing.T) {
 					return
 				}
 
+				// 1.
 				p.cnpgClient.EXPECT().CreateBackup(ctx, namespace, createdBackup.Name, existingCluster.Name, cnpg.CreateBackupOptions{GenerateName: true}).
 					Return(th.ErrOr1Val(createdBackup, tt.simulateBackupError))
 				if tt.simulateBackupError {
@@ -348,6 +423,7 @@ func TestCloneCluster(t *testing.T) {
 					return
 				}
 
+				// 2.
 				p.cmClient.EXPECT().CreateCertificate(ctx, namespace, helpers.CleanName(createdServingCert.Name), servingIssuerName, certmanager.CreateCertificateOptions{
 					CommonName: createdServingCert.Name,
 					DNSNames:   getClusterDomainNames(newClusterName, namespace),
@@ -355,43 +431,99 @@ func TestCloneCluster(t *testing.T) {
 						"cnpg.io/reload": "true",
 					},
 					Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageServerAuth},
-					IssuerKind: tt.opts.ServingCertIssuerKind,
-					Subject:    tt.opts.ServingCertSubject,
+					IssuerKind: tt.opts.Certificates.ServingCert.IssuerKind,
+					Subject:    tt.opts.Certificates.ServingCert.Subject,
 				}).Return(th.ErrOr1Val(createdServingCert, tt.simulateServingCertCreationError))
 				if tt.simulateServingCertCreationError {
 					return
 				}
+				p.clonedCluster.EXPECT().setServingCert(createdServingCert)
 
-				p.clonedCluster.EXPECT().setServingCert(createdServingCert).Return()
-				p.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdServingCert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.WaitForServingCertTimeout}).
+				p.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdServingCert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.Certificates.ServingCert.WaitForReadyTimeout}).
 					Return(th.ErrOr1Val(createdServingCert, tt.simulateWaitForServingCertError))
 				if tt.simulateWaitForServingCertError {
 					return
 				}
-				p.clonedCluster.EXPECT().setServingCert(createdServingCert).Return()
+				p.clonedCluster.EXPECT().setServingCert(createdServingCert)
 
-				p.cmClient.EXPECT().CreateCertificate(ctx, namespace, helpers.CleanName(createdClientCert.Name), clientIssuerName, certmanager.CreateCertificateOptions{
-					CommonName: "postgres",
-					SecretLabels: map[string]string{
-						"cnpg.io/reload": "true",
+				// 3.
+				// 3.1
+				clientCACertName := helpers.CleanName(createdClientCACert.Name)
+				p.cmClient.EXPECT().CreateCertificate(ctx, namespace, clientCACertName, clientIssuerName, certmanager.CreateCertificateOptions{
+					IsCA: true,
+					CAConstraints: &certmanagerv1.NameConstraints{
+						Critical: true,
+						Excluded: &certmanagerv1.NameConstraintItem{
+							DNSDomains:     []string{},
+							IPRanges:       []string{},
+							EmailAddresses: []string{},
+							URIDomains:     []string{},
+						},
 					},
-					Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageClientAuth},
-					IssuerKind: tt.opts.ClientCertIssuerKind,
-					Subject:    tt.opts.ClientCertSubject,
-				}).Return(th.ErrOr1Val(createdClientCert, tt.simulateClientCertCreationError))
-				if tt.simulateClientCertCreationError {
+					CommonName: fmt.Sprintf("%s CNPG CA", newClusterName),
+					Subject:    tt.opts.Certificates.ClientCACert.Subject,
+					Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageCertSign},
+					SecretLabels: map[string]string{
+						utils.WatchedLabelName: "true",
+					},
+					IssuerKind: tt.opts.Certificates.ClientCACert.IssuerKind,
+				}).Return(th.ErrOr1Val(createdClientCACert, tt.simulateClientCACertCreationError))
+				if tt.simulateClientCACertCreationError {
 					return
 				}
+				p.clonedCluster.EXPECT().setClientCACert(createdClientCACert)
 
-				p.clonedCluster.EXPECT().setClientCert(createdClientCert).Return()
-				p.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdClientCert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.WaitForClientCertTimeout}).
-					Return(th.ErrOr1Val(createdClientCert, tt.simulateWaitForClientCertError))
-				if tt.simulateWaitForClientCertError {
+				p.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdClientCACert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.Certificates.ClientCACert.WaitForReadyTimeout}).
+					Return(th.ErrOr1Val(createdClientCACert, tt.simulateWaitForClientCACertError))
+				if tt.simulateWaitForClientCACertError {
 					return
 				}
-				p.clonedCluster.EXPECT().setClientCert(createdClientCert).Return()
+				p.clonedCluster.EXPECT().setClientCACert(createdClientCACert)
 
-				p.cnpgClient.EXPECT().CreateCluster(ctx, namespace, newCluster.Name, resource.MustParse(existingCluster.Spec.StorageConfiguration.Size), createdServingCert.Name, createdClientCert.Name, clusterOpts).
+				// 3.2
+				p.cmClient.EXPECT().CreateIssuer(ctx, namespace, mock.Anything, clientCACertName, certmanager.CreateIssuerOptions{}).
+					RunAndReturn(func(ctx context.Context, namespace, name, clientCACertName string, opts certmanager.CreateIssuerOptions) (*certmanagerv1.Issuer, error) {
+						assert.Contains(t, name, clientCACertName)
+						return th.ErrOr1Val(createdClientCAIssuer, tt.simulateClientCAIssuerCreationError)
+					})
+				if tt.simulateClientCAIssuerCreationError {
+					return
+				}
+				p.clonedCluster.EXPECT().setClientCAIssuer(createdClientCAIssuer)
+
+				p.cmClient.EXPECT().WaitForReadyIssuer(ctx, namespace, mock.Anything, certmanager.WaitForReadyIssuerOpts{MaxWaitTime: tt.opts.ClientCAIssuer.WaitForReadyTimeout}).
+					Return(th.ErrOr1Val(createdClientCAIssuer, tt.simulateWaitForClientCAIssuerError))
+				if tt.simulateWaitForClientCAIssuerError {
+					return
+				}
+				p.clonedCluster.EXPECT().setClientCAIssuer(createdClientCAIssuer)
+
+				// 4.
+				p.cucp.EXPECT().NewClusterUserCert(ctx, namespace, "postgres", createdClientCAIssuer.Name, newClusterName, clusterusercert.NewClusterUserCertOpts{
+					Subject:            tt.opts.Certificates.PostgresUserCert.Subject,
+					CRPOpts:            tt.opts.Certificates.PostgresUserCert.CRPOpts,
+					WaitForCertTimeout: tt.opts.Certificates.PostgresUserCert.WaitForReadyTimeout,
+					CleanupTimeout:     tt.opts.CleanupTimeout,
+				}).Return(th.ErrOr1Val(postgresUserCert, tt.simulatePostgresUserCertCreationError))
+				if tt.simulatePostgresUserCertCreationError {
+					return
+				}
+				p.clonedCluster.EXPECT().setPostgresUserCert(postgresUserCert)
+
+				// 5.
+				p.cucp.EXPECT().NewClusterUserCert(ctx, namespace, "streaming_replica", createdClientCAIssuer.Name, newClusterName, clusterusercert.NewClusterUserCertOpts{
+					Subject:            tt.opts.Certificates.StreamingReplicaUserCert.Subject,
+					CRPOpts:            tt.opts.Certificates.StreamingReplicaUserCert.CRPOpts,
+					WaitForCertTimeout: tt.opts.Certificates.StreamingReplicaUserCert.WaitForReadyTimeout,
+					CleanupTimeout:     tt.opts.CleanupTimeout,
+				}).Return(th.ErrOr1Val(streamingReplicaUserCert, tt.simulateStreamingReplicaUserCertCreationError))
+				if tt.simulateStreamingReplicaUserCertCreationError {
+					return
+				}
+				p.clonedCluster.EXPECT().setStreamingReplicaUserCert(streamingReplicaUserCert)
+
+				// 6.
+				p.cnpgClient.EXPECT().CreateCluster(ctx, namespace, newCluster.Name, resource.MustParse(existingCluster.Spec.StorageConfiguration.Size), createdServingCert.Name, createdClientCACert.Name, clusterOpts).
 					Return(th.ErrOr1Val(newCluster, tt.simulateClusterCreationError))
 				if tt.simulateClusterCreationError {
 					return
@@ -451,33 +583,45 @@ func TestClonedClusterDelete(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "serving-cert", Namespace: "test-ns"},
 	}
 
-	clientCert := &certmanagerv1.Certificate{
-		ObjectMeta: metav1.ObjectMeta{Name: "client-cert", Namespace: "test-ns"},
+	clientCACert := &certmanagerv1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{Name: "client-ca-cert", Namespace: "test-ns"},
+	}
+
+	clientCAIssuer := &certmanagerv1.Issuer{
+		ObjectMeta: metav1.ObjectMeta{Name: "client-ca-issuer", Namespace: "test-ns"},
 	}
 
 	allResourcesCluster := ClonedCluster{
-		cluster:            cluster,
-		servingCertificate: servingCert,
-		clientCertificate:  clientCert,
+		cluster:             cluster,
+		servingCertificate:  servingCert,
+		clientCACertificate: clientCACert,
+		clientCAIssuer:      clientCAIssuer,
 	}
 
 	tests := []struct {
-		desc                           string
-		cc                             ClonedCluster
-		simulateClusterDeleteError     bool
-		simulateClientCertDeleteError  bool
-		simulateServingCertDeleteError bool
-		expectedErrorsInMessage        int
+		desc                                        string
+		cc                                          ClonedCluster
+		includePostgresUserCert                     bool // Workaround as these are mocked types that require test-specific t
+		includeStreamingReplicaUserCert             bool
+		simulateClusterDeleteError                  bool
+		simulateStreamingReplicaUserCertDeleteError bool
+		simulatePostgresUserCertDeleteError         bool
+		simulateClientCAIssuerDeleteError           bool
+		simulateClientCACertDeleteError             bool
+		simulateServingCertDeleteError              bool
+		expectedErrorsInMessage                     int
 	}{
 		{
-			desc: "delete all resources",
-			cc:   allResourcesCluster,
+			desc:                            "delete all resources",
+			cc:                              allResourcesCluster,
+			includePostgresUserCert:         true,
+			includeStreamingReplicaUserCert: true,
 		},
 		{
 			desc: "delete with no cluster",
 			cc: ClonedCluster{
-				servingCertificate: servingCert,
-				clientCertificate:  clientCert,
+				servingCertificate:  servingCert,
+				clientCACertificate: clientCACert,
 			},
 		},
 		{
@@ -489,8 +633,8 @@ func TestClonedClusterDelete(t *testing.T) {
 		{
 			desc: "delete with just client cert",
 			cc: ClonedCluster{
-				servingCertificate: servingCert,
-				clientCertificate:  clientCert,
+				servingCertificate:  servingCert,
+				clientCACertificate: clientCACert,
 			},
 		},
 		{
@@ -503,12 +647,17 @@ func TestClonedClusterDelete(t *testing.T) {
 			desc: "delete empty cloned cluster",
 		},
 		{
-			desc:                           "all deletions fail",
-			cc:                             allResourcesCluster,
-			simulateClusterDeleteError:     true,
-			simulateClientCertDeleteError:  true,
-			simulateServingCertDeleteError: true,
-			expectedErrorsInMessage:        3,
+			desc:                            "all deletions fail",
+			cc:                              allResourcesCluster,
+			includePostgresUserCert:         true,
+			includeStreamingReplicaUserCert: true,
+			simulateClusterDeleteError:      true,
+			simulateStreamingReplicaUserCertDeleteError: true,
+			simulatePostgresUserCertDeleteError:         true,
+			simulateClientCAIssuerDeleteError:           true,
+			simulateClientCACertDeleteError:             true,
+			simulateServingCertDeleteError:              true,
+			expectedErrorsInMessage:                     6,
 		},
 		{
 			desc:                       "cluster deletion fails",
@@ -517,11 +666,11 @@ func TestClonedClusterDelete(t *testing.T) {
 			expectedErrorsInMessage:    1,
 		},
 		{
-			desc:                           "certificate deletions fail",
-			cc:                             allResourcesCluster,
-			simulateClientCertDeleteError:  true,
-			simulateServingCertDeleteError: true,
-			expectedErrorsInMessage:        2,
+			desc:                            "certificate deletions fail",
+			cc:                              allResourcesCluster,
+			simulateClientCACertDeleteError: true,
+			simulateServingCertDeleteError:  true,
+			expectedErrorsInMessage:         2,
 		},
 		{
 			desc:                           "serving certificate deletion fails",
@@ -541,8 +690,24 @@ func TestClonedClusterDelete(t *testing.T) {
 				p.cnpgClient.EXPECT().DeleteCluster(ctx, tt.cc.cluster.Namespace, tt.cc.cluster.Name).Return(th.ErrIfTrue(tt.simulateClusterDeleteError))
 			}
 
-			if tt.cc.clientCertificate != nil {
-				p.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.clientCertificate.Namespace, tt.cc.clientCertificate.Name).Return(th.ErrIfTrue(tt.simulateClientCertDeleteError))
+			if tt.includeStreamingReplicaUserCert {
+				streamingReplicaUserCert := clusterusercert.NewMockClusterUserCertInterface(t)
+				tt.cc.streamingReplicaUserCertificate = streamingReplicaUserCert
+				streamingReplicaUserCert.EXPECT().Delete(ctx).Return(th.ErrIfTrue(tt.simulateStreamingReplicaUserCertDeleteError))
+			}
+
+			if tt.includePostgresUserCert {
+				postgresUserCert := clusterusercert.NewMockClusterUserCertInterface(t)
+				tt.cc.postgresUserCertificate = postgresUserCert
+				postgresUserCert.EXPECT().Delete(ctx).Return(th.ErrIfTrue(tt.simulatePostgresUserCertDeleteError))
+			}
+
+			if tt.cc.clientCAIssuer != nil {
+				p.cmClient.EXPECT().DeleteIssuer(ctx, tt.cc.clientCAIssuer.Namespace, tt.cc.clientCAIssuer.Name).Return(th.ErrIfTrue(tt.simulateClientCAIssuerDeleteError))
+			}
+
+			if tt.cc.clientCACertificate != nil {
+				p.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.clientCACertificate.Namespace, tt.cc.clientCACertificate.Name).Return(th.ErrIfTrue(tt.simulateClientCACertDeleteError))
 			}
 
 			if tt.cc.servingCertificate != nil {
@@ -631,70 +796,6 @@ func TestClonedClusterGetServingCert(t *testing.T) {
 	}
 }
 
-func TestClonedClusterSetClientCert(t *testing.T) {
-	tests := []struct {
-		desc string
-		cert *certmanagerv1.Certificate
-	}{
-		{
-			desc: "set non-nil certificate",
-			cert: &certmanagerv1.Certificate{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cert",
-					Namespace: "test-ns",
-				},
-			},
-		},
-		{
-			desc: "set nil certificate",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.desc, func(t *testing.T) {
-			cc := &ClonedCluster{}
-			cc.setClientCert(tt.cert)
-			assert.Equal(t, tt.cert, cc.clientCertificate)
-		})
-	}
-}
-
-func TestClonedClusterGetClientCert(t *testing.T) {
-	tests := []struct {
-		desc string
-		cc   ClonedCluster
-		want *certmanagerv1.Certificate
-	}{
-		{
-			desc: "get existing client certificate",
-			cc: ClonedCluster{
-				clientCertificate: &certmanagerv1.Certificate{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-cert",
-						Namespace: "test-ns",
-					},
-				},
-			},
-			want: &certmanagerv1.Certificate{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cert",
-					Namespace: "test-ns",
-				},
-			},
-		},
-		{
-			desc: "get nil client certificate",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.desc, func(t *testing.T) {
-			got := tt.cc.GetClientCert()
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestClonedClusterSetCluster(t *testing.T) {
 	tests := []struct {
 		desc    string
@@ -755,6 +856,236 @@ func TestClonedClusterGetCluster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			got := tt.cc.GetCluster()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestClonedClusterSetClientCACert(t *testing.T) {
+	tests := []struct {
+		desc string
+		cert *certmanagerv1.Certificate
+	}{
+		{
+			desc: "set non-nil certificate",
+			cert: &certmanagerv1.Certificate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cert",
+					Namespace: "test-ns",
+				},
+			},
+		},
+		{
+			desc: "set nil certificate",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			cc := &ClonedCluster{}
+			cc.setClientCACert(tt.cert)
+			assert.Equal(t, tt.cert, cc.clientCACertificate)
+		})
+	}
+}
+
+func TestClonedClusterGetClientCACert(t *testing.T) {
+	tests := []struct {
+		desc string
+		cc   *ClonedCluster
+		want *certmanagerv1.Certificate
+	}{
+		{
+			desc: "get existing client CA certificate",
+			cc: &ClonedCluster{
+				clientCACertificate: &certmanagerv1.Certificate{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-cert",
+						Namespace: "test-ns",
+					},
+				},
+			},
+			want: &certmanagerv1.Certificate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cert",
+					Namespace: "test-ns",
+				},
+			},
+		},
+		{
+			desc: "get nil client CA certificate",
+			cc:   &ClonedCluster{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := tt.cc.GetClientCACert()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestClonedClusterSetClientCAIssuer(t *testing.T) {
+	tests := []struct {
+		desc   string
+		issuer *certmanagerv1.Issuer
+	}{
+		{
+			desc: "set non-nil issuer",
+			issuer: &certmanagerv1.Issuer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-issuer",
+					Namespace: "test-ns",
+				},
+			},
+		},
+		{
+			desc: "set nil issuer",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			cc := &ClonedCluster{}
+			cc.setClientCAIssuer(tt.issuer)
+			assert.Equal(t, tt.issuer, cc.clientCAIssuer)
+		})
+	}
+}
+
+func TestClonedClusterGetClientCAIssuer(t *testing.T) {
+	tests := []struct {
+		desc string
+		cc   *ClonedCluster
+		want *certmanagerv1.Issuer
+	}{
+		{
+			desc: "get existing client CA issuer",
+			cc: &ClonedCluster{
+				clientCAIssuer: &certmanagerv1.Issuer{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-issuer",
+						Namespace: "test-ns",
+					},
+				},
+			},
+			want: &certmanagerv1.Issuer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-issuer",
+					Namespace: "test-ns",
+				},
+			},
+		},
+		{
+			desc: "get nil client CA issuer",
+			cc:   &ClonedCluster{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := tt.cc.GetClientCAIssuer()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestClonedClusterSetPostgresUserCert(t *testing.T) {
+	tests := []struct {
+		desc string
+		cert clusterusercert.ClusterUserCertInterface
+	}{
+		{
+			desc: "set non-nil certificate",
+			cert: &clusterusercert.ClusterUserCert{},
+		},
+		{
+			desc: "set nil certificate",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			cc := &ClonedCluster{}
+			cc.setPostgresUserCert(tt.cert)
+			assert.Equal(t, tt.cert, cc.postgresUserCertificate)
+		})
+	}
+}
+
+func TestClonedClusterGetPostgresUserCert(t *testing.T) {
+	tests := []struct {
+		desc string
+		cc   *ClonedCluster
+		want clusterusercert.ClusterUserCertInterface
+	}{
+		{
+			desc: "get existing postgres user certificate",
+			cc: &ClonedCluster{
+				postgresUserCertificate: &clusterusercert.ClusterUserCert{},
+			},
+			want: &clusterusercert.ClusterUserCert{},
+		},
+		{
+			desc: "get nil postgres user certificate",
+			cc:   &ClonedCluster{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := tt.cc.GetPostgresUserCert()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestClonedClusterSetStreamingReplicaUserCert(t *testing.T) {
+	tests := []struct {
+		desc string
+		cert clusterusercert.ClusterUserCertInterface
+	}{
+		{
+			desc: "set non-nil certificate",
+			cert: &clusterusercert.ClusterUserCert{},
+		},
+		{
+			desc: "set nil certificate",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			cc := &ClonedCluster{}
+			cc.setStreamingReplicaUserCert(tt.cert)
+			assert.Equal(t, tt.cert, cc.streamingReplicaUserCertificate)
+		})
+	}
+}
+
+func TestClonedClusterGetStreamingReplicaUserCert(t *testing.T) {
+	tests := []struct {
+		desc string
+		cc   *ClonedCluster
+		want clusterusercert.ClusterUserCertInterface
+	}{
+		{
+			desc: "get existing streaming replica user certificate",
+			cc: &ClonedCluster{
+				streamingReplicaUserCertificate: &clusterusercert.ClusterUserCert{},
+			},
+			want: &clusterusercert.ClusterUserCert{},
+		},
+		{
+			desc: "get nil streaming replica user certificate",
+			cc:   &ClonedCluster{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := tt.cc.GetStreamingReplicaUserCert()
 			assert.Equal(t, tt.want, got)
 		})
 	}

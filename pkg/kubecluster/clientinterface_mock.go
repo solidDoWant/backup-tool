@@ -22,7 +22,7 @@ import (
 
 	core "github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 
-	createcrpforprofile "github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
+	createcrpforcertificate "github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 
 	externalsnapshotter "github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 
@@ -421,7 +421,7 @@ func (_c *MockClientInterface_CreateBackupToolInstance_Call) RunAndReturn(run fu
 }
 
 // CreateCRPForCertificate provides a mock function with given fields: ctx, cert, opts
-func (_m *MockClientInterface) CreateCRPForCertificate(ctx context.Context, cert *certmanagerv1.Certificate, opts createcrpforprofile.CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error) {
+func (_m *MockClientInterface) CreateCRPForCertificate(ctx context.Context, cert *certmanagerv1.Certificate, opts createcrpforcertificate.CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error) {
 	ret := _m.Called(ctx, cert, opts)
 
 	if len(ret) == 0 {
@@ -430,10 +430,10 @@ func (_m *MockClientInterface) CreateCRPForCertificate(ctx context.Context, cert
 
 	var r0 *v1alpha1.CertificateRequestPolicy
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *certmanagerv1.Certificate, createcrpforprofile.CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *certmanagerv1.Certificate, createcrpforcertificate.CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error)); ok {
 		return rf(ctx, cert, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *certmanagerv1.Certificate, createcrpforprofile.CreateCRPForCertificateOpts) *v1alpha1.CertificateRequestPolicy); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *certmanagerv1.Certificate, createcrpforcertificate.CreateCRPForCertificateOpts) *v1alpha1.CertificateRequestPolicy); ok {
 		r0 = rf(ctx, cert, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -441,7 +441,7 @@ func (_m *MockClientInterface) CreateCRPForCertificate(ctx context.Context, cert
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *certmanagerv1.Certificate, createcrpforprofile.CreateCRPForCertificateOpts) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *certmanagerv1.Certificate, createcrpforcertificate.CreateCRPForCertificateOpts) error); ok {
 		r1 = rf(ctx, cert, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -458,14 +458,14 @@ type MockClientInterface_CreateCRPForCertificate_Call struct {
 // CreateCRPForCertificate is a helper method to define mock.On call
 //   - ctx context.Context
 //   - cert *certmanagerv1.Certificate
-//   - opts createcrpforprofile.CreateCRPForCertificateOpts
+//   - opts createcrpforcertificate.CreateCRPForCertificateOpts
 func (_e *MockClientInterface_Expecter) CreateCRPForCertificate(ctx interface{}, cert interface{}, opts interface{}) *MockClientInterface_CreateCRPForCertificate_Call {
 	return &MockClientInterface_CreateCRPForCertificate_Call{Call: _e.mock.On("CreateCRPForCertificate", ctx, cert, opts)}
 }
 
-func (_c *MockClientInterface_CreateCRPForCertificate_Call) Run(run func(ctx context.Context, cert *certmanagerv1.Certificate, opts createcrpforprofile.CreateCRPForCertificateOpts)) *MockClientInterface_CreateCRPForCertificate_Call {
+func (_c *MockClientInterface_CreateCRPForCertificate_Call) Run(run func(ctx context.Context, cert *certmanagerv1.Certificate, opts createcrpforcertificate.CreateCRPForCertificateOpts)) *MockClientInterface_CreateCRPForCertificate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*certmanagerv1.Certificate), args[2].(createcrpforprofile.CreateCRPForCertificateOpts))
+		run(args[0].(context.Context), args[1].(*certmanagerv1.Certificate), args[2].(createcrpforcertificate.CreateCRPForCertificateOpts))
 	})
 	return _c
 }
@@ -475,7 +475,7 @@ func (_c *MockClientInterface_CreateCRPForCertificate_Call) Return(_a0 *v1alpha1
 	return _c
 }
 
-func (_c *MockClientInterface_CreateCRPForCertificate_Call) RunAndReturn(run func(context.Context, *certmanagerv1.Certificate, createcrpforprofile.CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error)) *MockClientInterface_CreateCRPForCertificate_Call {
+func (_c *MockClientInterface_CreateCRPForCertificate_Call) RunAndReturn(run func(context.Context, *certmanagerv1.Certificate, createcrpforcertificate.CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error)) *MockClientInterface_CreateCRPForCertificate_Call {
 	_c.Call.Return(run)
 	return _c
 }

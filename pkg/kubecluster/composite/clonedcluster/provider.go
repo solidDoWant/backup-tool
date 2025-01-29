@@ -3,6 +3,7 @@ package clonedcluster
 import (
 	context "context"
 
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 )
@@ -18,13 +19,15 @@ type providerInterfaceInternal interface {
 }
 
 type Provider struct {
+	cucp             clusterusercert.ProviderInterface
 	cmClient         certmanager.ClientInterface
 	cnpgClient       cnpg.ClientInterface
 	newClonedCluster func() ClonedClusterInterface
 }
 
-func NewProvider(cmClient certmanager.ClientInterface, cnpgClient cnpg.ClientInterface) *Provider {
+func NewProvider(cucp clusterusercert.ProviderInterface, cmClient certmanager.ClientInterface, cnpgClient cnpg.ClientInterface) *Provider {
 	p := &Provider{
+		cucp:       cucp,
 		cmClient:   cmClient,
 		cnpgClient: cnpgClient,
 	}

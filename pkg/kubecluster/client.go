@@ -76,10 +76,10 @@ func NewClient(cm certmanager.ClientInterface, cnpg cnpg.ClientInterface, esClie
 	}
 
 	c.backupToolInstanceProvider = backuptoolinstance.NewProvider(coreClient)
-	c.clonedClusterProvider = clonedcluster.NewProvider(cm, cnpg)
 	c.clonePVCProvider = clonepvc.NewProvider(coreClient, esClient)
 	c.createCRPForProfileProvider = createcrpforcertificate.NewProvider(apClient)
 	c.clusterUserCertProvider = clusterusercert.NewProvider(c.createCRPForProfileProvider, apClient, cm)
+	c.clonedClusterProvider = clonedcluster.NewProvider(c.clusterUserCertProvider, cm, cnpg)
 
 	return c
 }
