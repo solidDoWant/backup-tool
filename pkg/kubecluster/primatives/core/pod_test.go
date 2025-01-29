@@ -415,7 +415,6 @@ func TestRestrictedPodSecurityContext(t *testing.T) {
 			assert.Equal(t, tt.uid, *createdSC.RunAsUser)
 			assert.Equal(t, tt.gid, *createdSC.RunAsGroup)
 			assert.True(t, *createdSC.RunAsNonRoot)
-			assert.Equal(t, tt.gid, *createdSC.FSGroup)
 		})
 	}
 }

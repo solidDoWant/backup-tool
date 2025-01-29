@@ -61,7 +61,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	defer backup.Stop()
 
 	// 1. Snapshot/clone PVC containing data directory
-	clonedPVC, err := vw.kubernetesClient.ClonePVC(ctx, namespace, dataPVC, clonepvc.ClonePVCOptions{DestPvcNamePrefix: backup.GetFullName(), CleanupTimeout: backupOptions.CleanupTimeout})
+	clonedPVC, err := vw.kubernetesClient.ClonePVC(ctx, namespace, dataPVC, clonepvc.ClonePVCOptions{DestPvcNamePrefix: backup.GetFullName(), CleanupTimeout: backupOptions.CleanupTimeout, ForceBind: true})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to clone data PVC")
 	}
