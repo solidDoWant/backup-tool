@@ -448,6 +448,7 @@ func TestRestrictedContainerSecurityContext(t *testing.T) {
 			assert.Equal(t, tt.gid, *createdSC.RunAsGroup)
 			assert.True(t, *createdSC.RunAsNonRoot)
 			assert.True(t, *createdSC.ReadOnlyRootFilesystem)
+			assert.False(t, *createdSC.AllowPrivilegeEscalation)
 		})
 	}
 }

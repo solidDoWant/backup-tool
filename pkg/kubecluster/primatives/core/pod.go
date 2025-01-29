@@ -110,10 +110,11 @@ func RestrictedContainerSecurityContext(uid, gid int64) *corev1.SecurityContext 
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
-		Privileged:             ptr.To(false),
-		RunAsUser:              ptr.To(uid),
-		RunAsGroup:             ptr.To(gid),
-		RunAsNonRoot:           ptr.To(true),
-		ReadOnlyRootFilesystem: ptr.To(true),
+		Privileged:               ptr.To(false),
+		RunAsUser:                ptr.To(uid),
+		RunAsGroup:               ptr.To(gid),
+		RunAsNonRoot:             ptr.To(true),
+		ReadOnlyRootFilesystem:   ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
 	}
 }
