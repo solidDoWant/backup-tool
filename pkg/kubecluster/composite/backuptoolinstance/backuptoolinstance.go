@@ -79,6 +79,9 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 			Run()
 	}
 
+	uid := int64(1000)
+	gid := int64(1000)
+
 	container := corev1.Container{
 		Name:         constants.ToolName,
 		Image:        constants.FullImageName,
@@ -92,6 +95,7 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 				Protocol:      corev1.ProtocolTCP,
 			},
 		},
+		SecurityContext: core.RestrictedContainerSecurityContext(uid, gid),
 	}
 
 	pod := &corev1.Pod{
@@ -104,9 +108,10 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 		},
 		// TODO security, probes, etc
 		Spec: corev1.PodSpec{
-			Containers:    []corev1.Container{container},
-			RestartPolicy: corev1.RestartPolicyNever,
-			Volumes:       lo.Map(opts.Volumes, func(vol core.SingleContainerVolume, _ int) corev1.Volume { return vol.ToVolume() }),
+			Containers:      []corev1.Container{container},
+			RestartPolicy:   corev1.RestartPolicyNever,
+			Volumes:         lo.Map(opts.Volumes, func(vol core.SingleContainerVolume, _ int) corev1.Volume { return vol.ToVolume() }),
+			SecurityContext: core.RestrictedPodSecurityContext(uid, gid),
 		},
 	}
 
