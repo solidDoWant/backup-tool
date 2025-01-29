@@ -106,6 +106,9 @@ $(BUILD_DIR)/%/$(BINARY_NAME): $(GO_SOURCE_FILES)
 	@mkdir -p $(@D)
 	@GOOS=$(word 1,$(subst /, ,$*)) GOARCH=$(word 2,$(subst /, ,$*)) go build -ldflags="$(GO_LDFLAGS)" -o $@ .
 
+PHONY += (binary)
+binary: build
+
 PHONY += (build)
 build: $(BUILD_DIR)/$(shell go env GOOS)/$(shell go env GOARCH)/$(BINARY_NAME)
 
