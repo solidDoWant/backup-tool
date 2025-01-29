@@ -389,3 +389,66 @@ func TestSingleContainerVolumeToVolumeMount(t *testing.T) {
 		})
 	}
 }
+
+func TestRestrictedPodSecurityContext(t *testing.T) {
+	tests := []struct {
+		name string
+		uid  int64
+		gid  int64
+	}{
+		{
+			name: "non-root user/group",
+			uid:  1000,
+			gid:  1000,
+		},
+		{
+			name: "different uid/gid",
+			uid:  2000,
+			gid:  3000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			createdSC := RestrictedPodSecurityContext(tt.uid, tt.gid)
+			require.NotNil(t, createdSC)
+			assert.Equal(t, tt.uid, *createdSC.RunAsUser)
+			assert.Equal(t, tt.gid, *createdSC.RunAsGroup)
+			assert.True(t, *createdSC.RunAsNonRoot)
+			assert.Equal(t, tt.gid, *createdSC.FSGroup)
+		})
+	}
+}
+
+func TestRestrictedContainerSecurityContext(t *testing.T) {
+	tests := []struct {
+		name string
+		uid  int64
+		gid  int64
+	}{
+		{
+			name: "non-root user/group",
+			uid:  1000,
+			gid:  1000,
+		},
+		{
+			name: "different uid/gid",
+			uid:  2000,
+			gid:  3000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			createdSC := RestrictedContainerSecurityContext(tt.uid, tt.gid)
+			require.NotNil(t, createdSC)
+			assert.NotNil(t, createdSC.Capabilities)
+			assert.Equal(t, []corev1.Capability{"ALL"}, createdSC.Capabilities.Drop)
+			assert.False(t, *createdSC.Privileged)
+			assert.Equal(t, tt.uid, *createdSC.RunAsUser)
+			assert.Equal(t, tt.gid, *createdSC.RunAsGroup)
+			assert.True(t, *createdSC.RunAsNonRoot)
+			assert.True(t, *createdSC.ReadOnlyRootFilesystem)
+		})
+	}
+}

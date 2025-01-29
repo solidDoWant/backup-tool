@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
@@ -21,6 +22,7 @@ func TestClonePVC(t *testing.T) {
 	namespace := "test-ns"
 	pvcName := "test-pvc"
 	snapshotName := "test-snapshot"
+	podName := "test-pod"
 	size := resource.MustParse("5Gi")
 
 	createdSnapshot := &volumesnapshotv1.VolumeSnapshot{
@@ -33,15 +35,27 @@ func TestClonePVC(t *testing.T) {
 		},
 	}
 
+	createdPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+		},
+	}
+
 	tests := []struct {
 		desc                       string
 		opts                       ClonePVCOptions
 		initialPVC                 *corev1.PersistentVolumeClaim
 		createdSnapshot            *volumesnapshotv1.VolumeSnapshot
+		clonedPVC                  *corev1.PersistentVolumeClaim
 		simulateSnapshotErr        bool
 		simulateWaitForSnapshotErr bool
 		simulateQueryExistingErr   bool
 		simulateCreateErr          bool
+		simulatePodCreateErr       bool
+		simulatePodWaitErr         bool
+		simulatePodDeleteError     bool
+		simulatePVCDeleteError     bool
 		expectRestoreSizeErr       bool
 		expectedPVC                *corev1.PersistentVolumeClaim
 	}{
@@ -63,8 +77,8 @@ func TestClonePVC(t *testing.T) {
 			},
 			expectedPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: pvcName,
-					Namespace:    namespace,
+					Name:      pvcName,
+					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					StorageClassName: ptr.To("standard"),
@@ -89,8 +103,8 @@ func TestClonePVC(t *testing.T) {
 			},
 			expectedPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: pvcName,
-					Namespace:    namespace,
+					Name:      pvcName,
+					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -109,6 +123,8 @@ func TestClonePVC(t *testing.T) {
 			opts: ClonePVCOptions{
 				DestStorageClassName: "custom-class",
 				DestPvcNamePrefix:    "custom-prefix",
+				ForceBind:            true,
+				ForceBindTimeout:     helpers.ShortWaitTime,
 			},
 			initialPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -121,8 +137,8 @@ func TestClonePVC(t *testing.T) {
 			},
 			expectedPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "custom-prefix-",
-					Namespace:    namespace,
+					Name:      "custom-prefix",
+					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					StorageClassName: ptr.To("custom-class"),
@@ -223,6 +239,128 @@ func TestClonePVC(t *testing.T) {
 			},
 			simulateCreateErr: true,
 		},
+		{
+			desc: "error while creating pod for force bind",
+			initialPVC: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pvcName,
+					Namespace: namespace,
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					StorageClassName: ptr.To("standard"),
+				},
+			},
+			opts: ClonePVCOptions{ForceBind: true},
+			clonedPVC: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pvcName,
+					Namespace: namespace,
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					DataSourceRef: &corev1.TypedObjectReference{
+						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						Kind:     externalsnapshotter.VolumeSnapshotKind,
+						Name:     snapshotName,
+					},
+				},
+			},
+			simulatePodCreateErr: true,
+		},
+		{
+			desc: "error while waiting for pod to be ready",
+			initialPVC: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pvcName,
+					Namespace: namespace,
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					StorageClassName: ptr.To("standard"),
+				},
+			},
+			opts: ClonePVCOptions{ForceBind: true},
+			clonedPVC: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pvcName,
+					Namespace: namespace,
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					DataSourceRef: &corev1.TypedObjectReference{
+						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						Kind:     externalsnapshotter.VolumeSnapshotKind,
+						Name:     snapshotName,
+					},
+				},
+			},
+			simulatePodWaitErr: true,
+		},
+		{
+			desc: "error while deleting pod",
+			initialPVC: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pvcName,
+					Namespace: namespace,
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					StorageClassName: ptr.To("standard"),
+				},
+			},
+			opts: ClonePVCOptions{ForceBind: true},
+			clonedPVC: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pvcName,
+					Namespace: namespace,
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					DataSourceRef: &corev1.TypedObjectReference{
+						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						Kind:     externalsnapshotter.VolumeSnapshotKind,
+						Name:     snapshotName,
+					},
+				},
+			},
+			simulatePodDeleteError: true,
+			simulatePodWaitErr:     true,
+		},
+		{
+			desc: "error while deleting pvc",
+			initialPVC: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pvcName,
+					Namespace: namespace,
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					StorageClassName: ptr.To("standard"),
+				},
+			},
+			opts: ClonePVCOptions{ForceBind: true},
+			clonedPVC: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pvcName,
+					Namespace: namespace,
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					DataSourceRef: &corev1.TypedObjectReference{
+						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						Kind:     externalsnapshotter.VolumeSnapshotKind,
+						Name:     snapshotName,
+					},
+				},
+			},
+			simulatePodWaitErr:     true,
+			simulatePVCDeleteError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -285,11 +423,65 @@ func TestClonePVC(t *testing.T) {
 					opts.StorageClassName = *tt.initialPVC.Spec.StorageClassName
 				}
 
-				p.coreClient.EXPECT().CreatePVC(ctx, namespace, newPVCName, size, opts).Return(th.ErrOr1Val(tt.expectedPVC, tt.simulateCreateErr))
+				p.coreClient.EXPECT().CreatePVC(ctx, namespace, newPVCName, size, opts).
+					RunAndReturn(func(ctx context.Context, s1, s2 string, q resource.Quantity, cp core.CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+						pvc := tt.clonedPVC
+						if pvc == nil {
+							pvc = tt.expectedPVC
+						}
+
+						return th.ErrOr1Val(pvc, tt.simulateCreateErr)
+					})
+				if tt.simulateCreateErr {
+					return
+				}
+
+				if tt.simulatePodCreateErr || tt.simulatePodWaitErr || tt.simulatePodDeleteError {
+					p.coreClient.EXPECT().DeleteVolume(mock.Anything, namespace, mock.Anything).Return(th.ErrIfTrue(tt.simulatePVCDeleteError))
+				}
+
+				if !tt.opts.ForceBind {
+					return
+				}
+
+				p.coreClient.EXPECT().CreatePod(ctx, namespace, mock.Anything).
+					RunAndReturn(func(ctx context.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
+						assert.Contains(t, pod.Name, "force-bind")
+						assert.Len(t, pod.Spec.Containers, 1)
+						assert.Len(t, pod.Spec.Volumes, 1)
+
+						volume := pod.Spec.Volumes[0]
+						require.NotNil(t, volume.PersistentVolumeClaim)
+
+						container := pod.Spec.Containers[0]
+						assert.Contains(t, container.Image, "pause")
+						assert.Len(t, container.VolumeMounts, 1)
+						volumeMount := container.VolumeMounts[0]
+						assert.Equal(t, volume.Name, volumeMount.Name)
+
+						return th.ErrOr1Val(createdPod, tt.simulatePodCreateErr)
+					})
+				if tt.simulatePodCreateErr {
+					return
+				}
+				p.coreClient.EXPECT().DeletePod(mock.Anything, namespace, createdPod.Name).Return(th.ErrIfTrue(tt.simulatePodDeleteError))
+
+				p.coreClient.EXPECT().WaitForReadyPod(ctx, namespace, createdPod.Name, core.WaitForReadyPodOpts{MaxWaitTime: tt.opts.ForceBindTimeout}).
+					Return(th.ErrOr1Val(createdPod, tt.simulatePodWaitErr))
 			}()
 
 			clonedPVC, err := p.ClonePVC(ctx, namespace, pvcName, tt.opts)
-			if th.ErrExpected(tt.simulateSnapshotErr, tt.simulateWaitForSnapshotErr, tt.simulateQueryExistingErr, tt.simulateCreateErr, tt.expectRestoreSizeErr) {
+			if th.ErrExpected(
+				tt.simulateSnapshotErr,
+				tt.simulateWaitForSnapshotErr,
+				tt.simulateQueryExistingErr,
+				tt.simulateCreateErr,
+				tt.expectRestoreSizeErr,
+				tt.simulatePodCreateErr,
+				tt.simulatePodWaitErr,
+				tt.simulatePodDeleteError,
+				tt.simulatePVCDeleteError,
+			) {
 				require.Error(t, err)
 				require.Nil(t, clonedPVC)
 				return

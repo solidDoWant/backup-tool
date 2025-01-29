@@ -12,6 +12,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
 
@@ -19,6 +20,8 @@ type ClonePVCOptions struct {
 	WaitForSnapshotTimeout helpers.MaxWaitTime
 	DestStorageClassName   string // Override the storage class used for the created volume. Must be compatible with the snapshot.
 	DestPvcNamePrefix      string // Override the prefix used for the created volume name
+	ForceBind              bool   // Force the PVC to be bound immediately. This should be set if the storage class does not have `volumeBindingMode: Immediate` set, because the snapshot will be deleted after the PVC is created.
+	ForceBindTimeout       helpers.MaxWaitTime
 	CleanupTimeout         helpers.MaxWaitTime
 }
 
@@ -82,6 +85,51 @@ func (p *Provider) ClonePVC(ctx context.Context, namespace, pvcName string, opts
 	if err != nil {
 		err = trace.Wrap(err, "failed to create volume from created snapshot %q", helpers.FullName(readySnapshot))
 		return
+	}
+	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
+		if err == nil {
+			return nil
+		}
+		cleanupErr := p.coreClient.DeleteVolume(ctx, namespace, clonedPvc.Name)
+		clonedPvc = nil
+		return cleanupErr
+	}).WithErrMessage("failed to delete created volume for PVC %q", helpers.FullNameStr(namespace, pvcName)).WithOriginalErr(&err).Run()
+
+	if opts.ForceBind {
+		podVol := core.NewSingleContainerPVC(clonedPvc.Name, "/mnt")
+
+		var pod *corev1.Pod
+		pod, err = p.coreClient.CreatePod(ctx, namespace, &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "force-bind-" + clonedPvc.Name,
+			},
+			Spec: corev1.PodSpec{
+				Volumes: []corev1.Volume{podVol.ToVolume()},
+				Containers: []corev1.Container{
+					{
+						Name:            "force-bind",
+						Image:           "registry.k8s.io/pause", // TODO pin
+						VolumeMounts:    []corev1.VolumeMount{podVol.ToVolumeMount()},
+						SecurityContext: core.RestrictedContainerSecurityContext(1000, 1000),
+					},
+				},
+				SecurityContext: core.RestrictedPodSecurityContext(1000, 1000),
+				RestartPolicy:   corev1.RestartPolicyNever,
+			},
+		})
+		if err != nil {
+			err = trace.Wrap(err, "failed to create 'force bind' pod for PVC %q", helpers.FullName(clonedPvc))
+			return
+		}
+		defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
+			return p.coreClient.DeletePod(ctx, namespace, pod.Name)
+		}).WithErrMessage("failed to delete 'force bind' pod for PVC %q", helpers.FullName(clonedPvc)).WithOriginalErr(&err).Run()
+
+		_, err = p.coreClient.WaitForReadyPod(ctx, namespace, pod.Name, core.WaitForReadyPodOpts{MaxWaitTime: opts.ForceBindTimeout})
+		if err != nil {
+			err = trace.Wrap(err, "failed to wait for 'force bind' pod %q to become ready", helpers.FullName(pod))
+			return
+		}
 	}
 
 	return
