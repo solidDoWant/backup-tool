@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/goccy/go-yaml"
 	"github.com/gravitational/trace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -16,6 +17,21 @@ import (
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/utils/ptr"
 )
+
+func init() {
+	yaml.RegisterCustomUnmarshaler(func(mwt *MaxWaitTime, b []byte) error {
+		var duration time.Duration
+		if err := yaml.Unmarshal(b, &duration); err != nil {
+			return err
+		}
+		*mwt = MaxWaitTime(duration)
+		return nil
+	})
+
+	yaml.RegisterCustomMarshaler(func(mwt MaxWaitTime) ([]byte, error) {
+		return yaml.Marshal(time.Duration(mwt))
+	})
+}
 
 type metaResource interface {
 	GetName() string
