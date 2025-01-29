@@ -13,6 +13,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 )
 
@@ -125,7 +126,12 @@ func (cmc *Client) ReissueCertificate(ctx context.Context, namespace, name strin
 	}
 
 	cmutil.SetCertificateCondition(cert, cert.Generation, certmanagerv1.CertificateConditionIssuing, cmmeta.ConditionTrue, "ManuallyTriggered", fmt.Sprintf("Certificate re-issuance triggered by %s", constants.ToolName))
-	updatedCert, err := cmc.client.CertmanagerV1().Certificates(cert.Namespace).UpdateStatus(ctx, cert, metav1.UpdateOptions{})
+	var updatedCert *certmanagerv1.Certificate
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		updatedCert, err = cmc.client.CertmanagerV1().Certificates(cert.Namespace).UpdateStatus(ctx, cert, metav1.UpdateOptions{})
+		return err
+	})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to update status of Certificate %s/%s", cert.Namespace, cert.Name)
 	}
