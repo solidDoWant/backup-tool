@@ -16,6 +16,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 type BackupToolInstanceInterface interface {
@@ -98,6 +99,10 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 		SecurityContext: core.RestrictedContainerSecurityContext(uid, gid),
 	}
 
+	podSecurityContext := core.RestrictedPodSecurityContext(uid, gid)
+	podSecurityContext.FSGroup = &gid
+	podSecurityContext.FSGroupChangePolicy = ptr.To(corev1.FSGroupChangeOnRootMismatch)
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: helpers.CleanName(namePrefix),
@@ -111,7 +116,7 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 			Containers:      []corev1.Container{container},
 			RestartPolicy:   corev1.RestartPolicyNever,
 			Volumes:         lo.Map(opts.Volumes, func(vol core.SingleContainerVolume, _ int) corev1.Volume { return vol.ToVolume() }),
-			SecurityContext: core.RestrictedPodSecurityContext(uid, gid),
+			SecurityContext: podSecurityContext,
 		},
 	}
 

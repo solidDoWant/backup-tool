@@ -165,6 +165,21 @@ func TestCreateBackupToolInstance(t *testing.T) {
 					require.Equal(t, int32(servers.GRPCPort), port.ContainerPort)
 					require.Equal(t, corev1.ProtocolTCP, port.Protocol)
 
+					require.NotNil(t, pod.Spec.SecurityContext)
+					require.NotNil(t, pod.Spec.SecurityContext.FSGroupChangePolicy)
+					require.Equal(t, corev1.FSGroupChangeOnRootMismatch, *pod.Spec.SecurityContext.FSGroupChangePolicy)
+
+					require.NotNil(t, pod.Spec.SecurityContext.RunAsUser)
+					require.Equal(t, int64(1000), *pod.Spec.SecurityContext.RunAsUser)
+					require.NotNil(t, pod.Spec.SecurityContext.RunAsGroup)
+					require.Equal(t, int64(1000), *pod.Spec.SecurityContext.RunAsGroup)
+					require.NotNil(t, pod.Spec.SecurityContext.FSGroup)
+					require.Equal(t, *pod.Spec.SecurityContext.RunAsGroup, *pod.Spec.SecurityContext.FSGroup)
+
+					require.NotNil(t, container.SecurityContext)
+					require.NotNil(t, container.SecurityContext.RunAsGroup)
+					require.Equal(t, *pod.Spec.SecurityContext.RunAsGroup, *container.SecurityContext.RunAsGroup)
+
 					return th.ErrOr1Val(pod, tt.simulateCreatePodError)
 				})
 				if tt.simulateCreatePodError {
