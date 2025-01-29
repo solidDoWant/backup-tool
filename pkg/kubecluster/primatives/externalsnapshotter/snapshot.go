@@ -11,7 +11,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-const VolumeSnapshotKind = "volumesnapshots" // This is not exported by the external-snapshotter package
+const VolumeSnapshotKind = "VolumeSnapshot" // This is not exported by the external-snapshotter package
 
 type SnapshotVolumeOptions struct {
 	Name string
