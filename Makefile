@@ -130,9 +130,16 @@ PHONY += (container-image)
 container-image: build
 	@docker buildx build --platform linux/$(LOCALARCH) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) .
 
+CONTAINER_MANIFEST_PUSH ?= false
+
 PHONY += (container-manifest-image)
+container-manifest: PUSH_ARG = $(if $(findstring t,$(CONTAINER_MANIFEST_PUSH)),--push)
 container-manifest: $(CONTAINER_PLATFORMS:%=$(BUILD_DIR)/%/$(BINARY_NAME))
-	@docker buildx build $(CONTAINER_PLATFORMS:%=--platform %) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) .
+	@docker buildx build $(CONTAINER_PLATFORMS:%=--platform %) $(PUSH_ARG) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) .
+
+PHONY += (container-push)
+container-push: container-manifest
+	@docker manifest push $(CONTAINER_IMAGE_TAG)
 
 PHONY += (clean)
 clean:
