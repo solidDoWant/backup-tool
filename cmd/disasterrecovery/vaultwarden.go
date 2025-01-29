@@ -40,7 +40,7 @@ func (vwc *VaultWardenCommand) DRCommand() *cobra.Command {
 }
 
 func (vwc *VaultWardenCommand) Backup() error {
-	ctx, cancel := vwc.timeoutContext.GetContextTimeout()
+	ctx, cancel := vwc.timeoutContext.GetCommandContext()
 	defer cancel()
 
 	config, err := vwc.configFile.ReadConfigFile(ctx)
