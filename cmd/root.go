@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"html"
 	"os"
 
 	"github.com/gravitational/trace"
@@ -22,7 +23,11 @@ func Execute() {
 	rootCmd.AddCommand(disasterrecovery.GetDRCommand())
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, trace.DebugReport(err))
+		report := trace.DebugReport(err)
+		// This isn't ideal but because the upstream library HTML escapes template chars,
+		// they need to be "unescaped" for readability here. TODO replace this lib.
+		report = html.UnescapeString(report)
+		fmt.Fprintln(os.Stderr, report)
 		os.Exit(1)
 	}
 }
