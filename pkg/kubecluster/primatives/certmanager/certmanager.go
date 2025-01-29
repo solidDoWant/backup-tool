@@ -120,20 +120,19 @@ func (cmc *Client) WaitForReadyCertificate(ctx context.Context, namespace, name 
 
 // Trigger an immediate re-issuance of a certificate
 func (cmc *Client) ReissueCertificate(ctx context.Context, namespace, name string) (*certmanagerv1.Certificate, error) {
-	cert, err := cmc.client.CertmanagerV1().Certificates(namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, trace.Wrap(err, "failed to get certificate %q", helpers.FullNameStr(namespace, name))
-	}
-
-	cmutil.SetCertificateCondition(cert, cert.Generation, certmanagerv1.CertificateConditionIssuing, cmmeta.ConditionTrue, "ManuallyTriggered", fmt.Sprintf("Certificate re-issuance triggered by %s", constants.ToolName))
 	var updatedCert *certmanagerv1.Certificate
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var err error
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cert, err := cmc.client.CertmanagerV1().Certificates(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return trace.Wrap(err, "failed to get certificate %q", helpers.FullNameStr(namespace, name))
+		}
+
+		cmutil.SetCertificateCondition(cert, cert.Generation, certmanagerv1.CertificateConditionIssuing, cmmeta.ConditionTrue, "ManuallyTriggered", fmt.Sprintf("Certificate re-issuance triggered by %s", constants.ToolName))
 		updatedCert, err = cmc.client.CertmanagerV1().Certificates(cert.Namespace).UpdateStatus(ctx, cert, metav1.UpdateOptions{})
 		return err
 	})
 	if err != nil {
-		return nil, trace.Wrap(err, "failed to update status of Certificate %s/%s", cert.Namespace, cert.Name)
+		return nil, trace.Wrap(err, "failed to update status of Certificate %q", helpers.FullNameStr(namespace, name))
 	}
 
 	return updatedCert, nil
