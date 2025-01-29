@@ -92,4 +92,23 @@ PHONY += (dep-licenses)
 dep-licenses:
 	@go run github.com/google/go-licenses@latest report ./...
 
+BUILD_DIR = build
+BINARY_PLATFORMS = linux/amd64 linux/arm64
+BINARY_NAME = backup-tool
+GO_SOURCE_FILES := $(shell find . \( -name '*.go' ! -name '*_test.go' ! -name '*_mock*.go' ! -path './pkg/testhelpers/*' ! -path '*/fake/*' \))
+
+$(BUILD_DIR)/%/$(BINARY_NAME): $(GO_SOURCE_FILES)
+	@mkdir -p $(@D)
+	@GOOS=$(word 1,$(subst /, ,$*)) GOARCH=$(word 2,$(subst /, ,$*)) go build -o $@ .
+
+PHONY += (build)
+build: $(BUILD_DIR)/$(shell go env GOOS)/$(shell go env GOARCH)/$(BINARY_NAME)
+
+PHONY += (build-all)
+build-all: $(BINARY_PLATFORMS:%=$(BUILD_DIR)/%/$(BINARY_NAME))
+
+PHONY += (clean)
+clean:
+	@rm -rf $(BUILD_DIR)
+
 .PHONY: $(PHONY)
