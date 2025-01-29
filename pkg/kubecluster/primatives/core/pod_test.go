@@ -415,6 +415,8 @@ func TestRestrictedPodSecurityContext(t *testing.T) {
 			assert.Equal(t, tt.uid, *createdSC.RunAsUser)
 			assert.Equal(t, tt.gid, *createdSC.RunAsGroup)
 			assert.True(t, *createdSC.RunAsNonRoot)
+			require.NotNil(t, createdSC.SeccompProfile)
+			assert.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, createdSC.SeccompProfile.Type)
 		})
 	}
 }
@@ -449,6 +451,8 @@ func TestRestrictedContainerSecurityContext(t *testing.T) {
 			assert.True(t, *createdSC.RunAsNonRoot)
 			assert.True(t, *createdSC.ReadOnlyRootFilesystem)
 			assert.False(t, *createdSC.AllowPrivilegeEscalation)
+			require.NotNil(t, createdSC.SeccompProfile)
+			assert.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, createdSC.SeccompProfile.Type)
 		})
 	}
 }

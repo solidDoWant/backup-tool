@@ -102,6 +102,9 @@ func RestrictedPodSecurityContext(uid, gid int64) *corev1.PodSecurityContext {
 		RunAsUser:    ptr.To(uid),
 		RunAsGroup:   ptr.To(gid),
 		RunAsNonRoot: ptr.To(true),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
 	}
 }
 
@@ -116,5 +119,8 @@ func RestrictedContainerSecurityContext(uid, gid int64) *corev1.SecurityContext 
 		RunAsNonRoot:             ptr.To(true),
 		ReadOnlyRootFilesystem:   ptr.To(true),
 		AllowPrivilegeEscalation: ptr.To(false),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
 	}
 }
