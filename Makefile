@@ -102,6 +102,9 @@ GO_SOURCE_FILES := $(shell find . \( -name '*.go' ! -name '*_test.go' ! -name '*
 GO_CONSTANTS := Version=$(VERSION) ImageRegistry=$(CONTAINER_REGISTRY)
 GO_LDFLAGS := $(GO_CONSTANTS:%=-X $(MODULE_NAME)/pkg/constants.%)
 
+LOCALOS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
+LOCALARCH := $(shell uname -m | sed 's/x86_64/amd64/')
+
 $(BUILD_DIR)/%/$(BINARY_NAME): $(GO_SOURCE_FILES)
 	@mkdir -p $(@D)
 	@GOOS=$(word 1,$(subst /, ,$*)) GOARCH=$(word 2,$(subst /, ,$*)) go build -ldflags="$(GO_LDFLAGS)" -o $@ .
@@ -110,7 +113,7 @@ PHONY += (binary)
 binary: build
 
 PHONY += (build)
-build: $(BUILD_DIR)/$(shell go env GOOS)/$(shell go env GOARCH)/$(BINARY_NAME)
+build: $(BUILD_DIR)/$(LOCALOS)/$(LOCALARCH)/$(BINARY_NAME)
 
 PHONY += (build-all)
 build-all: $(BINARY_PLATFORMS:%=$(BUILD_DIR)/%/$(BINARY_NAME))
