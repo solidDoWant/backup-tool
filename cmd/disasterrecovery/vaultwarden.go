@@ -12,12 +12,12 @@ import (
 type VaultWardenBackupConfig struct {
 	disasterrecovery.VaultWardenBackupOptions `yaml:",inline"`
 	// TODO test if these can be moved to an embedded "required" struct
-	Namespace             string `yaml:"namespace" jsonschema:"required"`
-	BackupName            string `yaml:"backupName" jsonschema:"required"`
-	DataPVCName           string `yaml:"dataPVCName" jsonschema:"required"`
-	CNPGClusterName       string `yaml:"cnpgClusterName" jsonschema:"required"`
-	ServingCertIssuerName string `yaml:"servingCertIssuerName" jsonschema:"required"`
-	ClientCertIssuerName  string `yaml:"clientCertIssuerName" jsonschema:"required"`
+	Namespace              string `yaml:"namespace" jsonschema:"required"`
+	BackupName             string `yaml:"backupName" jsonschema:"required"`
+	DataPVCName            string `yaml:"dataPVCName" jsonschema:"required"`
+	CNPGClusterName        string `yaml:"cnpgClusterName" jsonschema:"required"`
+	ServingCertIssuerName  string `yaml:"servingCertIssuerName" jsonschema:"required"`
+	ClientCACertIssuerName string `yaml:"clientCACertIssuerName" jsonschema:"required"`
 }
 
 type VaultWardenCommand struct {
@@ -54,7 +54,7 @@ func (vwc *VaultWardenCommand) Backup() error {
 	}
 
 	vw := disasterrecovery.NewVaultWarden(clusterClient)
-	backup, err := vw.Backup(ctx, config.Namespace, config.BackupName, config.DataPVCName, config.CNPGClusterName, config.ServingCertIssuerName, config.ClientCertIssuerName, config.VaultWardenBackupOptions)
+	backup, err := vw.Backup(ctx, config.Namespace, config.BackupName, config.DataPVCName, config.CNPGClusterName, config.ServingCertIssuerName, config.ClientCACertIssuerName, config.VaultWardenBackupOptions)
 	fmt.Printf("Backup completed in %s\n", backup.CalculateRuntime().String()) // TODO logging/output library
 	return trace.Wrap(err, "failed to backup Vaultwarden")
 }
