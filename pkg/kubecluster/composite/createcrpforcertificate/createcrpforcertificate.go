@@ -40,23 +40,27 @@ func (p *Provider) CreateCRPForCertificate(ctx context.Context, cert *certmanage
 	}
 
 	if cert.Spec.PrivateKey != nil {
-		privateKeySet := false
-		privateKey := &policyv1alpha1.CertificateRequestPolicyConstraintsPrivateKey{}
+		// TODO remove this after https://github.com/cert-manager/approver-policy/pull/572 is merged
+		// This is needed to work around an upstream bug
+		if cert.Spec.PrivateKey.Algorithm != certmanagerv1.Ed25519KeyAlgorithm {
+			privateKeySet := false
+			privateKey := &policyv1alpha1.CertificateRequestPolicyConstraintsPrivateKey{}
 
-		if cert.Spec.PrivateKey.Algorithm != "" {
-			privateKey.Algorithm = &cert.Spec.PrivateKey.Algorithm
-			privateKeySet = true
-		}
+			if cert.Spec.PrivateKey.Algorithm != "" {
+				privateKey.Algorithm = &cert.Spec.PrivateKey.Algorithm
+				privateKeySet = true
+			}
 
-		if cert.Spec.PrivateKey.Size != 0 {
-			privateKey.MinSize = &cert.Spec.PrivateKey.Size
-			privateKey.MaxSize = &cert.Spec.PrivateKey.Size
-			privateKeySet = true
-		}
+			if cert.Spec.PrivateKey.Size != 0 {
+				privateKey.MinSize = &cert.Spec.PrivateKey.Size
+				privateKey.MaxSize = &cert.Spec.PrivateKey.Size
+				privateKeySet = true
+			}
 
-		if privateKeySet {
-			constraints.PrivateKey = privateKey
-			constraintsSet = true
+			if privateKeySet {
+				constraints.PrivateKey = privateKey
+				constraintsSet = true
+			}
 		}
 	}
 
