@@ -118,8 +118,25 @@ build: $(BUILD_DIR)/$(LOCALOS)/$(LOCALARCH)/$(BINARY_NAME)
 PHONY += (build-all)
 build-all: $(BINARY_PLATFORMS:%=$(BUILD_DIR)/%/$(BINARY_NAME))
 
+DEBIAN_IMAGE_VERSION = 12.9-slim
+POSTGRES_MAJOR_VERSION = 17
+
+CONTAINER_IMAGE_TAG = $(CONTAINER_REGISTRY)/$(BINARY_NAME):$(VERSION)
+CONTAINER_BUILD_ARG_VARS = DEBIAN_IMAGE_VERSION POSTGRES_MAJOR_VERSION
+CONTAINER_BUILD_ARGS := $(foreach var,$(CONTAINER_BUILD_ARG_VARS),--build-arg $(var)=$($(var)))
+CONTAINER_PLATFORMS := $(BINARY_PLATFORMS)
+
+PHONY += (container-image)
+container-image: build
+	@docker buildx build --platform linux/$(LOCALARCH) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) .
+
+PHONY += (container-manifest-image)
+container-manifest: $(CONTAINER_PLATFORMS:%=$(BUILD_DIR)/%/$(BINARY_NAME))
+	@docker buildx build $(CONTAINER_PLATFORMS:%=--platform %) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) .
+
 PHONY += (clean)
 clean:
 	@rm -rf $(BUILD_DIR)
+	@docker image rm -f $(CONTAINER_IMAGE_TAG) 2> /dev/null > /dev/null || true
 
 .PHONY: $(PHONY)
