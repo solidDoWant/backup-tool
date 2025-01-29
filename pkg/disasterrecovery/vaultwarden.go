@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-const baseMountPath = string(os.PathListSeparator) + "mnt"
+const baseMountPath = string(os.PathSeparator) + "mnt"
 
 // TODO plumb a lot more options through to here
 type VaultWardenBackupOptions struct {
