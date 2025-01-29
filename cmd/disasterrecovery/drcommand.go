@@ -35,6 +35,7 @@ func getDRSubcommands() []*cobra.Command {
 				RunE: func(cmd *cobra.Command, args []string) error {
 					return backupDRCmd.Backup()
 				},
+				SilenceUsage: true,
 			}
 			backupDRCmd.ConfigureBackupFlags(backupCommand)
 			drCommand.AddCommand(backupCommand)
@@ -46,6 +47,7 @@ func getDRSubcommands() []*cobra.Command {
 				RunE: func(cmd *cobra.Command, args []string) error {
 					return restoreDRCmd.Restore()
 				},
+				SilenceUsage: true,
 			}
 			drCommand.AddCommand(restoreCommand)
 		}
@@ -56,6 +58,7 @@ func getDRSubcommands() []*cobra.Command {
 				RunE: func(cmd *cobra.Command, args []string) error {
 					return genSchemaCmd.GenerateConfigSchema()
 				},
+				SilenceUsage: true,
 			}
 			drCommand.AddCommand(restoreCommand)
 		}
