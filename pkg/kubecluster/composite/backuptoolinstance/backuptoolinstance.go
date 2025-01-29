@@ -180,7 +180,8 @@ func (b *BackupToolInstance) GetGRPCClient(ctx context.Context, searchDomains ..
 		return nil, trace.Wrap(err, "failed to find reachable service address for backup tool instance")
 	}
 
-	grpcClient, err := clients.NewClient(ctx, endpoint)
+	address := net.JoinHostPort(endpoint, fmt.Sprintf("%d", servers.GRPCPort))
+	grpcClient, err := clients.NewClient(ctx, address)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to connect to backup tool GRPC server at %q", endpoint)
 	}
