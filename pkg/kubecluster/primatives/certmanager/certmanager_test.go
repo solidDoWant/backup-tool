@@ -618,7 +618,7 @@ func TestDeleteIssuer(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			err := client.DeleteIssuer(ctx, issuerName, namespace)
+			err := client.DeleteIssuer(ctx, namespace, issuerName)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return

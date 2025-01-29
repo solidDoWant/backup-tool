@@ -199,7 +199,7 @@ func (cmc *Client) WaitForReadyIssuer(ctx context.Context, namespace, name strin
 	return issuer, nil
 }
 
-func (cmc *Client) DeleteIssuer(ctx context.Context, name, namespace string) error {
+func (cmc *Client) DeleteIssuer(ctx context.Context, namespace, name string) error {
 	err := cmc.client.CertmanagerV1().Issuers(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete issuer %q", helpers.FullNameStr(namespace, name))
 }
