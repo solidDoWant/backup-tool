@@ -108,7 +108,7 @@ func TestGetCredentials(t *testing.T) {
 			clientCertMountDir:  "/certs/client",
 			expectedCredentials: &cnpg.KubernetesSecretCredentials{
 				Host:                         "test-cluster-rw.test-ns.svc",
-				ServingCertificateCAFilePath: "/certs/server/ca.crt",
+				ServingCertificateCAFilePath: "/certs/server/tls.crt",
 				ClientCertificateFilePath:    "/certs/client/tls.crt",
 				ClientPrivateKeyFilePath:     "/certs/client/tls.key",
 			},
@@ -125,7 +125,7 @@ func TestGetCredentials(t *testing.T) {
 			clientCertMountDir:  "/var/run/secrets/client-cert",
 			expectedCredentials: &cnpg.KubernetesSecretCredentials{
 				Host:                         "prod-db-rw.prod.svc",
-				ServingCertificateCAFilePath: "/var/run/secrets/server-cert/ca.crt",
+				ServingCertificateCAFilePath: "/var/run/secrets/server-cert/tls.crt",
 				ClientCertificateFilePath:    "/var/run/secrets/client-cert/tls.crt",
 				ClientPrivateKeyFilePath:     "/var/run/secrets/client-cert/tls.key",
 			},

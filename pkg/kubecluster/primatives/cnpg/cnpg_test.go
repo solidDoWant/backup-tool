@@ -786,7 +786,7 @@ func TestGetVariables(t *testing.T) {
 				Host:                         "test-host",
 				Port:                         "5433",
 				User:                         "test-user",
-				ServingCertificateCAFilePath: "/certs/ca.crt",
+				ServingCertificateCAFilePath: "/certs/tls.crt",
 				ClientCertificateFilePath:    "/certs/client.crt",
 				ClientPrivateKeyFilePath:     "/certs/client.key",
 			},
@@ -798,7 +798,7 @@ func TestGetVariables(t *testing.T) {
 				postgres.SSLModeVarName:     "verify-full",
 				postgres.SSLCertVarName:     "/certs/client.crt",
 				postgres.SSLKeyVarName:      "/certs/client.key",
-				postgres.SSLRootCertVarName: "/certs/ca.crt",
+				postgres.SSLRootCertVarName: "/certs/tls.crt",
 			},
 		},
 		{

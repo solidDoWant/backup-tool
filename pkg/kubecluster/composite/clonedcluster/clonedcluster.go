@@ -339,7 +339,7 @@ func (cc *ClonedCluster) GetCluster() *apiv1.Cluster {
 func (cc *ClonedCluster) GetCredentials(servingCertMountDirectory, clientCertMountDirectory string) postgres.Credentials {
 	return &cnpg.KubernetesSecretCredentials{
 		Host:                         fmt.Sprintf("%s.%s.svc", cc.cluster.GetServiceReadWriteName(), cc.cluster.Namespace),
-		ServingCertificateCAFilePath: filepath.Join(servingCertMountDirectory, "ca.crt"),
+		ServingCertificateCAFilePath: filepath.Join(servingCertMountDirectory, "tls.crt"),
 		ClientCertificateFilePath:    filepath.Join(clientCertMountDirectory, "tls.crt"),
 		ClientPrivateKeyFilePath:     filepath.Join(clientCertMountDirectory, "tls.key"),
 	}
