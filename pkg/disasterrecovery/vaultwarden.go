@@ -110,7 +110,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 		Volumes: []core.SingleContainerVolume{
 			core.NewSingleContainerPVC(drPVC.Name, drVolumeMountPath),
 			core.NewSingleContainerPVC(clonedPVC.Name, clonedVolumeMountPath),
-			core.NewSingleContainerSecret(clonedCluster.GetServingCert().Name, servingCertVolumeMountPath),
+			core.NewSingleContainerSecret(clonedCluster.GetServingCert().Name, servingCertVolumeMountPath, corev1.KeyToPath{Key: "tls.crt", Path: "tls.crt"}),
 			core.NewSingleContainerSecret(clonedCluster.GetClientCACert().Name, clientCertVolumeMountPath),
 		},
 		CleanupTimeout: backupOptions.CleanupTimeout,
