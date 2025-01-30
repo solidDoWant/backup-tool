@@ -14,6 +14,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonepvc"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
@@ -145,9 +146,9 @@ func TestVaultWardenBackup(t *testing.T) {
 					Namespace: namespace,
 				},
 			}
-			clientCACert := certmanagerv1.Certificate{
+			postgresCertificate := certmanagerv1.Certificate{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "client-cert",
+					Name:      "postgres-cert",
 					Namespace: namespace,
 				},
 			}
@@ -237,7 +238,9 @@ func TestVaultWardenBackup(t *testing.T) {
 
 				// Step 4
 				clonedCluster.EXPECT().GetServingCert().Return(&servingCert)
-				clonedCluster.EXPECT().GetClientCACert().Return(&clientCACert)
+				userCert := clusterusercert.NewMockClusterUserCertInterface(t)
+				clonedCluster.EXPECT().GetPostgresUserCert().Return(userCert)
+				userCert.EXPECT().GetCertificate().Return(&postgresCertificate)
 				mockClient.EXPECT().CreateBackupToolInstance(ctx, namespace, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, namespace, instance string, opts backuptoolinstance.CreateBackupToolInstanceOptions) (backuptoolinstance.BackupToolInstanceInterface, error) {
 						require.Equal(t, fullBackupName, opts.NamePrefix)
@@ -289,7 +292,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				// Step 7
 				mockESClient.EXPECT().SnapshotVolume(ctx, namespace, clonedPVCName, mock.Anything).
 					RunAndReturn(func(ctx context.Context, namespace, pvcName string, opts externalsnapshotter.SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error) {
-						require.Equal(t, fullBackupName, opts.Name)
+						require.Equal(t, helpers.CleanName(fullBackupName), opts.Name)
 
 						return th.ErrOr1Val(&volumesnapshotv1.VolumeSnapshot{
 							ObjectMeta: metav1.ObjectMeta{

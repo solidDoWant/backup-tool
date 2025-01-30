@@ -145,7 +145,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	}
 
 	// 7. Snapshot the backup PVC
-	snapshot, err := vw.kubernetesClient.ES().SnapshotVolume(ctx, namespace, drPVC.Name, externalsnapshotter.SnapshotVolumeOptions{Name: backup.GetFullName()})
+	snapshot, err := vw.kubernetesClient.ES().SnapshotVolume(ctx, namespace, drPVC.Name, externalsnapshotter.SnapshotVolumeOptions{Name: helpers.CleanName(backup.GetFullName())})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to snapshot backup volume %q", helpers.FullName(drPVC))
 	}
