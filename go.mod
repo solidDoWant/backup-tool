@@ -6,27 +6,29 @@ require (
 	dario.cat/mergo v1.0.1
 	github.com/cert-manager/approver-policy v0.18.0
 	github.com/cert-manager/cert-manager v1.16.3
-	github.com/cloudnative-pg/cloudnative-pg v1.25.0
-	github.com/cloudnative-pg/machinery v0.0.0-20241219102532-2807bc88310d
+	// Commit pinning is needed to support a newer version of sigs.k8s.io/controller-runtime,
+	// as the latest released version (v1.25.0) does not have a fix for dep breaking changes, and will not compile
+	github.com/cloudnative-pg/cloudnative-pg v1.25.1-0.20250129141216-762c282c4749
+	github.com/cloudnative-pg/machinery v0.0.0-20250124134709-2553c239f2c8
 	github.com/fatih/structtag v1.2.0
 	github.com/go-playground/validator/v10 v10.24.0
 	github.com/goccy/go-yaml v1.15.15
 	github.com/gravitational/trace v1.4.0
 	github.com/jinzhu/copier v0.4.0
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.2.0
-	github.com/otiai10/copy v1.14.0
-	github.com/samber/lo v1.47.0
+	github.com/otiai10/copy v1.14.1
+	github.com/samber/lo v1.49.1
 	// TODO the 1.9 release will add support for removing/replacing help templates, which prevents dead code elimination (https://github.com/spf13/cobra/pull/1956)
 	github.com/spf13/cobra v1.8.1
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/term v0.28.0
-	google.golang.org/grpc v1.69.2
-	google.golang.org/protobuf v1.36.2
-	k8s.io/api v0.32.0
-	k8s.io/apiextensions-apiserver v0.32.0
-	k8s.io/apimachinery v0.32.0
-	k8s.io/client-go v0.32.0
+	google.golang.org/grpc v1.70.0
+	google.golang.org/protobuf v1.36.4
+	k8s.io/api v0.32.1
+	k8s.io/apiextensions-apiserver v0.32.1
+	k8s.io/apimachinery v0.32.1
+	k8s.io/client-go v0.32.1
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
 )
 
@@ -34,7 +36,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudnative-pg/barman-cloud v0.0.0-20241218093921-134c7de4954a // indirect
+	github.com/cloudnative-pg/barman-cloud v0.0.0-20250104195650-c1472628b450 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
@@ -74,18 +76,17 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.59.1 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/robfig/cron v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.opentelemetry.io/otel v1.31.0 // indirect
-	go.opentelemetry.io/otel/trace v1.31.0 // indirect
+	go.opentelemetry.io/otel v1.32.0 // indirect
+	go.opentelemetry.io/otel/trace v1.32.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
 	golang.org/x/mod v0.22.0
 	golang.org/x/net v0.34.0 // indirect
-	golang.org/x/oauth2 v0.23.0 // indirect
+	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
@@ -95,7 +96,7 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/component-base v0.32.0 // indirect
+	k8s.io/component-base v0.32.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
 	sigs.k8s.io/controller-runtime v0.19.4 // indirect
@@ -104,3 +105,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.5.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+require github.com/otiai10/mint v1.6.3 // indirect

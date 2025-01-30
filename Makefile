@@ -21,7 +21,8 @@ $(PROTOBUF_GEN_DIR)/%_grpc_mock.pb.go $(PROTOBUF_GEN_DIR)/%_grpc.pb.go $(PROTOBU
 
 KUBE_CODEGEN_VERSION ?= kubernetes-1.32.0
 
-CNPG_VERSION := $(shell go list -f '{{ .Version }}' -m github.com/cloudnative-pg/cloudnative-pg)
+# Temp setting to main until v1.25.1/later release
+CNPG_VERSION := main # $(shell go list -f '{{ .Version }}' -m github.com/cloudnative-pg/cloudnative-pg)
 CNPG_CODEGEN_WORKING_DIR = /tmp/cnpg-gen
 CNPG_KUBE_CODEGEN = $(CNPG_CODEGEN_WORKING_DIR)/kube_codegen.sh
 CNPG_GIT_DIR = $(CNPG_CODEGEN_WORKING_DIR)/repo
