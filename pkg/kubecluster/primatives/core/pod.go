@@ -125,3 +125,28 @@ func RestrictedContainerSecurityContext(uid, gid int64) *corev1.SecurityContext 
 		},
 	}
 }
+
+func PrivilegedPodSecurityContext() *corev1.PodSecurityContext {
+	return &corev1.PodSecurityContext{
+		RunAsUser:    ptr.To(int64(0)),
+		RunAsGroup:   ptr.To(int64(0)),
+		RunAsNonRoot: ptr.To(false),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+}
+
+func PrivilegedContainerSecurityContext() *corev1.SecurityContext {
+	return &corev1.SecurityContext{
+		Privileged:               ptr.To(true),
+		RunAsUser:                ptr.To(int64(0)),
+		RunAsGroup:               ptr.To(int64(0)),
+		RunAsNonRoot:             ptr.To(false),
+		ReadOnlyRootFilesystem:   ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(true),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+}

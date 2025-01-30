@@ -80,9 +80,6 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 			Run()
 	}
 
-	uid := int64(1000)
-	gid := int64(1000)
-
 	container := corev1.Container{
 		Name:         constants.ToolName,
 		Image:        constants.FullImageName,
@@ -96,12 +93,12 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 				Protocol:      corev1.ProtocolTCP,
 			},
 		},
-		SecurityContext: core.RestrictedContainerSecurityContext(uid, gid),
+		// Must run as root to read, chown, and chmod arbitrary files.
+		// This does not require root on the host - just on the container.
+		// Note: this is not compatible with pod-security.kubernetes.io/enforce: baseline
+		SecurityContext: core.PrivilegedContainerSecurityContext(),
+		ImagePullPolicy: corev1.PullAlways, // TODO DEBUGGING REMOVE
 	}
-
-	podSecurityContext := core.RestrictedPodSecurityContext(uid, gid)
-	podSecurityContext.FSGroup = &gid
-	podSecurityContext.FSGroupChangePolicy = ptr.To(corev1.FSGroupChangeOnRootMismatch)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -111,12 +108,13 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 				"app.kubernetes.io/instance": instance,
 			},
 		},
-		// TODO security, probes, etc
+		// TODO probes, etc
 		Spec: corev1.PodSpec{
+			HostUsers:       ptr.To(false), // Don't run as node root
 			Containers:      []corev1.Container{container},
 			RestartPolicy:   corev1.RestartPolicyNever,
 			Volumes:         lo.Map(opts.Volumes, func(vol core.SingleContainerVolume, _ int) corev1.Volume { return vol.ToVolume() }),
-			SecurityContext: podSecurityContext,
+			SecurityContext: core.PrivilegedPodSecurityContext(),
 		},
 	}
 

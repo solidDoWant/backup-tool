@@ -490,3 +490,26 @@ func TestRestrictedContainerSecurityContext(t *testing.T) {
 		})
 	}
 }
+
+func TestPrivilegedPodSecurityContext(t *testing.T) {
+	createdSC := PrivilegedPodSecurityContext()
+	require.NotNil(t, createdSC)
+	assert.Equal(t, int64(0), *createdSC.RunAsUser)
+	assert.Equal(t, int64(0), *createdSC.RunAsGroup)
+	assert.False(t, *createdSC.RunAsNonRoot)
+	require.NotNil(t, createdSC.SeccompProfile)
+	assert.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, createdSC.SeccompProfile.Type)
+}
+
+func TestPrivilegedContainerSecurityContext(t *testing.T) {
+	createdSC := PrivilegedContainerSecurityContext()
+	require.NotNil(t, createdSC)
+	assert.True(t, *createdSC.Privileged)
+	assert.Equal(t, int64(0), *createdSC.RunAsUser)
+	assert.Equal(t, int64(0), *createdSC.RunAsGroup)
+	assert.False(t, *createdSC.RunAsNonRoot)
+	assert.True(t, *createdSC.ReadOnlyRootFilesystem)
+	assert.True(t, *createdSC.AllowPrivilegeEscalation)
+	require.NotNil(t, createdSC.SeccompProfile)
+	assert.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, createdSC.SeccompProfile.Type)
+}
