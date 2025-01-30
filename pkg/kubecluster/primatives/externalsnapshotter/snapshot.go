@@ -14,7 +14,8 @@ import (
 const VolumeSnapshotKind = "VolumeSnapshot" // This is not exported by the external-snapshotter package
 
 type SnapshotVolumeOptions struct {
-	Name string
+	Name          string
+	SnapshotClass string
 }
 
 func (c *Client) SnapshotVolume(ctx context.Context, namespace, pvcName string, opts SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error) {
@@ -30,6 +31,10 @@ func (c *Client) SnapshotVolume(ctx context.Context, namespace, pvcName string, 
 		snapshot.ObjectMeta.GenerateName = helpers.CleanName(pvcName)
 	} else {
 		snapshot.ObjectMeta.Name = opts.Name
+	}
+
+	if opts.SnapshotClass != "" {
+		snapshot.Spec.VolumeSnapshotClassName = &opts.SnapshotClass
 	}
 
 	snapshot, err := c.client.SnapshotV1().VolumeSnapshots(namespace).Create(ctx, snapshot, metav1.CreateOptions{})

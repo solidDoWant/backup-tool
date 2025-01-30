@@ -25,13 +25,18 @@ import (
 
 const baseMountPath = string(os.PathSeparator) + "mnt"
 
+type VaultWardenBackupOptionsBackupSnapshot struct {
+	ReadyTimeout  helpers.MaxWaitTime `yaml:"snapshotReadyTimeout,omitempty"`
+	SnapshotClass string              `yaml:"snapshotClass,omitempty"`
+}
+
 // TODO plumb a lot more options through to here
 type VaultWardenBackupOptions struct {
 	VolumeSize                   resource.Quantity                                  `yaml:"volumeSize,omitempty"`
 	VolumeStorageClass           string                                             `yaml:"volumeStorageClass,omitempty"`
 	CloneClusterOptions          clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
 	BackupToolPodCreationTimeout helpers.MaxWaitTime                                `yaml:"backupToolPodCreationTimeout,omitempty"`
-	SnapshotReadyTimeout         helpers.MaxWaitTime                                `yaml:"snapshotReadyTimeout,omitempty"`
+	BackupSnapshot               VaultWardenBackupOptionsBackupSnapshot             `yaml:"backupSnapshot,omitempty"`
 	RemoteBackupToolOptions      backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	ClusterServiceSearchDomains  []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
 	CleanupTimeout               helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
@@ -145,12 +150,12 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	}
 
 	// 7. Snapshot the backup PVC
-	snapshot, err := vw.kubernetesClient.ES().SnapshotVolume(ctx, namespace, drPVC.Name, externalsnapshotter.SnapshotVolumeOptions{Name: helpers.CleanName(backup.GetFullName())})
+	snapshot, err := vw.kubernetesClient.ES().SnapshotVolume(ctx, namespace, drPVC.Name, externalsnapshotter.SnapshotVolumeOptions{Name: helpers.CleanName(backup.GetFullName()), SnapshotClass: backupOptions.BackupSnapshot.SnapshotClass})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to snapshot backup volume %q", helpers.FullName(drPVC))
 	}
 
-	_, err = vw.kubernetesClient.ES().WaitForReadySnapshot(ctx, namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: backupOptions.SnapshotReadyTimeout})
+	_, err = vw.kubernetesClient.ES().WaitForReadySnapshot(ctx, namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: backupOptions.BackupSnapshot.ReadyTimeout})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to wait for backup snapshot %q to become ready", helpers.FullName(snapshot))
 	}

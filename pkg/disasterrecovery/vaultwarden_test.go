@@ -78,8 +78,11 @@ func TestVaultWardenBackup(t *testing.T) {
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
 				BackupToolPodCreationTimeout: helpers.MaxWaitTime(1 * time.Second),
-				SnapshotReadyTimeout:         helpers.MaxWaitTime(2 * time.Second),
-				CleanupTimeout:               helpers.MaxWaitTime(3 * time.Second),
+				BackupSnapshot: VaultWardenBackupOptionsBackupSnapshot{
+					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
+					SnapshotClass: "custom-snapshot-class",
+				},
+				CleanupTimeout: helpers.MaxWaitTime(3 * time.Second),
 			},
 		},
 		{
@@ -293,6 +296,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				mockESClient.EXPECT().SnapshotVolume(ctx, namespace, clonedPVCName, mock.Anything).
 					RunAndReturn(func(ctx context.Context, namespace, pvcName string, opts externalsnapshotter.SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error) {
 						require.Equal(t, helpers.CleanName(fullBackupName), opts.Name)
+						require.Equal(t, tt.backupOptions.BackupSnapshot.SnapshotClass, opts.SnapshotClass)
 
 						return th.ErrOr1Val(&volumesnapshotv1.VolumeSnapshot{
 							ObjectMeta: metav1.ObjectMeta{
@@ -305,7 +309,7 @@ func TestVaultWardenBackup(t *testing.T) {
 					return
 				}
 
-				mockESClient.EXPECT().WaitForReadySnapshot(ctx, namespace, mock.Anything, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: tt.backupOptions.SnapshotReadyTimeout}).
+				mockESClient.EXPECT().WaitForReadySnapshot(ctx, namespace, mock.Anything, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: tt.backupOptions.BackupSnapshot.ReadyTimeout}).
 					RunAndReturn(func(ctx context.Context, namespace, snapsnotName string, wfrso externalsnapshotter.WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error) {
 						require.Equal(t, fullBackupName, snapsnotName)
 						return th.ErrOr1Val(&volumesnapshotv1.VolumeSnapshot{}, tt.simulateWaitSnapErr)

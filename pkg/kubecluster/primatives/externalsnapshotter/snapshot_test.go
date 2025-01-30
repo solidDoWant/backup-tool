@@ -30,8 +30,8 @@ func TestSnapshotVolume(t *testing.T) {
 			name: "successful snapshot with generated name",
 		},
 		{
-			name: "successful snapshot with provided name",
-			opts: SnapshotVolumeOptions{Name: "snapshot-name"},
+			name: "successful snapshot with all options",
+			opts: SnapshotVolumeOptions{Name: "snapshot-name", SnapshotClass: "snapshot-class"},
 		},
 		{
 			name:                "client error",
