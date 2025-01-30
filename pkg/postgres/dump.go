@@ -29,6 +29,15 @@ var ignoreLines = []string{
 	"COMMENT ON ROLE streaming_replica",
 }
 
+type writerCloserCallback struct {
+	io.Writer
+	callback func() error
+}
+
+func (wcc *writerCloserCallback) Close() error {
+	return wcc.callback()
+}
+
 type DumpAllOptions struct {
 	CleanupTimeout time.Duration
 }
@@ -40,7 +49,13 @@ func (lr *LocalRuntime) DumpAll(ctx context.Context, credentials Credentials, ou
 
 	cmd := lr.wrapCommand(exec.CommandContext(commandCtx, commandName, "--clean", "--if-exists", "--exclude-database=postgres"))
 	cmd.Env = credentials.GetVariables().SetDatabaseName("postgres").ToEnvSlice()
-	cmd.Stderr = lr.errOutputWriter // TODO integrate this with logging lib at some point
+
+	// Capture stderr and also write it to the standard error output stream.
+	var stderrCapture strings.Builder
+	cmd.Stderr = &writerCloserCallback{
+		Writer:   io.MultiWriter(&stderrCapture, lr.errOutputWriter), // TODO integrate this with logging lib at some point
+		callback: lr.errOutputWriter.Close,
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -131,6 +146,6 @@ func (lr *LocalRuntime) DumpAll(ctx context.Context, credentials Credentials, ou
 		}
 	}
 
-	cmdErr := trace.Wrap(cmd.Wait(), "process %q failed", commandName)
+	cmdErr := trace.Wrap(cmd.Wait(), "process %q failed with stderr: %s", commandName, stderrCapture.String())
 	return trace.NewAggregate(cmdErr, err)
 }
