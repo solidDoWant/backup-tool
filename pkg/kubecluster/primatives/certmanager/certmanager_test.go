@@ -84,6 +84,7 @@ func TestCreateCertificate(t *testing.T) {
 					certmanagerv1.UsageEmailProtection,
 					certmanagerv1.UsageNetscapeSGC,
 				},
+				KeyAlgorithm: certmanagerv1.RSAKeyAlgorithm,
 			},
 			expected: &certmanagerv1.Certificate{
 				ObjectMeta: metav1.ObjectMeta{
@@ -113,6 +114,9 @@ func TestCreateCertificate(t *testing.T) {
 					Usages: []certmanagerv1.KeyUsage{
 						certmanagerv1.UsageEmailProtection,
 						certmanagerv1.UsageNetscapeSGC,
+					},
+					PrivateKey: &certmanagerv1.CertificatePrivateKey{
+						Algorithm: certmanagerv1.RSAKeyAlgorithm,
 					},
 				},
 			},

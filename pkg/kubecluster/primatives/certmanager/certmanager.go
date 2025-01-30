@@ -29,6 +29,7 @@ type CreateCertificateOptions struct {
 	SecretName    string
 	Subject       *certmanagerv1.X509Subject
 	Usages        []certmanagerv1.KeyUsage
+	KeyAlgorithm  certmanagerv1.PrivateKeyAlgorithm
 }
 
 func (cmc *Client) CreateCertificate(ctx context.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
@@ -78,6 +79,10 @@ func (cmc *Client) CreateCertificate(ctx context.Context, namespace, name, issue
 		certificate.Spec.SecretTemplate = &certmanagerv1.CertificateSecretTemplate{
 			Labels: opts.SecretLabels,
 		}
+	}
+
+	if opts.KeyAlgorithm != "" {
+		certificate.Spec.PrivateKey.Algorithm = opts.KeyAlgorithm
 	}
 
 	certificate, err := cmc.client.CertmanagerV1().Certificates(namespace).Create(ctx, certificate, metav1.CreateOptions{})
