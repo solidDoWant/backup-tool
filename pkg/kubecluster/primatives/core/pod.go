@@ -70,7 +70,7 @@ func NewSingleContainerPVC(pvcName, mountPath string) SingleContainerVolume {
 	}
 }
 
-func NewSingleContainerSecret(secretName, mountPath string) SingleContainerVolume {
+func NewSingleContainerSecret(secretName, mountPath string, items ...corev1.KeyToPath) SingleContainerVolume {
 	return SingleContainerVolume{
 		Name:      secretName,
 		MountPath: mountPath,
@@ -78,6 +78,7 @@ func NewSingleContainerSecret(secretName, mountPath string) SingleContainerVolum
 			Secret: &corev1.SecretVolumeSource{
 				SecretName:  secretName,
 				DefaultMode: ptr.To(int32(0400)), // Read only by owner
+				Items:       items,
 			},
 		},
 	}

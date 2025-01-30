@@ -265,6 +265,7 @@ func TestNewSingleContainerSecret(t *testing.T) {
 		name       string
 		secretName string
 		mountPath  string
+		items      []corev1.KeyToPath
 		want       SingleContainerVolume
 	}{
 		{
@@ -283,11 +284,30 @@ func TestNewSingleContainerSecret(t *testing.T) {
 			},
 		},
 		{
-			name: "empty paths",
+			name:       "only mount specific items",
+			secretName: "test-secret",
+			mountPath:  "/secrets",
+			items: []corev1.KeyToPath{
+				{
+					Key:  "secret-key",
+					Path: "file-mount-path",
+					Mode: ptr.To(int32(0123)),
+				},
+			},
 			want: SingleContainerVolume{
+				Name:      "test-secret",
+				MountPath: "/secrets",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
+						SecretName:  "test-secret",
 						DefaultMode: ptr.To(int32(0400)),
+						Items: []corev1.KeyToPath{
+							{
+								Key:  "secret-key",
+								Path: "file-mount-path",
+								Mode: ptr.To(int32(0123)),
+							},
+						},
 					},
 				},
 			},
@@ -296,7 +316,7 @@ func TestNewSingleContainerSecret(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NewSingleContainerSecret(tt.secretName, tt.mountPath)
+			got := NewSingleContainerSecret(tt.secretName, tt.mountPath, tt.items...)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -335,6 +355,13 @@ func TestSingleContainerVolumeToVolume(t *testing.T) {
 					Secret: &corev1.SecretVolumeSource{
 						SecretName:  "test-secret",
 						DefaultMode: ptr.To(int32(0400)),
+						Items: []corev1.KeyToPath{
+							{
+								Key:  "secret-key",
+								Path: "file-mount-path",
+								Mode: ptr.To(int32(0123)),
+							},
+						},
 					},
 				},
 			},
@@ -344,6 +371,13 @@ func TestSingleContainerVolumeToVolume(t *testing.T) {
 					Secret: &corev1.SecretVolumeSource{
 						SecretName:  "test-secret",
 						DefaultMode: ptr.To(int32(0400)),
+						Items: []corev1.KeyToPath{
+							{
+								Key:  "secret-key",
+								Path: "file-mount-path",
+								Mode: ptr.To(int32(0123)),
+							},
+						},
 					},
 				},
 			},
