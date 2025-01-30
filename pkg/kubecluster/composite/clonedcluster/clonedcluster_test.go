@@ -324,6 +324,12 @@ func TestCloneCluster(t *testing.T) {
 						Size:         "10Gi",
 						StorageClass: ptr.To("specified-storage-class"),
 					},
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						InitDB: &apiv1.BootstrapInitDB{
+							Database: "test-db",
+							Owner:    "test-owner",
+						},
+					},
 				},
 			}
 			createdBackup := &apiv1.Backup{
@@ -532,6 +538,8 @@ func TestCloneCluster(t *testing.T) {
 				p.clonedCluster.EXPECT().setStreamingReplicaUserCert(streamingReplicaUserCert)
 
 				// 6.
+				clusterOpts.DatabaseName = existingCluster.Spec.Bootstrap.InitDB.Database
+				clusterOpts.OwnerName = existingCluster.Spec.Bootstrap.InitDB.Owner
 				p.cnpgClient.EXPECT().CreateCluster(ctx, namespace, newCluster.Name, resource.MustParse(existingCluster.Spec.StorageConfiguration.Size), createdServingCert.Name, createdClientCACert.Name, streamingReplicaUserCert.GetCertificate().Name, clusterOpts).
 					Return(th.ErrOr1Val(newCluster, tt.simulateClusterCreationError))
 				if tt.simulateClusterCreationError {

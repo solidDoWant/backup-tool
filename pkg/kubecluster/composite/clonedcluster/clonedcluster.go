@@ -251,6 +251,19 @@ func (p *Provider) CloneCluster(ctx context.Context, namespace, existingClusterN
 		}
 	}
 
+	if existingCluster.Spec.Bootstrap != nil {
+		if existingCluster.Spec.Bootstrap.InitDB != nil {
+			clusterOpts.DatabaseName = existingCluster.Spec.Bootstrap.InitDB.Database
+			clusterOpts.OwnerName = existingCluster.Spec.Bootstrap.InitDB.Owner
+		} else if existingCluster.Spec.Bootstrap.PgBaseBackup != nil {
+			clusterOpts.DatabaseName = existingCluster.Spec.Bootstrap.PgBaseBackup.Database
+			clusterOpts.OwnerName = existingCluster.Spec.Bootstrap.PgBaseBackup.Owner
+		} else if existingCluster.Spec.Bootstrap.Recovery != nil {
+			clusterOpts.DatabaseName = existingCluster.Spec.Bootstrap.Recovery.Database
+			clusterOpts.OwnerName = existingCluster.Spec.Bootstrap.Recovery.Owner
+		}
+	}
+
 	newCluster, err := p.cnpgClient.CreateCluster(ctx, namespace, newClusterName, clusterVolumeSize, readyServingCert.Name, readyClientCACert.Name, replicationUserCert.GetCertificate().Name, clusterOpts)
 	if err != nil {
 		return errHandler(err, "failed to create new cluster %q from backup %q with serving certificate %q and client certificate %q",
