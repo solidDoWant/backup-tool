@@ -40,7 +40,7 @@ func (p *Provider) CreateCRPForCertificate(ctx context.Context, cert *certmanage
 	}
 
 	if cert.Spec.PrivateKey != nil {
-		// TODO remove this after https://github.com/cert-manager/approver-policy/pull/572 is merged
+		// TODO remove this after https://github.com/cert-manager/approver-policy/pull/572 is released
 		// This is needed to work around an upstream bug
 		if cert.Spec.PrivateKey.Algorithm != certmanagerv1.Ed25519KeyAlgorithm {
 			privateKeySet := false

@@ -323,7 +323,7 @@ func TestEnsurePVCExists(t *testing.T) {
 
 func TestDeleteVolume(t *testing.T) {
 	namespace := "test-ns"
-	volumeName := "test-volume"
+	pvcName := "test-volume"
 
 	tests := []struct {
 		name                string
@@ -335,7 +335,7 @@ func TestDeleteVolume(t *testing.T) {
 			name: "successful deletion",
 			initialPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      volumeName,
+					Name:      pvcName,
 					Namespace: namespace,
 				},
 			},
@@ -367,7 +367,7 @@ func TestDeleteVolume(t *testing.T) {
 				})
 			}
 
-			err := c.DeleteVolume(ctx, namespace, volumeName)
+			err := c.DeletePVC(ctx, namespace, pvcName)
 			if tt.expectedErr {
 				require.Error(t, err)
 				return

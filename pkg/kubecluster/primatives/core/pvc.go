@@ -86,7 +86,7 @@ func (c *Client) EnsurePVCExists(ctx context.Context, namespace, pvcName string,
 	return pvc, nil
 }
 
-func (c *Client) DeleteVolume(ctx context.Context, namespace, volumeName string) error {
+func (c *Client) DeletePVC(ctx context.Context, namespace, volumeName string) error {
 	err := c.client.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, volumeName, meta_v1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete volume %q in namespace %q", volumeName, namespace)
 }

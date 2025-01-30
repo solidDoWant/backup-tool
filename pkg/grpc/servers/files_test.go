@@ -39,7 +39,7 @@ func transferTest(t *testing.T, onExpectCall func(expecter *files.MockRuntime_Ex
 			server := NewFilesServer()
 			server.runtime = runtime
 
-			ctx := context.TODO()
+			ctx := context.Background()
 			src := "src"
 			dest := "dest"
 			onExpectCall(runtime.EXPECT(), ctx, src, dest).Return(tt.returnValue)

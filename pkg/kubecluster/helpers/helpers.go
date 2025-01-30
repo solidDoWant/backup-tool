@@ -156,7 +156,6 @@ func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interfac
 
 // Do a best-effort cleanup of the provided value to make it a valid k8s generated resource name.
 func CleanName(generateName string) string {
-	// TODO regex
 	replaceChars := "_:."
 	replacerStrings := make([]string, 0, len(replaceChars)*2)
 	for _, char := range replaceChars {

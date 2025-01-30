@@ -90,7 +90,7 @@ func (p *Provider) ClonePVC(ctx context.Context, namespace, pvcName string, opts
 		if err == nil {
 			return nil
 		}
-		cleanupErr := p.coreClient.DeleteVolume(ctx, namespace, clonedPvc.Name)
+		cleanupErr := p.coreClient.DeletePVC(ctx, namespace, clonedPvc.Name)
 		clonedPvc = nil
 		return cleanupErr
 	}).WithErrMessage("failed to delete created volume for PVC %q", helpers.FullNameStr(namespace, pvcName)).WithOriginalErr(&err).Run()

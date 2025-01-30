@@ -437,7 +437,7 @@ func TestClonePVC(t *testing.T) {
 				}
 
 				if tt.simulatePodCreateErr || tt.simulatePodWaitErr || tt.simulatePodDeleteError {
-					p.coreClient.EXPECT().DeleteVolume(mock.Anything, namespace, mock.Anything).Return(th.ErrIfTrue(tt.simulatePVCDeleteError))
+					p.coreClient.EXPECT().DeletePVC(mock.Anything, namespace, mock.Anything).Return(th.ErrIfTrue(tt.simulatePVCDeleteError))
 				}
 
 				if !tt.opts.ForceBind {

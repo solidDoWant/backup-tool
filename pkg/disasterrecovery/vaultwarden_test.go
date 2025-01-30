@@ -207,7 +207,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				if tt.simulateClonePVCError {
 					return
 				}
-				mockCoreClient.EXPECT().DeleteVolume(mock.Anything, namespace, clonedPVCName).RunAndReturn(func(cleanupCtx context.Context, _, _ string) error {
+				mockCoreClient.EXPECT().DeletePVC(mock.Anything, namespace, clonedPVCName).RunAndReturn(func(cleanupCtx context.Context, _, _ string) error {
 					require.NotEqual(t, ctx, cleanupCtx)
 					return th.ErrIfTrue(tt.simulatePVCCleanupError)
 				})

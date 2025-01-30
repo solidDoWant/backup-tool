@@ -71,7 +71,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 		return backup, trace.Wrap(err, "failed to clone data PVC")
 	}
 	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
-		return vw.kubernetesClient.Core().DeleteVolume(ctx, namespace, clonedPVC.Name)
+		return vw.kubernetesClient.Core().DeletePVC(ctx, namespace, clonedPVC.Name)
 	}).WithErrMessage("failed to cleanup PVC %q", helpers.FullName(clonedPVC)).WithOriginalErr(&err).Run()
 
 	// 2. Create the DR PVC if not exists

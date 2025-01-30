@@ -20,7 +20,7 @@ type ClientInterface interface {
 	GetPVC(ctx context.Context, namespace, name string) (*corev1.PersistentVolumeClaim, error)
 	DoesPVCExist(ctx context.Context, namespace, name string) (bool, error)
 	EnsurePVCExists(ctx context.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error)
-	DeleteVolume(ctx context.Context, namespace, volumeName string) error // TODO rename
+	DeletePVC(ctx context.Context, namespace, volumeName string) error
 	// Services
 	CreateService(ctx context.Context, namespce string, service *corev1.Service) (*corev1.Service, error)
 	WaitForReadyService(ctx context.Context, namespace, name string, opts WaitForReadyServiceOpts) (*corev1.Service, error)

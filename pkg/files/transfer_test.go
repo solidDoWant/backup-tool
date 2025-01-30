@@ -310,7 +310,7 @@ func TestCopyFiles(t *testing.T) {
 				tC.setup(t, tC.src, tC.dest)
 			}
 
-			err := runtime.CopyFiles(context.TODO(), tC.src, tC.dest)
+			err := runtime.CopyFiles(context.Background(), tC.src, tC.dest)
 			tC.errFunc(t, err)
 
 			if tC.verify != nil {
@@ -384,7 +384,7 @@ func TestSyncFiles(t *testing.T) {
 				tC.setup(t, tC.src, tC.dest)
 			}
 
-			err := runtime.SyncFiles(context.TODO(), tC.src, tC.dest)
+			err := runtime.SyncFiles(context.Background(), tC.src, tC.dest)
 			tC.errFunc(t, err)
 
 			if tC.verify != nil {

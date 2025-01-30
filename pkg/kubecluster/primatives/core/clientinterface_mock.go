@@ -206,6 +206,54 @@ func (_c *MockClientInterface_CreateService_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// DeletePVC provides a mock function with given fields: ctx, namespace, volumeName
+func (_m *MockClientInterface) DeletePVC(ctx context.Context, namespace string, volumeName string) error {
+	ret := _m.Called(ctx, namespace, volumeName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePVC")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, namespace, volumeName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClientInterface_DeletePVC_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeletePVC'
+type MockClientInterface_DeletePVC_Call struct {
+	*mock.Call
+}
+
+// DeletePVC is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - volumeName string
+func (_e *MockClientInterface_Expecter) DeletePVC(ctx interface{}, namespace interface{}, volumeName interface{}) *MockClientInterface_DeletePVC_Call {
+	return &MockClientInterface_DeletePVC_Call{Call: _e.mock.On("DeletePVC", ctx, namespace, volumeName)}
+}
+
+func (_c *MockClientInterface_DeletePVC_Call) Run(run func(ctx context.Context, namespace string, volumeName string)) *MockClientInterface_DeletePVC_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_DeletePVC_Call) Return(_a0 error) *MockClientInterface_DeletePVC_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClientInterface_DeletePVC_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClientInterface_DeletePVC_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeletePod provides a mock function with given fields: ctx, namespace, name
 func (_m *MockClientInterface) DeletePod(ctx context.Context, namespace string, name string) error {
 	ret := _m.Called(ctx, namespace, name)
@@ -298,54 +346,6 @@ func (_c *MockClientInterface_DeleteService_Call) Return(_a0 error) *MockClientI
 }
 
 func (_c *MockClientInterface_DeleteService_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClientInterface_DeleteService_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// DeleteVolume provides a mock function with given fields: ctx, namespace, volumeName
-func (_m *MockClientInterface) DeleteVolume(ctx context.Context, namespace string, volumeName string) error {
-	ret := _m.Called(ctx, namespace, volumeName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DeleteVolume")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, namespace, volumeName)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockClientInterface_DeleteVolume_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteVolume'
-type MockClientInterface_DeleteVolume_Call struct {
-	*mock.Call
-}
-
-// DeleteVolume is a helper method to define mock.On call
-//   - ctx context.Context
-//   - namespace string
-//   - volumeName string
-func (_e *MockClientInterface_Expecter) DeleteVolume(ctx interface{}, namespace interface{}, volumeName interface{}) *MockClientInterface_DeleteVolume_Call {
-	return &MockClientInterface_DeleteVolume_Call{Call: _e.mock.On("DeleteVolume", ctx, namespace, volumeName)}
-}
-
-func (_c *MockClientInterface_DeleteVolume_Call) Run(run func(ctx context.Context, namespace string, volumeName string)) *MockClientInterface_DeleteVolume_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *MockClientInterface_DeleteVolume_Call) Return(_a0 error) *MockClientInterface_DeleteVolume_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockClientInterface_DeleteVolume_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClientInterface_DeleteVolume_Call {
 	_c.Call.Return(run)
 	return _c
 }
