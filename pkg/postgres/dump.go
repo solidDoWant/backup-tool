@@ -146,6 +146,9 @@ func (lr *LocalRuntime) DumpAll(ctx context.Context, credentials Credentials, ou
 		}
 	}
 
+	// TODO document this or parse and wrap the error
+	// Common errors:
+	// * authentication method requirement "none" failed: server requested SASL authentication: this usually means that the server isn't expecting client cert auth
 	cmdErr := trace.Wrap(cmd.Wait(), "process %q failed with stderr: %s", commandName, stderrCapture.String())
 	return trace.NewAggregate(cmdErr, err)
 }
