@@ -12,9 +12,9 @@ RUN KERNEL="$(uname -s | tr '[:upper:]' '[:lower:]')" && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
     # Needed until https://github.com/lovoo/protoc-gen-go-grpcmock/pull/52 is merged and released
     git -c advice.detachedHead=false clone --quiet --branch main --single-branch https://github.com/solidDoWant/protoc-gen-go-grpcmock.git /tmp/protoc-gen-go-grpcmock2 && \
-    pushd /tmp/protoc-gen-go-grpcmock2 && \
-    go install ./cmd/protoc-gen-go-grpcmock && \
-    popd
+    cd /tmp/protoc-gen-go-grpcmock2 && \
+    go install ./cmd/protoc-gen-go-grpcmock
+
 # go install github.com/lovoo/protoc-gen-go-grpcmock/cmd/protoc-gen-go-grpcmock@latest
 
 # Install tools for k8s CRD client generation
@@ -34,3 +34,6 @@ COPY --from=registry.k8s.io/kubectl:v1.31.2 /bin/kubectl /usr/local/bin/kubectl
 # Autocomplete
 RUN \
     kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl.bash > /dev/null
+
+# Fixup ownership
+RUN sudo chown -R vscode /go
