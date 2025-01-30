@@ -294,6 +294,9 @@ func TestCreateCluster(t *testing.T) {
 				ClientCASecret:       clientCAName,
 				ReplicationTLSSecret: replicationUserCertName,
 			},
+			PostgresConfiguration: apiv1.PostgresConfiguration{
+				PgHBA: []string{"hostssl all all all cert"},
+			},
 		},
 	}
 
@@ -399,9 +402,6 @@ func TestCreateCluster(t *testing.T) {
 							Owner:    "testowner",
 						},
 					},
-					PostgresConfiguration: apiv1.PostgresConfiguration{
-						PgHBA: []string{"hostssl testowner all all cert"},
-					},
 				},
 			},
 		},
@@ -425,9 +425,6 @@ func TestCreateCluster(t *testing.T) {
 					},
 					StorageConfiguration: apiv1.StorageConfiguration{
 						StorageClass: ptr.To("test-class"),
-					},
-					PostgresConfiguration: apiv1.PostgresConfiguration{
-						PgHBA: []string{"hostssl testowner all all cert"},
 					},
 				},
 			},

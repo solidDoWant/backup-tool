@@ -2,7 +2,6 @@ package cnpg
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -151,11 +150,9 @@ func (cnpgc *Client) CreateCluster(ctx context.Context, namespace, clusterName s
 		cluster.Spec.StorageConfiguration.StorageClass = &opts.StorageClass
 	}
 
-	if opts.OwnerName != "" {
-		cluster.Spec.PostgresConfiguration.PgHBA = []string{
-			// Require TLS auth
-			fmt.Sprintf("hostssl %s all all cert", opts.OwnerName),
-		}
+	cluster.Spec.PostgresConfiguration.PgHBA = []string{
+		// Require TLS auth for all connection
+		"hostssl all all all cert",
 	}
 
 	_, err := cnpgc.apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, podMonitorCRDName, metav1.GetOptions{})
