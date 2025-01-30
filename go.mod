@@ -16,6 +16,7 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.2.0
 	github.com/otiai10/copy v1.14.0
 	github.com/samber/lo v1.47.0
+	// TODO the 1.9 release will add support for removing/replacing help templates, which prevents dead code elimination (https://github.com/spf13/cobra/pull/1956)
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.10.0
