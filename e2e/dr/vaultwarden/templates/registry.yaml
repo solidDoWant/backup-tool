@@ -1,0 +1,20 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: testpod
+  labels:
+    name: testpod
+spec:
+  selector:
+    matchLabels:
+      name: testpod
+  template:
+    metadata:
+      labels:
+        name: testpod
+    spec:
+      containers:
+        - image: localhost:5000/testimage:latest
+          name: testpod
+      restartPolicy: Always

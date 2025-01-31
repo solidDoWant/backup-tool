@@ -107,7 +107,10 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
+require sigs.k8s.io/e2e-framework v0.6.0
+
 require (
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
+	github.com/vladimirvivien/gexe v0.4.1 // indirect
 	golang.org/x/tools v0.29.0 // indirect
 )

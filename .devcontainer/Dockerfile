@@ -30,10 +30,12 @@ RUN go install github.com/vektra/mockery/v2@latest \
 
 # Misc. development tools
 COPY --from=registry.k8s.io/kubectl:v1.31.2 /bin/kubectl /usr/local/bin/kubectl
+COPY --from=registry.k8s.io/kustomize/kustomize:v5.0.0 /app/kustomize /usr/local/bin/kustomize
 
 # Autocomplete
 RUN \
-    kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl.bash > /dev/null
+    kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl.bash > /dev/null && \
+    kustomize completion bash | sudo tee /etc/bash_completion.d/kustomize.bash > /dev/null
 
 # Fixup ownership
-RUN sudo chown -R vscode /go
+RUN chown -R vscode /go

@@ -1,0 +1,17 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+  - role: worker
+containerdConfigPatches:
+  # Docs: https://github.com/containerd/containerd/blob/main/docs/cri/registry.md
+  # When KinD moves to containerd v2, the TOML key will need to be replaced with
+  # [plugins."io.containerd.cri.v1.images".registry]
+  - |-
+    # For containerd v1
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"
+
+    # For containerd v2
+    [plugins."io.containerd.cri.v1.images".registry]
+      config_path = "/etc/containerd/certs.d"
