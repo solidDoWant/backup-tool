@@ -147,4 +147,16 @@ clean:
 	@rm -rf $(BUILD_DIR)
 	@docker image rm -f $(CONTAINER_IMAGE_TAG) 2> /dev/null > /dev/null || true
 
+# When e2e tests fail during setup or teardown, they can leave resources behind.
+# This target is intended to clean up those resources.
+PHONY += (clean-e2e)
+clean-e2e: FILTERS = name=my-cluster* name=registry*
+clean-e2e: GET_CONTAINERS = docker ps $(FILTERS:%=-f "%") -a -q
+clean-e2e: FOR_EACH_CONTAINER = $(GET_CONTAINERS) | xargs -I '{}'
+clean-e2e:
+	@$(FOR_EACH_CONTAINER) docker container stop '{}'
+	@$(FOR_EACH_CONTAINER) docker container rm '{}'
+	@losetup -D
+	@docker volume prune -f
+
 .PHONY: $(PHONY)

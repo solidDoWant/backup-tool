@@ -1,0 +1,30 @@
+---
+master:
+  data:
+    type: persistentVolumeClaim
+    size: 2Gi
+    storageClass: standard
+  affinity: ""
+volume:
+  dataDirs:
+    - name: data
+      type: persistentVolumeClaim
+      size: 2Gi
+      storageClass: standard
+      maxVolumes: 0
+  affinity: ""
+filer:
+  enablePVC: true
+  storage: 2Gi
+  storageClass: standard
+  data:
+    type: persistentVolumeClaim
+    size: 2Gi
+    storageClass: standard
+  affinity: ""
+  s3:
+    enabled: true
+s3:
+  enabled: true
+  logs:
+    type: emptyDir

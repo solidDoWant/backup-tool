@@ -1,0 +1,71 @@
+---
+# This is designed to roughly match the cluster that this project is designed for - my own
+# https://github.com/solidDoWant/infra-mk3
+
+helmDefaults:
+  cleanupOnFail: true
+  wait: true
+  waitForJobs: true
+  createNamespace: false
+  historyMax: 1
+  timeout: 120
+
+repositories:
+  - name: piraeus-charts
+    url: https://piraeus.io/helm-charts/
+  - name: openebs-charts
+    url: https://openebs.github.io/openebs
+  # SeaweedFS is used instead of Minio for object storage because Minio
+  # requires XFS-formatted storage. The XFS module is not loaded by Docker
+  # Desktop. Rook/Ceph isn't used because it has a history of wiping host
+  # drives when used with KinD.
+  - name: seaweedfs-charts
+    url: https://seaweedfs.github.io/seaweedfs/helm
+  - name: cnpg-charts
+    url: https://cloudnative-pg.github.io/charts
+  - name: cert-manager-charts
+    url: https://charts.jetstack.io
+
+releases:
+  - name: volume-snapshot-controller
+    chart: piraeus-charts/snapshot-controller
+    version: 4.0.0
+    atomic: true
+    values:
+      - ./snapshot-controller.values.yaml
+  - name: openebs
+    chart: openebs-charts/openebs
+    version: 4.1.1
+    atomic: true
+    needs:
+      - volume-snapshot-controller
+    values:
+      - ./openebs.values.yaml
+  - name: seeweedfs
+    chart: seaweedfs-charts/seaweedfs
+    version: 4.0.383
+    atomic: true
+    needs:
+      - openebs
+    values:
+      - ./seaweedfs.values.yaml
+  - name: cnpg-operator
+    chart: cnpg-charts/cloudnative-pg
+    version: 0.22.1
+    atomic: true
+    values:
+      - ./cnpg.values.yaml
+  - name: cert-manager
+    chart: cert-manager-charts/cert-manager
+    version: 1.16.1
+    atomic: true
+    values:
+      - ./cert-manager.values.yaml
+  - name: approver-policy
+    chart: cert-manager-charts/cert-manager-approver-policy
+    version: 0.16.0
+    atomic: true
+    needs:
+      - cert-manager
+    values:
+      - ./cert-manager-approver-policy.values.yaml

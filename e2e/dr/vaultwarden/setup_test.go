@@ -7,11 +7,19 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gravitational/trace"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/e2e-framework/klient/k8s"
+	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/klient/wait"
+	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
@@ -38,18 +46,21 @@ func TestMain(m *testing.M) {
 	clusterSetup, clusterFinish, clusterName := Cluster()
 	registrySetup, registryFinish := Registry(clusterName)
 	pushImageSetup, pushImageFinish := PushImage(getRegistryName)
+	deployDependentServicesSetup, deployDependentServicesFinish := DeployDependentServices(clusterName)
 
 	// Use pre-defined environment funcs to create a kind cluster prior to test run
 	testenv.Setup(
 		clusterSetup,
 		registrySetup,
 		pushImageSetup,
+		deployDependentServicesSetup,
 		envfuncs.CreateNamespace(namespace),
 	)
 
 	// Use pre-defined environment funcs to teardown kind cluster after tests
 	testenv.Finish(
 		envfuncs.DeleteNamespace(namespace),
+		deployDependentServicesFinish,
 		pushImageFinish,
 		registryFinish,
 		clusterFinish,
@@ -62,7 +73,7 @@ func TestMain(m *testing.M) {
 func Cluster() (types.EnvFunc, types.EnvFunc, string) {
 	clusterName := envconf.RandomName("my-cluster", 16)
 
-	setup := envfuncs.CreateClusterWithConfig(kind.NewProvider(), clusterName, "kind-config.yaml")
+	setup := envfuncs.CreateClusterWithConfig(kind.NewProvider(), clusterName, "config/kind-config.yaml")
 
 	finish := envfuncs.DestroyCluster(clusterName)
 
@@ -121,12 +132,6 @@ func Registry(clusterName string) (types.EnvFunc, types.EnvFunc) {
 		futurePort = ptr.To(address[strings.LastIndex(address, ":")+1:])
 
 		// Configure the cluster nodes container registry resolver to map "localhost:<port>" to "<registry-container-name>:<port>"
-		p = utils.RunCommand(fmt.Sprintf("kind get nodes --name %q", clusterName))
-		if p.Err() != nil {
-			return ctx, trace.Wrap(p.Err(), "failed to get cluster nodes")
-		}
-		nodes := strings.Split(strings.TrimSpace(p.Result()), "\n")
-
 		// Update the /etc/containerd/certs.d/localhost:<port>/hosts.toml file on each node
 		// Docs: https://github.com/containerd/containerd/blob/main/docs/hosts.md
 		certsDir := "/etc/containerd/certs.d/localhost:" + *futurePort
@@ -137,15 +142,9 @@ func Registry(clusterName string) (types.EnvFunc, types.EnvFunc) {
 			fmt.Sprintf("echo %q >> %q", hostsConfigFileContents, hostsConfigFilePath),
 		}
 
-		script := strings.Join(commands, " && ")
-		commandToExec := fmt.Sprintf("sh -c '%s'", script)
-
-		for _, node := range nodes {
-			fullExecCommand := fmt.Sprintf("docker exec %q %s", node, commandToExec)
-			p := utils.RunCommand(fullExecCommand)
-			if p.Err() != nil {
-				return ctx, trace.Wrap(p.Err(), "failed to configure %q to use the registry: %s", node, p.Result())
-			}
+		err := RunNodesScript(clusterName, commands)
+		if err != nil {
+			return ctx, trace.Wrap(err, "failed to configure nodes to use the registry")
 		}
 
 		// Configure the cluster to use the registry
@@ -159,16 +158,18 @@ func Registry(clusterName string) (types.EnvFunc, types.EnvFunc) {
 	}
 
 	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		errors := []error{} // Collect errors to return as an aggregate so that all cleanup steps are attempted
+
 		registryConfigMap := getConfigMap()
 		if err := cfg.Client().Resources().Delete(ctx, registryConfigMap); err != nil {
-			return ctx, trace.Wrap(err, "failed to create %s config map", registryConfigMap.Name)
+			errors = append(errors, trace.Wrap(err, "failed to delete %s config map", registryConfigMap.Name))
 		}
 
 		if p := utils.RunCommand(fmt.Sprintf("docker stop %s", registryContainerName)); p.Err() != nil {
-			return ctx, trace.Wrap(p.Err(), "failed to stop registry")
+			errors = append(errors, trace.Wrap(p.Err(), "failed to stop registry container"))
 		}
 
-		return ctx, nil
+		return ctx, trace.NewAggregate(errors...)
 	}
 
 	return setup, finish
@@ -190,4 +191,133 @@ func PushImage(getRegistryName func() string) (types.EnvFunc, types.EnvFunc) {
 	}
 
 	return setup, finish
+}
+
+func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) {
+	helmfilePath := "./config/dependent-services/helmfile.yaml"
+	zpoolName := "openebs-zpool" // This must match the name used in the storage class
+	imageFilePath := "/tmp/zfs-pool-vdev-1.img"
+	defaultStorageClass := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard"}}
+	storageClassPatch := func(isDefault bool) k8s.Patch {
+		return k8s.Patch{
+			PatchType: k8stypes.StrategicMergePatchType,
+			Data:      []byte(fmt.Sprintf(`{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "%t"}}}`, isDefault)),
+		}
+	}
+
+	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		// Deploy ZFS zpool for openebs
+		commands := []string{
+			// Install ZFS FUSE (no kernel module requirement)
+			"apt update",
+			"apt install --no-install-recommends -y zfs-fuse",
+			"systemctl start zfs-fuse",
+			// Create a file-backed device to use as a ZFS pool
+			// Size is not critical because the file is sparse (-s option)
+			fmt.Sprintf("truncate -s 100G %q", imageFilePath),
+			// Create a ZFS pool using a file attached to a loop device, and match the ashift to the sector size
+			// Escaped quotes are used instead of %q because %q would escape quotes inside the losetup command
+			fmt.Sprintf("zpool create -f -o ashift=12 %q \"$(losetup --show --sector-size 4096 --direct-io --find %q)\"", zpoolName, imageFilePath),
+		}
+		if err := RunNodesScript(clusterName, commands); err != nil {
+			return ctx, trace.Wrap(err, "failed to create ZFS pool")
+		}
+
+		// Remove the "default" annotation from local-path CSI storage class
+		if err := cfg.Client().Resources().Patch(ctx, defaultStorageClass, storageClassPatch(false)); err != nil {
+			return ctx, trace.Wrap(err, "failed to remove default annotation from storage class %q", defaultStorageClass.Name)
+		}
+
+		// Deploy services
+		if p := utils.RunCommand(fmt.Sprintf("helmfile apply --file %q --skip-diff-on-install --suppress-diff", helmfilePath)); p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to deploy dependent services: %s", p.Result())
+		}
+
+		// Deploy shared resources that don't have a corresponding helm chart
+		if p := utils.RunCommand("kubectl apply -f config/dependent-services/manifests.yaml"); p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to deploy shared resources: %s", p.Result())
+		}
+
+		return ctx, nil
+	}
+
+	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		errors := []error{} // Collect errors to return as an aggregate so that all cleanup steps are attempted
+
+		// Destroy shared resources that don't have a corresponding helm chart
+		if p := utils.RunCommand("kubectl delete -f config/dependent-services/manifests.yaml"); p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to destroy shared resources: %s", p.Result())
+		}
+
+		// Remove the services
+		if p := utils.RunCommand(fmt.Sprintf("helmfile destroy --file %q", helmfilePath)); p.Err() != nil {
+			errors = append(errors, trace.Wrap(p.Err(), "failed to remove dependent services: %s", p.Result()))
+		}
+
+		// Set the "default" annotation from local-path CSI storage class
+		if err := cfg.Client().Resources().Patch(ctx, defaultStorageClass, storageClassPatch(true)); err != nil {
+			return ctx, trace.Wrap(err, "failed to set default annotation from storage class %q", defaultStorageClass.Name)
+		}
+
+		// Wait for Helm-created pods to be deleted
+		// Helmfile will wait for the deployments and daemonsets to be deleted, but not the pods
+		pods := &corev1.PodList{}
+		if err := cfg.Client().Resources().List(ctx, pods, resources.WithLabelSelector(labels.FormatLabels(map[string]string{"heritage": "Helm"}))); err != nil {
+			errors = append(errors, trace.Wrap(err, "failed to list Helm-created pods"))
+		} else if err := wait.For(conditions.New(cfg.Client().Resources()).ResourcesDeleted(pods), wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute)); err != nil {
+			errors = append(errors, trace.Wrap(err, "failed to wait for pods to be deleted"))
+		}
+
+		// Destroy the ZFS pool. Sometimes this may fail and need to be retried.
+		if err := wait.For(func(ctx context.Context) (bool, error) {
+			return RunNodesCommand(clusterName, fmt.Sprintf("zpool destroy -f %q", zpoolName)) == nil, nil
+		}, wait.WithContext(ctx), wait.WithInterval(2*time.Second), wait.WithTimeout(30*time.Second), wait.WithImmediate()); err != nil {
+			errors = append(errors, trace.Wrap(err, "failed to remove ZFS pool"))
+		} else {
+			// Do the rest of the ZFS cleanup, which will fail if the pool isn't destroyed
+			commands := []string{
+				// Detach the loop device
+				fmt.Sprintf("losetup -d \"$(losetup --noheadings --output NAME --associated %q)\"", imageFilePath),
+				// Remove the file
+				fmt.Sprintf("rm -f %q", imageFilePath),
+				// Remove ZFS FUSE
+				"systemctl stop zfs-fuse",
+				"apt autoremove -y zfs-fuse",
+			}
+			if err := RunNodesScript(clusterName, commands); err != nil {
+				errors = append(errors, trace.Wrap(err, "failed to remove ZFS pool"))
+			}
+		}
+
+		return ctx, trace.NewAggregate(errors...)
+	}
+
+	return setup, finish
+}
+
+// func DeployVaultwarden() (types.EnvFunc, types.EnvFunc) {
+
+// }
+
+func RunNodesScript(clusterName string, commands []string) error {
+	script := strings.Join(commands, " && ")
+	containerCommand := fmt.Sprintf("sh -c '%s'", script)
+	return RunNodesCommand(clusterName, containerCommand)
+}
+
+func RunNodesCommand(clusterName, command string) error {
+	p := utils.RunCommand(fmt.Sprintf("kind get nodes --name %q", clusterName))
+	if p.Err() != nil {
+		return trace.Wrap(p.Err(), "failed to get cluster %q nodes: %s", clusterName, p.Result())
+	}
+
+	nodes := strings.Split(strings.TrimSpace(p.Result()), "\n")
+	for _, node := range nodes {
+		p := utils.RunCommand(fmt.Sprintf("docker exec %q %s", node, command))
+		if p.Err() != nil {
+			return trace.Wrap(p.Err(), "failed to run command %q against node %q: %s", command, node, p.Result())
+		}
+	}
+
+	return nil
 }

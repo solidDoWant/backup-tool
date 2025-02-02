@@ -1,0 +1,33 @@
+---
+openebs-crds: &crds
+  csi:
+    # Handled via volume-snapshot-controller
+    volumeSnapshots:
+      enabled: false
+# Disable localpv provisioner entirely
+localpv-provisioner:
+  rbac:
+    create: false
+  localpv:
+    enabled: false
+  serviceAccount:
+    create: false
+  hostpathClass:
+    enabled: false
+# Disable everything but zfs-localpv
+engines:
+  local:
+    lvm:
+      enabled: true
+    zfs:
+      enabled: false
+  replicated:
+    mayastor:
+      enabled: false
+# zfs-localpv:
+#   zfsNode:
+#     # cspell:words encr
+#     encrKeysDir: /var/zfs/encryption-keys
+#   # Disable zfs-localpv-installed volume snapshot CRDs entirely
+#   crds: *crds
+# lvm-localpv:

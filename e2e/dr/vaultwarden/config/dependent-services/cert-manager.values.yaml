@@ -1,0 +1,11 @@
+---
+# yaml-language-server: $schema=https://artifacthub.io/api/v1/packages/f475c82a-27a5-4f71-8413-fe70d31268a2/1.16.1/values-schema
+featureGates: NameConstraints=true,ServerSideApply=true,UseCertificateRequestBasicConstraints=true,UseDomainQualifiedFinalizer=true,ValidateCAA=true,ExperimentalGatewayAPISupport=true
+enableCertificateOwnerRef: true
+disableAutoApproval: true
+webhook:
+  featureGates: NameConstraints=true
+cainjector:
+  featureGates: ServerSideApply=true
+crds:
+  enabled: true

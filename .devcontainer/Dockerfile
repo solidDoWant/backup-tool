@@ -31,11 +31,18 @@ RUN go install github.com/vektra/mockery/v2@latest \
 # Misc. development tools
 COPY --from=registry.k8s.io/kubectl:v1.31.2 /bin/kubectl /usr/local/bin/kubectl
 COPY --from=registry.k8s.io/kustomize/kustomize:v5.0.0 /app/kustomize /usr/local/bin/kustomize
+COPY --from=ghcr.io/helmfile/helmfile:v1.0.0-rc.7 /usr/local/bin/helmfile /usr/local/bin/helmfile
+ENV HELM_DATA_HOME=/usr/local/share/helm
+COPY --from=alpine/helm:3.16.2 /usr/bin/helm /usr/local/bin/helm
+RUN helm plugin install https://github.com/jkroepke/helm-secrets --version v4.6.2 && \
+    helm plugin install https://github.com/databus23/helm-diff --version v3.9.11
 
 # Autocomplete
 RUN \
     kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl.bash > /dev/null && \
-    kustomize completion bash | sudo tee /etc/bash_completion.d/kustomize.bash > /dev/null
+    kustomize completion bash | sudo tee /etc/bash_completion.d/kustomize.bash > /dev/null && \
+    helm completion bash | sudo tee /etc/bash_completion.d/helm.bash > /dev/null && \
+    helmfile completion bash | sudo tee /etc/bash_completion.d/helmfile.bash > /dev/null
 
 # Fixup ownership
 RUN chown -R vscode /go

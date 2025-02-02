@@ -1,0 +1,4 @@
+---
+# yaml-language-server: $schema=https://artifacthub.io/api/v1/packages/789b1172-cf45-4599-8553-06248bd5a441/0.16.0/values-schema
+crds:
+  enabled: true

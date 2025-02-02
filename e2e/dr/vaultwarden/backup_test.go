@@ -17,7 +17,7 @@ func TestBack(t *testing.T) {
 	f1 := features.New("test deploying pod").
 		WithLabel("type", "setup").
 		Assess("pod can deploy", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			p := utils.RunCommand("kubectl apply -f templates/registry.yaml")
+			p := utils.RunCommand("kubectl apply -f config/registry.yaml")
 			assert.NoError(t, trace.Wrap(p.Err(), "failed to deploy pod: %s", p.Result()))
 			return ctx
 		}).
