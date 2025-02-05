@@ -14,11 +14,11 @@ type fakeClusterImageCatalogs struct {
 	Fake *FakePostgresqlV1
 }
 
-func newFakeClusterImageCatalogs(fake *FakePostgresqlV1, namespace string) apiv1.ClusterImageCatalogInterface {
+func newFakeClusterImageCatalogs(fake *FakePostgresqlV1) apiv1.ClusterImageCatalogInterface {
 	return &fakeClusterImageCatalogs{
 		gentype.NewFakeClientWithList[*v1.ClusterImageCatalog, *v1.ClusterImageCatalogList](
 			fake.Fake,
-			namespace,
+			"",
 			v1.GroupVersion.WithResource("clusterimagecatalogs"),
 			v1.GroupVersion.WithKind("ClusterImageCatalog"),
 			func() *v1.ClusterImageCatalog { return &v1.ClusterImageCatalog{} },

@@ -36,8 +36,8 @@ func (c *PostgresqlV1Client) Clusters(namespace string) ClusterInterface {
 	return newClusters(c, namespace)
 }
 
-func (c *PostgresqlV1Client) ClusterImageCatalogs(namespace string) ClusterImageCatalogInterface {
-	return newClusterImageCatalogs(c, namespace)
+func (c *PostgresqlV1Client) ClusterImageCatalogs() ClusterImageCatalogInterface {
+	return newClusterImageCatalogs(c)
 }
 
 func (c *PostgresqlV1Client) Databases(namespace string) DatabaseInterface {

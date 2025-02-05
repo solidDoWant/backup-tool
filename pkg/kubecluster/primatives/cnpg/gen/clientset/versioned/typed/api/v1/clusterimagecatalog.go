@@ -16,7 +16,7 @@ import (
 // ClusterImageCatalogsGetter has a method to return a ClusterImageCatalogInterface.
 // A group's client should implement this interface.
 type ClusterImageCatalogsGetter interface {
-	ClusterImageCatalogs(namespace string) ClusterImageCatalogInterface
+	ClusterImageCatalogs() ClusterImageCatalogInterface
 }
 
 // ClusterImageCatalogInterface has methods to work with ClusterImageCatalog resources.
@@ -38,13 +38,13 @@ type clusterImageCatalogs struct {
 }
 
 // newClusterImageCatalogs returns a ClusterImageCatalogs
-func newClusterImageCatalogs(c *PostgresqlV1Client, namespace string) *clusterImageCatalogs {
+func newClusterImageCatalogs(c *PostgresqlV1Client) *clusterImageCatalogs {
 	return &clusterImageCatalogs{
 		gentype.NewClientWithList[*apiv1.ClusterImageCatalog, *apiv1.ClusterImageCatalogList](
 			"clusterimagecatalogs",
 			c.RESTClient(),
 			scheme.ParameterCodec,
-			namespace,
+			"",
 			func() *apiv1.ClusterImageCatalog { return &apiv1.ClusterImageCatalog{} },
 			func() *apiv1.ClusterImageCatalogList { return &apiv1.ClusterImageCatalogList{} },
 		),

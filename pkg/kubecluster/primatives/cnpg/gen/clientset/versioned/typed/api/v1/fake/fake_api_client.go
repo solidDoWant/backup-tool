@@ -20,8 +20,8 @@ func (c *FakePostgresqlV1) Clusters(namespace string) v1.ClusterInterface {
 	return newFakeClusters(c, namespace)
 }
 
-func (c *FakePostgresqlV1) ClusterImageCatalogs(namespace string) v1.ClusterImageCatalogInterface {
-	return newFakeClusterImageCatalogs(c, namespace)
+func (c *FakePostgresqlV1) ClusterImageCatalogs() v1.ClusterImageCatalogInterface {
+	return newFakeClusterImageCatalogs(c)
 }
 
 func (c *FakePostgresqlV1) Databases(namespace string) v1.DatabaseInterface {
