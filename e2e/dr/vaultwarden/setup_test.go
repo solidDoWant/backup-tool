@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg/gen/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,13 +42,12 @@ var (
 
 func TestMain(m *testing.M) {
 	testenv = env.New()
-	// kindClusterName := envconf.RandomName("my-cluster", 16)
-	namespace := envconf.RandomName("myns", 16)
 
 	clusterSetup, clusterFinish, clusterName := Cluster()
 	registrySetup, registryFinish := Registry(clusterName)
 	pushImageSetup, pushImageFinish := PushImage(getRegistryName)
 	deployDependentServicesSetup, deployDependentServicesFinish := DeployDependentServices(clusterName)
+	vaultWardenSetup, vaultWardenFinish := DeployVaultWarden()
 
 	// Use pre-defined environment funcs to create a kind cluster prior to test run
 	testenv.Setup(
@@ -54,12 +55,12 @@ func TestMain(m *testing.M) {
 		registrySetup,
 		pushImageSetup,
 		deployDependentServicesSetup,
-		envfuncs.CreateNamespace(namespace),
+		vaultWardenSetup,
 	)
 
 	// Use pre-defined environment funcs to teardown kind cluster after tests
 	testenv.Finish(
-		envfuncs.DeleteNamespace(namespace),
+		vaultWardenFinish,
 		deployDependentServicesFinish,
 		pushImageFinish,
 		registryFinish,
@@ -193,10 +194,29 @@ func PushImage(getRegistryName func() string) (types.EnvFunc, types.EnvFunc) {
 	return setup, finish
 }
 
+func Helmfile(helmfilePath string) (types.EnvFunc, types.EnvFunc) {
+	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		if p := utils.RunCommand(fmt.Sprintf("helmfile apply --file %q --skip-diff-on-install --suppress-diff --args --skip-schema-validation", helmfilePath)); p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to deploy helmfile at %q: %s", helmfilePath, p.Result())
+		}
+
+		return ctx, nil
+	}
+
+	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		if p := utils.RunCommand(fmt.Sprintf("helmfile destroy --file %q", helmfilePath)); p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to remove helmfile at %q: %s", helmfilePath, p.Result())
+		}
+
+		return ctx, nil
+	}
+
+	return setup, finish
+}
+
 func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) {
-	helmfilePath := "./config/dependent-services/helmfile.yaml"
 	zpoolName := "openebs-zpool" // This must match the name used in the storage class
-	imageFilePath := "/tmp/zfs-pool-vdev-1.img"
+	imageFilePath := fmt.Sprintf("/tmp/%s-vdev.img", zpoolName)
 	defaultStorageClass := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard"}}
 	storageClassPatch := func(isDefault bool) k8s.Patch {
 		return k8s.Patch{
@@ -204,23 +224,33 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 			Data:      []byte(fmt.Sprintf(`{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "%t"}}}`, isDefault)),
 		}
 	}
+	var loopDevice *string // This will be set during setup and used during finish
+	helmSetup, helmFinish := Helmfile("./config/dependent-services/helmfile.yaml")
 
 	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 		// Deploy ZFS zpool for openebs
+		if p := utils.RunCommand(fmt.Sprintf("truncate -s 100G %q", imageFilePath)); p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to create ZFS pool file: %s", p.Result())
+		}
+
+		p := utils.RunCommand(fmt.Sprintf("losetup --show --sector-size 4096 --direct-io --find %q", imageFilePath))
+		if p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to attach file to loop device: %s", p.Result())
+		}
+
+		loopDevice = ptr.To(strings.TrimSpace(p.Result()))
+		if p := utils.RunCommand(fmt.Sprintf("zpool create -f -o ashift=12 %q %q", zpoolName, *loopDevice)); p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to create ZFS pool: %s", p.Result())
+		}
+
+		// Install ZFS userspace utilities in the cluster node containers (needed for openebs-zfs)
 		commands := []string{
-			// Install ZFS FUSE (no kernel module requirement)
+			fmt.Sprintf("sed -i %q %q", "s/main/main contrib/", "/etc/apt/sources.list.d/debian.sources"),
 			"apt update",
-			"apt install --no-install-recommends -y zfs-fuse",
-			"systemctl start zfs-fuse",
-			// Create a file-backed device to use as a ZFS pool
-			// Size is not critical because the file is sparse (-s option)
-			fmt.Sprintf("truncate -s 100G %q", imageFilePath),
-			// Create a ZFS pool using a file attached to a loop device, and match the ashift to the sector size
-			// Escaped quotes are used instead of %q because %q would escape quotes inside the losetup command
-			fmt.Sprintf("zpool create -f -o ashift=12 %q \"$(losetup --show --sector-size 4096 --direct-io --find %q)\"", zpoolName, imageFilePath),
+			"apt install --no-install-recommends -y zfsutils-linux",
 		}
 		if err := RunNodesScript(clusterName, commands); err != nil {
-			return ctx, trace.Wrap(err, "failed to create ZFS pool")
+			return ctx, trace.Wrap(err, "failed to install ZFS userspace utilities")
 		}
 
 		// Remove the "default" annotation from local-path CSI storage class
@@ -229,13 +259,8 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 		}
 
 		// Deploy services
-		if p := utils.RunCommand(fmt.Sprintf("helmfile apply --file %q --skip-diff-on-install --suppress-diff", helmfilePath)); p.Err() != nil {
-			return ctx, trace.Wrap(p.Err(), "failed to deploy dependent services: %s", p.Result())
-		}
-
-		// Deploy shared resources that don't have a corresponding helm chart
-		if p := utils.RunCommand("kubectl apply -f config/dependent-services/manifests.yaml"); p.Err() != nil {
-			return ctx, trace.Wrap(p.Err(), "failed to deploy shared resources: %s", p.Result())
+		if ctx, err := helmSetup(ctx, cfg); err != nil {
+			return ctx, trace.Wrap(err, "failed to deploy dependent services")
 		}
 
 		return ctx, nil
@@ -244,14 +269,10 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 		errors := []error{} // Collect errors to return as an aggregate so that all cleanup steps are attempted
 
-		// Destroy shared resources that don't have a corresponding helm chart
-		if p := utils.RunCommand("kubectl delete -f config/dependent-services/manifests.yaml"); p.Err() != nil {
-			return ctx, trace.Wrap(p.Err(), "failed to destroy shared resources: %s", p.Result())
-		}
-
 		// Remove the services
-		if p := utils.RunCommand(fmt.Sprintf("helmfile destroy --file %q", helmfilePath)); p.Err() != nil {
-			errors = append(errors, trace.Wrap(p.Err(), "failed to remove dependent services: %s", p.Result()))
+		var err error
+		if ctx, err = helmFinish(ctx, cfg); err != nil {
+			errors = append(errors, trace.Wrap(err, "failed to remove dependent services"))
 		}
 
 		// Set the "default" annotation from local-path CSI storage class
@@ -268,24 +289,24 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 			errors = append(errors, trace.Wrap(err, "failed to wait for pods to be deleted"))
 		}
 
+		// Uninstall ZFS userspace utilities in the cluster node containers
+		if err := RunNodesCommand(clusterName, "apt autoremove --purge -y zfsutils-linux"); err != nil {
+			errors = append(errors, trace.Wrap(err, "failed to uninstall ZFS userspace utilities"))
+		}
+
 		// Destroy the ZFS pool. Sometimes this may fail and need to be retried.
 		if err := wait.For(func(ctx context.Context) (bool, error) {
-			return RunNodesCommand(clusterName, fmt.Sprintf("zpool destroy -f %q", zpoolName)) == nil, nil
+			return utils.RunCommand(fmt.Sprintf("zpool destroy -f %q", zpoolName)).Err() == nil, nil
 		}, wait.WithContext(ctx), wait.WithInterval(2*time.Second), wait.WithTimeout(30*time.Second), wait.WithImmediate()); err != nil {
 			errors = append(errors, trace.Wrap(err, "failed to remove ZFS pool"))
 		} else {
 			// Do the rest of the ZFS cleanup, which will fail if the pool isn't destroyed
-			commands := []string{
-				// Detach the loop device
-				fmt.Sprintf("losetup -d \"$(losetup --noheadings --output NAME --associated %q)\"", imageFilePath),
-				// Remove the file
-				fmt.Sprintf("rm -f %q", imageFilePath),
-				// Remove ZFS FUSE
-				"systemctl stop zfs-fuse",
-				"apt autoremove -y zfs-fuse",
+			if p := utils.RunCommand(fmt.Sprintf("losetup -d %q", *loopDevice)); p.Err() != nil {
+				errors = append(errors, trace.Wrap(p.Err(), "failed to detach loop device: %s", p.Result()))
 			}
-			if err := RunNodesScript(clusterName, commands); err != nil {
-				errors = append(errors, trace.Wrap(err, "failed to remove ZFS pool"))
+
+			if err := os.Remove(imageFilePath); err != nil {
+				errors = append(errors, trace.Wrap(err, "failed to remove ZFS pool file"))
 			}
 		}
 
@@ -295,9 +316,78 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 	return setup, finish
 }
 
-// func DeployVaultwarden() (types.EnvFunc, types.EnvFunc) {
+func DeployVaultWarden() (types.EnvFunc, types.EnvFunc) {
+	helmSetup, helmFinish := Helmfile("./config/vaultwarden-instance/helmfile.yaml")
 
-// }
+	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		if ctx, err := helmSetup(ctx, cfg); err != nil {
+			return ctx, trace.Wrap(err, "failed to deploy dependent services")
+		}
+
+		// Wait for the CNPG cluster to become ready
+		cnpgClient, err := versioned.NewForConfig(cfg.Client().RESTConfig())
+		if err != nil {
+			return ctx, trace.Wrap(err, "failed to create CNPG client")
+		}
+
+		if err := wait.For(func(ctx context.Context) (done bool, err error) {
+			cnpgCluster, err := cnpgClient.PostgresqlV1().Clusters("default").Get(ctx, "vaultwarden", metav1.GetOptions{})
+			if err != nil {
+				return false, trace.Wrap(err, "failed to get vaultwarden CNPG cluster")
+			}
+
+			for _, condition := range cnpgCluster.Status.Conditions {
+				if condition.Type != string(apiv1.ConditionClusterReady) {
+					continue
+				}
+
+				return condition.Status == metav1.ConditionTrue, nil
+			}
+
+			return false, nil
+		}, wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute)); err != nil {
+			return ctx, trace.Wrap(err, "failed to wait for vaultwarden CNPG cluster to be ready")
+		}
+
+		// Wait for the Vaultwarden service to become ready, by checking for at least one endpoint
+		if err := wait.For(func(ctx context.Context) (done bool, err error) {
+			endpoints := &corev1.Endpoints{}
+			if err := cfg.Client().Resources().Get(ctx, "vaultwarden", "default", endpoints); err != nil {
+				return false, trace.Wrap(err, "failed to get vaultwarden CNPG cluster")
+			}
+
+			if len(endpoints.Subsets) == 0 {
+				return false, nil
+			}
+
+			for _, subset := range endpoints.Subsets {
+				if len(subset.Addresses) > 0 {
+					return true, nil
+				}
+			}
+
+			return false, nil
+		}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute)); err != nil {
+			return ctx, trace.Wrap(err, "failed to wait for vaultwarden service to be ready")
+		}
+
+		return ctx, nil
+	}
+
+	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		errors := []error{} // Collect errors to return as an aggregate so that all cleanup steps are attempted
+
+		// Remove the services
+		var err error
+		if ctx, err = helmFinish(ctx, cfg); err != nil {
+			errors = append(errors, trace.Wrap(err, "failed to remove dependent services"))
+		}
+
+		return ctx, trace.NewAggregate(errors...)
+	}
+
+	return setup, finish
+}
 
 func RunNodesScript(clusterName string, commands []string) error {
 	script := strings.Join(commands, " && ")

@@ -1,0 +1,89 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.6.1/charts/library/common/values.schema.json
+rawResources:
+  postgres-serving-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: postgres-serving-cert
+    spec:
+      spec:
+        commonName: VaultWarden Postgres serving
+        dnsNames:
+          - vaultwarden-rw
+        usages:
+          - server auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: postgres-serving-cert
+  postgres-streaming-replica-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: postgres-streaming-replica-cert
+    spec:
+      spec:
+        commonName: streaming_replica
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: postgres-streaming-replica-cert
+  postgres-vaultwarden-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: postgres-vaultwarden-cert
+    spec:
+      spec:
+        commonName: vaultwarden
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: postgres-vaultwarden-cert
+  postgres-vaultwarden-cluster:
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    forceRename: vaultwarden
+    spec:
+      spec:
+        instances: 2 # One replica, one primary
+        bootstrap:
+          initdb:
+            database: vaultwarden
+            owner: vaultwarden
+            postInitSQL:
+              - ALTER USER vaultwarden WITH PASSWORD NULL;
+        postgresql:
+          pg_hba:
+            - hostssl vaultwarden all all cert
+        storage:
+          size: 5Gi
+          storageClass: openebs-zfs
+        backup:
+          target: prefer-standby
+          volumeSnapshot:
+            className: openebs-zfs
+            online: true
+            onlineConfiguration:
+              immediateCheckpoint: false
+              waitForArchive: true
+            snapshotOwnerReference: backup
+        certificates:
+          serverTLSSecret: postgres-serving-cert
+          serverCASecret: postgres-serving-cert
+          clientCASecret: postgres-client-ca-cert
+          replicationTLSSecret: postgres-streaming-replica-cert

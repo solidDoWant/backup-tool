@@ -18,16 +18,13 @@ localpv-provisioner:
 engines:
   local:
     lvm:
-      enabled: true
-    zfs:
       enabled: false
   replicated:
     mayastor:
       enabled: false
-# zfs-localpv:
-#   zfsNode:
-#     # cspell:words encr
-#     encrKeysDir: /var/zfs/encryption-keys
-#   # Disable zfs-localpv-installed volume snapshot CRDs entirely
-#   crds: *crds
-# lvm-localpv:
+zfs-localpv:
+  zfsNode:
+    # cspell:words encr
+    encrKeysDir: /var/zfs/encryption-keys
+  # Disable zfs-localpv-installed volume snapshot CRDs entirely
+  crds: *crds

@@ -18,9 +18,12 @@
 		}
 	},
 	// Host networking is required to communicate with registries at "localhost"
-	"postCreateCommand": "docker buildx create --use --bootstrap --driver docker-container --name container-builder --driver-opt network=host"
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
+	"postCreateCommand": "docker buildx create --use --bootstrap --driver docker-container --name container-builder --driver-opt network=host",
+	"forwardPorts": [
+		// Convenience for local testing. Useful in conjunction with, for example:
+		// kubectl port-forward --address 0.0.0.0 service/vaultwarden 8080:80
+		8080
+	]
 	// Configure tool-specific properties.
 	// "customizations": {},
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.

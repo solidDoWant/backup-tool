@@ -25,6 +25,8 @@ repositories:
     url: https://cloudnative-pg.github.io/charts
   - name: cert-manager-charts
     url: https://charts.jetstack.io
+  - name: bjw-s-charts
+    url: https://bjw-s.github.io/helm-charts
 
 releases:
   - name: volume-snapshot-controller
@@ -69,3 +71,14 @@ releases:
       - cert-manager
     values:
       - ./cert-manager-approver-policy.values.yaml
+  - name: resources
+    chart: bjw-s-charts/app-template
+    version: 3.6.1
+    atomic: true
+    needs:
+      - volume-snapshot-controller
+      - openebs
+      - cert-manager
+      - approver-policy
+    values:
+      - ./resources.values.yaml

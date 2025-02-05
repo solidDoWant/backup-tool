@@ -36,6 +36,9 @@ ENV HELM_DATA_HOME=/usr/local/share/helm
 COPY --from=alpine/helm:3.16.2 /usr/bin/helm /usr/local/bin/helm
 RUN helm plugin install https://github.com/jkroepke/helm-secrets --version v4.6.2 && \
     helm plugin install https://github.com/databus23/helm-diff --version v3.9.11
+RUN sed -i 's/main/main contrib non-free non-free-firmware/g' /etc/apt/sources.list.d/debian.sources && \
+    apt update && \
+    apt install -y --no-install-recommends zfsutils-linux
 
 # Autocomplete
 RUN \
@@ -45,4 +48,8 @@ RUN \
     helmfile completion bash | sudo tee /etc/bash_completion.d/helmfile.bash > /dev/null
 
 # Fixup ownership
-RUN chown -R vscode /go
+RUN chown -R vscode /go && \
+    # Needed for e2e tests for access to loopback devices
+    usermod -a -G disk vscode && \
+    # Needed for e2e tests for user to create zpool
+    chmod u+s /usr/sbin/zpool

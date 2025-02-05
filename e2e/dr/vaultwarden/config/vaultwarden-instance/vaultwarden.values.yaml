@@ -1,0 +1,55 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.6.1/charts/library/common/values.schema.json
+controllers:
+  vaultwarden:
+    containers:
+      app:
+        image:
+          repository: vaultwarden/server
+          tag: 1.33.0
+        env:
+          ADMIN_TOKEN: admintoken
+          DATA_FOLDER: data
+          DATABASE_URL: "\
+            postgresql://vaultwarden@vaultwarden-rw:5432/vaultwarden?\
+            sslrootcert=/serving-cert/ca.crt&\
+            sslcert=/user-cert/tls.crt&\
+            sslkey=/user-cert/tls.key&\
+            sslmode=verify-full"
+        ports:
+          - containerPort: 80
+            name: http
+service:
+  app:
+    controller: vaultwarden
+    ports:
+      http:
+        port: 80
+persistence:
+  data:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    storageClass: openebs-zfs
+    globalMounts:
+      - path: /data
+  serving-cert:
+    type: secret
+    name: postgres-serving-cert
+    defaultMode: 0444
+    items:
+      - key: ca.crt
+        path: ca.crt
+    globalMounts:
+      - path: /serving-cert
+  user-cert:
+    type: secret
+    name: postgres-vaultwarden-cert
+    defaultMode: 0440
+    items:
+      - key: tls.crt
+        path: tls.crt
+      - key: tls.key
+        path: tls.key
+    globalMounts:
+      - path: /user-cert

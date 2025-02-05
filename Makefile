@@ -157,6 +157,7 @@ clean-e2e:
 	@$(FOR_EACH_CONTAINER) docker container stop '{}'
 	@$(FOR_EACH_CONTAINER) docker container rm '{}'
 	@losetup -D
+	@zpool destroy -f openebs-zpool || true
 	@docker volume prune -f
 
 .PHONY: $(PHONY)
