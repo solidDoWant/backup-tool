@@ -132,7 +132,7 @@ func (p *Provider) CloneCluster(ctx context.Context, namespace, existingClusterN
 
 	readyBackup, err := p.cnpgClient.WaitForReadyBackup(ctx, namespace, backup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: opts.WaitForBackupTimeout})
 	if err != nil {
-		return errHandler(err, "failed to wait forbackup %q to be ready", helpers.FullName(backup))
+		return errHandler(err, "failed to wait for backup %q to be ready", helpers.FullName(backup))
 	}
 
 	// 2. Create the serving certificate (short lived)
