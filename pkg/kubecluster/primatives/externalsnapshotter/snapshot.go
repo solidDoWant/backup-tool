@@ -55,9 +55,9 @@ func (c *Client) WaitForReadySnapshot(ctx context.Context, namespace, name strin
 			return nil, false, nil
 		}
 
-		if snapshot.Status.Error != nil {
-			return nil, false, trace.Errorf("snapshot %q failed: %v", helpers.FullNameStr(namespace, name), *snapshot.Status.Error.Message)
-		}
+		// This previously checked is the snapshot was in an error state, but it was removed because
+		// the volume snapshot controller appears to sometimes place a snapshot in an error state, and
+		// later resolve it successfully.
 
 		if snapshot.Status == nil || snapshot.Status.ReadyToUse == nil {
 			return nil, false, nil
