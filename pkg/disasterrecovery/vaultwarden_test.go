@@ -8,6 +8,7 @@ import (
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
@@ -246,7 +247,8 @@ func TestVaultWardenBackup(t *testing.T) {
 				userCert.EXPECT().GetCertificate().Return(&postgresCertificate)
 				mockClient.EXPECT().CreateBackupToolInstance(ctx, namespace, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, namespace, instance string, opts backuptoolinstance.CreateBackupToolInstanceOptions) (backuptoolinstance.BackupToolInstanceInterface, error) {
-						require.Equal(t, fullBackupName, opts.NamePrefix)
+						require.Contains(t, opts.NamePrefix, fullBackupName)
+						require.Contains(t, opts.NamePrefix, constants.ToolName)
 						// TODO add test to ensure that the secrets are attached, along with the DR and cloned data PVCs
 						require.Len(t, opts.Volumes, 4)
 						return th.ErrOr1Val(btInstance, tt.simulateBTICreateError)
