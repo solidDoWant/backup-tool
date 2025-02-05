@@ -111,7 +111,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	servingCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "serving-cert")
 	clientCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "client-cert")
 	btOpts := backuptoolinstance.CreateBackupToolInstanceOptions{
-		NamePrefix: backup.GetFullName(),
+		NamePrefix: fmt.Sprintf("%s-%s", constants.ToolName, backup.GetFullName()),
 		Volumes: []core.SingleContainerVolume{
 			core.NewSingleContainerPVC(drPVC.Name, drVolumeMountPath),
 			core.NewSingleContainerPVC(clonedPVC.Name, clonedVolumeMountPath),
