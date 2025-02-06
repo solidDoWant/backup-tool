@@ -1,0 +1,26 @@
+---
+{{/* Template config values that the library doesn't */}}
+{{- $controller := index .Values "resources" "controllers" "backup-tool" -}}
+{{- $cronjob := $controller.cronjob -}}
+{{- $_ := set $cronjob "schedule" (tpl $cronjob.schedule .) -}}
+
+{{- $container := index $controller "containers" "backup-tool" -}}
+{{- $args := $container.args -}}
+{{- $templatedArgs := list -}}
+{{- range $index, $arg := $args -}}
+{{- $templatedArgs = append $templatedArgs (tpl $arg $) -}}
+{{- end -}}
+{{- $_ := set $container "args" $templatedArgs -}}
+
+{{- $configMapData := .Values.resources.configMaps.config.data -}}
+{{- $_ := set $configMapData "config.yaml" (tpl (index $configMapData "config.yaml") .) -}}
+
+{{/* Merge all the values into the format that the common library expects */}}
+{{- $mergedValues := mustDeepCopy .Values -}}
+{{- $mergedValues = omit $mergedValues "resources" "jobConfig" -}}
+{{- $mergedValues = mustMergeOverwrite $mergedValues (mustDeepCopy .Values.resources) -}}
+{{- $_ := set . "Values" $mergedValues }}
+
+{{/* Hand off to the common library for validation, templating, and rendering */}}
+{{- include "bjw-s.common.loader.init" . }}
+{{ include "bjw-s.common.loader.generate" . }}

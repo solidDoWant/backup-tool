@@ -1,0 +1,163 @@
+---
+# backup-tool specific values. These populate several "resource" values.
+jobConfig:
+  schedule: "@daily"
+  drType: vaultwarden
+  drAction: backup
+  configFile: {}
+resources:
+  controllers:
+    backup-tool:
+      type: cronjob
+      cronjob:
+        schedule: "{{ .Values.jobConfig.schedule }}"
+        parallelism: 1
+        backoffLimit: 1
+        ttlSecondsAfterFinished: 86400
+        successfulJobsHistory: 3
+        failedJobsHistory: 3
+      pod:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        restartPolicy: Never
+        terminationGracePeriodSeconds: 600 # Give a job time to complete and/or cleanup
+      containers:
+        backup-tool:
+          image:
+            repository: ghcr.io/soliddowant/backup-tool
+            tag: "{{ .Chart.AppVersion }}"
+          args:
+            - dr
+            - "{{ .Values.jobConfig.drType }}"
+            - "{{ .Values.jobConfig.drAction }}"
+            - --config-file
+            - /etc/backup-tool/config.yaml
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+  configMaps:
+    config:
+      data:
+        config.yaml: "{{- .Values.jobConfig.configFile | toYaml }}"
+  persistence:
+    backup-tool:
+      type: configMap
+      identifier: config
+      defaultMode: 0440
+      items:
+        - key: config.yaml
+          path: config.yaml
+      advancedMounts:
+        backup-tool:
+          backup-tool:
+            - path: /etc/backup-tool/config.yaml
+              subPath: config.yaml
+              readOnly: true
+  serviceAccount:
+    create: true
+  rbac:
+    roles:
+      backup-tool:
+        type: ClusterRole
+        rules:
+          # TODO prefix all resources with a fixed name, and limit RBAC to that prefix with a wildcard
+          # Core/baseline k8s resources
+          # Needed for verifying if services (i.e. backup tool, CNPG cluster) _should_ be accessible
+          - apiGroups:
+              - ""
+            resources:
+              - endpoints
+              - services
+            verbs:
+              - get
+              - list
+              - watch
+          - apiGroups:
+              - ""
+            resources:
+              # Needed to deploy backup tool GRPC instances, and clean them up
+              - pods
+              # Needed for cloning PVCs
+              - persistentvolumeclaims
+            verbs:
+              - create
+              - get
+              - list
+              - watch
+              - delete
+          # External snapshotter (volume snapshot) resources
+          # Needed to snapshot volumes for cloning, and for making backup snapshots
+          - apiGroups:
+              - snapshot.storage.k8s.io
+            resources:
+              - volumesnapshots
+            verbs:
+              - create
+              - get
+              - list
+              - watch
+              - delete
+          # CNPG resources
+          # Needed for cloning CNPG clusters
+          - apiGroups:
+              - postgresql.cnpg.io
+            resources:
+              - backups
+              - clusters
+            verbs:
+              - create
+              - get
+              - list
+              - watch
+              - delete
+          # Cert manager
+          # Needed for authenticating with cloned CNPG clusters
+          - apiGroups:
+              - cert-manager.io
+            resources:
+              - issuers
+            verbs:
+              - create
+              - get
+              - list
+              - watch
+              - delete
+          - apiGroups:
+              - cert-manager.io
+            resources:
+              - certificates
+            verbs:
+              - create
+              - get
+              - list
+              - watch
+              - update
+              - delete
+          # Cert manager approver policy
+          # Needed for issuing certs for cloned CNPG clusters
+          - apiGroups:
+              - policy.cert-manager.io
+            resources:
+              - certificaterequestpolicies
+            verbs:
+              - create
+              - get
+              - list
+              - watch
+              - delete
+    bindings:
+      backup-tool-role:
+        type: ClusterRoleBinding
+        roleRef:
+          identifier: backup-tool
+        subjects:
+          - identifier: default
