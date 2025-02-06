@@ -19,4 +19,5 @@ func TestVaultWardenCommandDRCommand(t *testing.T) {
 	assert.Equal(t, "vaultwarden", drCmd.Use)
 	assert.NotEmpty(t, drCmd.Short)
 	assert.Implements(t, (*SupportsBackup)(nil), cmd)
+	assert.Implements(t, (*SupportsConfigSchemaGeneration)(nil), cmd)
 }

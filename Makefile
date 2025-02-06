@@ -83,8 +83,6 @@ GENERATORS += generate-mocks
 generate-mocks:
 	@mockery
 
-generate-all: $(GENERATORS)
-
 PHONY += (test)
 test:
 	@go test -timeout 30s -failfast -v ./...
@@ -105,6 +103,7 @@ GO_LDFLAGS := $(GO_CONSTANTS:%=-X $(MODULE_NAME)/pkg/constants.%)
 
 LOCALOS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 LOCALARCH := $(shell uname -m | sed 's/x86_64/amd64/')
+LOCAL_BINARY_PATH := $(BUILD_DIR)/$(LOCALOS)/$(LOCALARCH)/$(BINARY_NAME)
 
 $(BUILD_DIR)/%/$(BINARY_NAME): $(GO_SOURCE_FILES)
 	@mkdir -p $(@D)
@@ -114,7 +113,7 @@ PHONY += (binary)
 binary: build
 
 PHONY += (build)
-build: $(BUILD_DIR)/$(LOCALOS)/$(LOCALARCH)/$(BINARY_NAME)
+build: $(LOCAL_BINARY_PATH)
 
 PHONY += (build-all)
 build-all: $(BINARY_PLATFORMS:%=$(BUILD_DIR)/%/$(BINARY_NAME))
@@ -143,6 +142,7 @@ container-manifest: $(CONTAINER_PLATFORMS:%=$(BUILD_DIR)/%/$(BINARY_NAME))
 	@docker buildx build $(CONTAINER_PLATFORMS:%=--platform %) $(PUSH_ARG) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) .
 
 PHONY += (clean)
+CLEANERS += clean
 clean:
 	@rm -rf $(BUILD_DIR)
 	@docker image rm -f $(CONTAINER_IMAGE_TAG) 2> /dev/null > /dev/null || true
@@ -150,6 +150,7 @@ clean:
 # When e2e tests fail during setup or teardown, they can leave resources behind.
 # This target is intended to clean up those resources.
 PHONY += (clean-e2e)
+CLEANERS += clean-e2e
 clean-e2e: FILTERS = name=my-cluster* name=registry*
 clean-e2e: GET_CONTAINERS = docker ps $(FILTERS:%=-f "%") -a -q
 clean-e2e: FOR_EACH_CONTAINER = $(GET_CONTAINERS) | xargs -I '{}'
@@ -159,5 +160,26 @@ clean-e2e:
 	@losetup -D
 	@zpool destroy -f openebs-zpool || true
 	@docker volume prune -f
+
+DR_SCHEMAS_PRETTY = true
+DR_SCHEMAS = vaultwarden
+DR_SCHEMAS_DIR = $(PROJECT_DIR)/schemas
+
+$(DR_SCHEMAS_DIR):
+	@mkdir -p "$@"
+
+$(DR_SCHEMAS_DIR)/%.schema.json: MAYBE_PRETTIFY = $(if $(findstring t,$(DR_SCHEMAS_PRETTY)),| jq)
+$(DR_SCHEMAS_DIR)/%.schema.json: build $(DR_SCHEMAS_DIR)
+	@$(LOCAL_BINARY_PATH) dr $* gen-config-schema $(MAYBE_PRETTIFY) > "$@"
+
+PHONY += (generate-dr-schemas)
+GENERATORS += generate-dr-schemas
+generate-dr-schemas: $(DR_SCHEMAS:%=$(DR_SCHEMAS_DIR)/%.schema.json)
+
+PHONY += (clean-all)
+generate-all: $(GENERATORS)
+
+PHONY += (clean-all)
+clean-all: $(CLEANERS)
 
 .PHONY: $(PHONY)

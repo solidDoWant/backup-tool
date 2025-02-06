@@ -1,6 +1,13 @@
 package disasterrecovery
 
-import "github.com/spf13/cobra"
+import (
+	"bytes"
+	"io"
+	"os"
+
+	"github.com/gravitational/trace"
+	"github.com/spf13/cobra"
+)
 
 type SupportsBackup interface {
 	Backup() error
@@ -12,7 +19,7 @@ type SupportsRestore interface {
 }
 
 type SupportsConfigSchemaGeneration interface {
-	GenerateConfigSchema() error
+	GenerateConfigSchema() ([]byte, error)
 }
 
 type DRCommand interface {
@@ -56,7 +63,13 @@ func getDRSubcommands() []*cobra.Command {
 			restoreCommand := &cobra.Command{
 				Use: "gen-config-schema",
 				RunE: func(cmd *cobra.Command, args []string) error {
-					return genSchemaCmd.GenerateConfigSchema()
+					schema, err := genSchemaCmd.GenerateConfigSchema()
+					if err != nil {
+						return trace.Wrap(err, "failed to generate config schema")
+					}
+
+					_, err = io.Copy(os.Stdout, bytes.NewReader(schema))
+					return trace.Wrap(err, "failed to write config schema to stdout")
 				},
 				SilenceUsage: true,
 			}

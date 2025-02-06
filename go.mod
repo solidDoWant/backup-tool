@@ -107,10 +107,16 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-require sigs.k8s.io/e2e-framework v0.6.0
+require (
+	github.com/invopop/jsonschema v0.13.0
+	sigs.k8s.io/e2e-framework v0.6.0
+)
 
 require (
+	github.com/bahlo/generic-list-go v0.2.0 // indirect
+	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/vladimirvivien/gexe v0.4.1 // indirect
+	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	golang.org/x/tools v0.29.0 // indirect
 )

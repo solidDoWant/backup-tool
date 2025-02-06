@@ -64,3 +64,7 @@ func (vwc *VaultWardenCommand) ConfigureBackupFlags(cmd *cobra.Command) {
 	vwc.timeoutContext.ConfigureFlags(cmd)
 	vwc.configFile.ConfigureFlags(cmd)
 }
+
+func (vwc *VaultWardenCommand) GenerateConfigSchema() ([]byte, error) {
+	return vwc.configFile.GenerateConfigSchema()
+}

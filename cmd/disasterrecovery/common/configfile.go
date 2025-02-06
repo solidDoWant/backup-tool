@@ -10,6 +10,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/goccy/go-yaml"
 	"github.com/gravitational/trace"
+	"github.com/invopop/jsonschema"
 	"github.com/jinzhu/copier"
 	"github.com/spf13/cobra"
 )
@@ -182,4 +183,13 @@ func (cfc *ConfigFileCommand[T]) ReadConfigFile(ctx context.Context) (T, error) 
 	}
 
 	return config, nil
+}
+
+func (cfc *ConfigFileCommand[T]) GenerateConfigSchema() ([]byte, error) {
+	configInstance := new(T)
+	schemaReflector := &jsonschema.Reflector{
+		RequiredFromJSONSchemaTags: true,
+	}
+	schema, err := schemaReflector.Reflect(configInstance).MarshalJSON()
+	return schema, trace.Wrap(err, "failed to marshal schema for %T", configInstance)
 }
