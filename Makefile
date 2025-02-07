@@ -138,10 +138,6 @@ LOCAL_BUILDERS += container-image
 container-image: binary
 	@docker buildx build --platform linux/$(LOCALARCH) -t $(CONTAINER_IMAGE_TAG) --load $(CONTAINER_BUILD_ARGS) .
 
-PHONY += container-image-tag
-container-image-tag:
-	@echo $(CONTAINER_IMAGE_TAG)
-
 CONTAINER_MANIFEST_PUSH ?= false
 
 PHONY += container-manifest
@@ -165,7 +161,7 @@ helm: $(HELM_PACKAGE)
 PHONY += clean
 CLEANERS += clean
 clean:
-	@rm -rf $(BUILD_DIR) $(WORKING_DIR)
+	@rm -rf $(BUILD_DIR) $(WORKING_DIR) $(HELM_CHART_DIR)/charts
 	@docker image rm -f $(CONTAINER_IMAGE_TAG) 2> /dev/null > /dev/null || true
 
 # When e2e tests fail during setup or teardown, they can leave resources behind.
@@ -208,5 +204,18 @@ generate-all: $(GENERATORS)
 
 PHONY += clean-all
 clean-all: $(CLEANERS)
+
+PHONY += print-version
+print-version:
+print-version:
+	@echo $(VERSION)
+
+PHONY += print-chart-path
+print-chart-path:
+	@echo $(HELM_PACKAGE)
+
+PHONY += print-container-image-tag
+print-container-image-tag:
+	@echo $(CONTAINER_IMAGE_TAG)
 
 .PHONY: $(PHONY)
