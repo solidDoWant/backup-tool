@@ -5,6 +5,7 @@ master:
     size: 2Gi
     storageClass: standard
   affinity: ""
+  volumeSizeLimitMB: 256
 volume:
   dataDirs:
     - name: data
@@ -24,7 +25,9 @@ filer:
   affinity: ""
   s3:
     enabled: true
+    enableAuth: true
 s3:
   enabled: true
   logs:
     type: emptyDir
+  enableAuth: true
