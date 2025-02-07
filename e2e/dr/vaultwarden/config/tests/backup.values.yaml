@@ -1,0 +1,23 @@
+---
+jobConfig:
+  configFile:
+    backupName: e2e
+    dataPVCName: vaultwarden-data
+    cnpgClusterName: vaultwarden
+    servingCertIssuerName: self-signed
+    clientCACertIssuerName: self-signed
+    clusterCloning:
+      certificates:
+        servingCert:
+          issuerKind: Issuer
+        clientCACert:
+          issuerKind: Issuer
+        postgresUserCert:
+          certificateRequestPolicy:
+            enabled: true
+        streamingReplicaUserCert:
+          certificateRequestPolicy:
+            enabled: true
+    backupToolPodCreationTimeout: 10m
+    backupSnapshot:
+      snapshotClass: openebs-zfs

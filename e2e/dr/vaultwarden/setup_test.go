@@ -30,8 +30,10 @@ import (
 	"sigs.k8s.io/e2e-framework/support/kind"
 )
 
-// TODO look upwards for .git or main.go or something
-const repoRoot = "./../../.."
+const (
+	repoRoot  = "./../../.."    // TODO look upwards for .git or main.go or something
+	zpoolName = "openebs-zpool" // This must match the name used in the storage class
+)
 
 var (
 	// Making these global isn't great, but it's how the docs show that
@@ -253,7 +255,6 @@ func Helmfile(helmfilePath string) (types.EnvFunc, types.EnvFunc) {
 }
 
 func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) {
-	zpoolName := "openebs-zpool" // This must match the name used in the storage class
 	imageFilePath := fmt.Sprintf("/tmp/%s-vdev.img", zpoolName)
 	defaultStorageClass := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard"}}
 	storageClassPatch := func(isDefault bool) k8s.Patch {
