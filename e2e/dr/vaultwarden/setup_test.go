@@ -36,8 +36,12 @@ const repoRoot = "./../../.."
 var (
 	// Making these global isn't great, but it's how the docs show that
 	// setup values should be passed to the test functions
-	testenv         env.Environment
-	getRegistryName func() string
+	testenv env.Environment
+
+	// These values are set during various setup stages, and will cause panic if used too early
+	registryName string
+	imageName    string
+	chartPath    string
 )
 
 func TestMain(m *testing.M) {
@@ -45,7 +49,8 @@ func TestMain(m *testing.M) {
 
 	clusterSetup, clusterFinish, clusterName := Cluster()
 	registrySetup, registryFinish := Registry(clusterName)
-	pushImageSetup, pushImageFinish := PushImage(getRegistryName)
+	pushImageSetup, pushImageFinish := PushImage()
+	buildChartSetup, buildChartFinish := BuildChart()
 	deployDependentServicesSetup, deployDependentServicesFinish := DeployDependentServices(clusterName)
 	vaultWardenSetup, vaultWardenFinish := DeployVaultWarden()
 
@@ -54,6 +59,7 @@ func TestMain(m *testing.M) {
 		clusterSetup,
 		registrySetup,
 		pushImageSetup,
+		buildChartSetup,
 		deployDependentServicesSetup,
 		vaultWardenSetup,
 	)
@@ -62,6 +68,7 @@ func TestMain(m *testing.M) {
 	testenv.Finish(
 		vaultWardenFinish,
 		deployDependentServicesFinish,
+		buildChartFinish,
 		pushImageFinish,
 		registryFinish,
 		clusterFinish,
@@ -83,15 +90,10 @@ func Cluster() (types.EnvFunc, types.EnvFunc, string) {
 
 func Registry(clusterName string) (types.EnvFunc, types.EnvFunc) {
 	registryContainerName := envconf.RandomName("registry", 16)
-	var futurePort *string
 	kubePublicNamespace := "kube-public" // This namespace should be created by KinD
 	configMapName := "local-registry-hosting"
 
-	getRegistryName = func() string {
-		return fmt.Sprintf("localhost:%s", *futurePort)
-	}
-
-	// Needs to be a func to capture the value of futurePort when called
+	// Needs to be a func to capture the value of registryName when called
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-cluster-lifecycle/generic/1755-communicating-a-local-registry#localregistryhosting
 	getConfigMap := func() *corev1.ConfigMap {
 		return &corev1.ConfigMap{
@@ -100,8 +102,7 @@ func Registry(clusterName string) (types.EnvFunc, types.EnvFunc) {
 				Namespace: kubePublicNamespace,
 			},
 			Data: map[string]string{
-				// "localRegistryHosting.v1": fmt.Sprintf(`{"host":%q, "help":%q}`, getRegistryName(), "https://kind.sigs.k8s.io/docs/user/local-registry/"),
-				"localRegistryHosting.v1": fmt.Sprintf("host: %q\n", getRegistryName()),
+				"localRegistryHosting.v1": fmt.Sprintf("host: %q\n", registryName),
 			},
 		}
 	}
@@ -130,12 +131,13 @@ func Registry(clusterName string) (types.EnvFunc, types.EnvFunc) {
 		}
 
 		address := strings.TrimSpace(p.Result())
-		futurePort = ptr.To(address[strings.LastIndex(address, ":")+1:])
+		port := address[strings.LastIndex(address, ":")+1:]
+		registryName = fmt.Sprintf("localhost:%s", port)
 
 		// Configure the cluster nodes container registry resolver to map "localhost:<port>" to "<registry-container-name>:<port>"
 		// Update the /etc/containerd/certs.d/localhost:<port>/hosts.toml file on each node
 		// Docs: https://github.com/containerd/containerd/blob/main/docs/hosts.md
-		certsDir := "/etc/containerd/certs.d/localhost:" + *futurePort
+		certsDir := "/etc/containerd/certs.d/localhost:" + port
 		hostsConfigFilePath := filepath.Join(certsDir, "hosts.toml")
 		hostsConfigFileContents := fmt.Sprintf("[host.%q]", fmt.Sprintf("http://%s:%d", registryContainerName, registryInternalPort))
 		commands := []string{
@@ -176,18 +178,54 @@ func Registry(clusterName string) (types.EnvFunc, types.EnvFunc) {
 	return setup, finish
 }
 
-func PushImage(getRegistryName func() string) (types.EnvFunc, types.EnvFunc) {
+func PushImage() (types.EnvFunc, types.EnvFunc) {
 	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 		// Call the makefile target used for releases
-		if p := utils.RunCommand(fmt.Sprintf("make -C %q container-manifest CONTAINER_REGISTRY=%s CONTAINER_MANIFEST_PUSH=true", repoRoot, getRegistryName())); p.Err() != nil {
+		if p := utils.RunCommand(fmt.Sprintf("make -C %q container-manifest CONTAINER_REGISTRY=%s CONTAINER_MANIFEST_PUSH=true", repoRoot, registryName)); p.Err() != nil {
 			return ctx, trace.Wrap(p.Err(), "failed to build image: %s", p.Result())
 		}
+
+		// Set the image name
+		p := utils.RunCommand(fmt.Sprintf("make -C %q --no-print-directory print-container-image-tag CONTAINER_REGISTRY=%s", repoRoot, registryName))
+		if p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to get image name: %s", p.Result())
+		}
+		imageName = strings.TrimSpace(p.Result())
 
 		return ctx, nil
 	}
 
 	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		// Nothing currently to do here. Buildkit does not cache the image.
+		// Clean up built binaries. These will have the image repository baked in. TODO make this configurable
+		if p := utils.RunCommand(fmt.Sprintf("make -C %q clean CONTAINER_REGISTRY=%s", repoRoot, registryName)); p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to clean up built binaries: %s", p.Result())
+		}
+
+		return ctx, nil
+	}
+
+	return setup, finish
+}
+
+func BuildChart() (types.EnvFunc, types.EnvFunc) {
+	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		// Call the makefile target used for releases
+		if p := utils.RunCommand(fmt.Sprintf("make -C %q helm", repoRoot)); p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to build chart: %s", p.Result())
+		}
+
+		// Set the chart path
+		p := utils.RunCommand(fmt.Sprintf("make -C %q --no-print-directory print-chart-path", repoRoot))
+		if p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to get chart path: %s", p.Result())
+		}
+		chartPath = strings.TrimSpace(p.Result())
+
+		return ctx, nil
+	}
+
+	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		// Nothing currently to do here
 		return ctx, nil
 	}
 
