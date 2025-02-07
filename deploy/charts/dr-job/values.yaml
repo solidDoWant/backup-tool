@@ -52,7 +52,7 @@ resources:
     backup-tool:
       type: configMap
       identifier: config
-      defaultMode: 0440
+      defaultMode: 0444
       items:
         - key: config.yaml
           path: config.yaml
@@ -76,11 +76,21 @@ resources:
               - ""
             resources:
               - endpoints
-              - services
             verbs:
               - get
               - list
               - watch
+          # Needed for creating services for backup tool GRPC instances
+          - apiGroups:
+              - ""
+            resources:
+              - services
+            verbs:
+              - create
+              - get
+              - list
+              - watch
+              - delete
           - apiGroups:
               - ""
             resources:
@@ -94,6 +104,13 @@ resources:
               - list
               - watch
               - delete
+          # Allow for determining if certain resource types are available
+          - apiGroups:
+              - apiextensions.k8s.io
+            resources:
+              - customresourcedefinitions
+            verbs:
+              - get
           # External snapshotter (volume snapshot) resources
           # Needed to snapshot volumes for cloning, and for making backup snapshots
           - apiGroups:
@@ -140,8 +157,14 @@ resources:
               - get
               - list
               - watch
-              - update
               - delete
+          # Allow for reissuing certificates
+          - apiGroups:
+              - cert-manager.io
+            resources:
+              - certificates/status
+            verbs:
+              - update
           # Cert manager approver policy
           # Needed for issuing certs for cloned CNPG clusters
           - apiGroups:
