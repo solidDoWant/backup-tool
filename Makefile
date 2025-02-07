@@ -99,7 +99,7 @@ PHONY += dep-licenses
 dep-licenses:
 	@go run github.com/google/go-licenses@latest report ./...
 
-VERSION = v0.0.1-dev
+VERSION = 0.0.1-dev
 CONTAINER_REGISTRY = ghcr.io/soliddowant
 
 BINARY_DIR = $(BUILD_DIR)/binaries
@@ -128,7 +128,7 @@ binary-all: $(BINARY_PLATFORMS:%=$(BINARY_DIR)/%/$(BINARY_NAME))
 DEBIAN_IMAGE_VERSION = 12.9-slim
 POSTGRES_MAJOR_VERSION = 17
 
-CONTAINER_IMAGE_TAG = $(CONTAINER_REGISTRY)/$(BINARY_NAME):$(VERSION:v%=%)
+CONTAINER_IMAGE_TAG = $(CONTAINER_REGISTRY)/$(BINARY_NAME):$(VERSION)
 CONTAINER_BUILD_ARG_VARS = DEBIAN_IMAGE_VERSION POSTGRES_MAJOR_VERSION
 CONTAINER_BUILD_ARGS := $(foreach var,$(CONTAINER_BUILD_ARG_VARS),--build-arg $(var)=$($(var)))
 CONTAINER_PLATFORMS := $(BINARY_PLATFORMS)
@@ -155,7 +155,7 @@ HELM_CHART_FILES := $(shell find $(HELM_CHART_DIR) -type f)
 HELM_PACKAGE = $(BUILD_DIR)/helm/dr-job-$(VERSION).tgz
 $(HELM_PACKAGE): $(HELM_CHART_FILES)
 	@mkdir -p "$(@D)"
-	@helm package "$(HELM_CHART_DIR)" --dependency-update --version "$(VERSION)" --app-version "$(VERSION:v%=%)" --destination "$(@D)"
+	@helm package "$(HELM_CHART_DIR)" --dependency-update --version "$(VERSION)" --app-version "$(VERSION)" --destination "$(@D)"
 
 PHONY += helm
 LOCAL_BUILDERS += helm

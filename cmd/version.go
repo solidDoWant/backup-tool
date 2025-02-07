@@ -12,6 +12,6 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: fmt.Sprintf("Print the %s version number", constants.ToolName),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(constants.Version)
+		fmt.Println("v" + constants.Version)
 	},
 }
