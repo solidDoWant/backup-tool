@@ -14,13 +14,13 @@ repositories:
 releases:
   - name: client-ca
     chart: bjw-s-charts/app-template
-    version: 3.6.1
+    version: 3.7.0
     atomic: true
     values:
       - ./client-ca.values.yaml
   - name: backend
     chart: bjw-s-charts/app-template
-    version: 3.6.1
+    version: 3.7.0
     atomic: true
     needs:
       - client-ca
@@ -28,7 +28,7 @@ releases:
       - ./backend.values.yaml
   - name: vaultwarden
     chart: bjw-s-charts/app-template
-    version: 3.6.1
+    version: 3.7.0
     atomic: true
     needs:
       - backend
