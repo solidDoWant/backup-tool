@@ -31,7 +31,7 @@ CNPG_GIT_DIR = $(CNPG_CODEGEN_WORKING_DIR)/repo
 CNPG_GEN_DIR = $(PROJECT_DIR)/pkg/kubecluster/primatives/cnpg/gen
 
 $(CNPG_KUBE_CODEGEN):
-	@mkdir -p $(shell dirname "$(CNPG_KUBE_CODEGEN)")
+	@mkdir -p "$(@D)"
 	@ # Deps are already installed via devcontainer, and this logic is flawed
 	@ # (https://github.com/kubernetes/code-generator/issues/184), so remove it
 	@curl -fsSL https://raw.githubusercontent.com/kubernetes/code-generator/refs/tags/$(KUBE_CODEGEN_VERSION)/kube_codegen.sh | \
@@ -39,7 +39,7 @@ $(CNPG_KUBE_CODEGEN):
 
 $(CNPG_GIT_DIR): SHELL := bash
 $(CNPG_GIT_DIR):
-	@mkdir -p $(shell dirname "$(CNPG_GIT_DIR)")
+	@mkdir -p "$(@D)"
 	@git -c advice.detachedHead=false \
 		clone --quiet --branch $(CNPG_VERSION) --single-branch https://github.com/cloudnative-pg/cloudnative-pg.git $(CNPG_GIT_DIR)
 	@# Do a really rudementary semver comparison to determine if the CNPG Go version should be downgraded
@@ -67,14 +67,14 @@ APPROVER_POLICY_GIT_DIR = $(APPROVER_POLICY_CODEGEN_WORKING_DIR)/repo
 APPROVER_POLICY_GEN_DIR = $(PROJECT_DIR)/pkg/kubecluster/primatives/approverpolicy/gen
 
 $(APPROVER_POLICY_KUBE_CODEGEN):
-	@mkdir -p $(shell dirname "$(APPROVER_POLICY_KUBE_CODEGEN)")
+	@mkdir -p "$(@D)"
 	@ # Deps are already installed via devcontainer, and this logic is flawed
 	@ # (https://github.com/kubernetes/code-generator/issues/184), so remove it
 	@curl -fsSL https://raw.githubusercontent.com/kubernetes/code-generator/refs/tags/$(KUBE_CODEGEN_VERSION)/kube_codegen.sh | \
 		sed 's/^[^#]*go install.*//' > $(APPROVER_POLICY_KUBE_CODEGEN)
 
 $(APPROVER_POLICY_GIT_DIR):
-	@mkdir -p $(shell dirname "$(APPROVER_POLICY_GIT_DIR)")
+	@mkdir -p "$(@D)"
 	@git -c advice.detachedHead=false \
 		clone --quiet --branch $(APPROVER_POLICY_VERSION) --single-branch $(APPROVER_POLICY_REPO) $(APPROVER_POLICY_GIT_DIR)
 
@@ -113,10 +113,8 @@ LOCALOS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 LOCALARCH := $(shell uname -m | sed 's/x86_64/amd64/')
 LOCAL_BINARY_PATH := $(BINARY_DIR)/$(LOCALOS)/$(LOCALARCH)/$(BINARY_NAME)
 
-$(BINARY_DIR):
-	@mkdir -p "$@"
-
 $(BINARY_DIR)/%/$(BINARY_NAME): $(GO_SOURCE_FILES)
+	@mkdir -p "$(@D)"
 	@GOOS="$(word 1,$(subst /, ,$*))" GOARCH="$(word 2,$(subst /, ,$*))" go build -ldflags="$(GO_LDFLAGS)" -o "$@" .
 
 PHONY += binary
@@ -151,6 +149,18 @@ ALL_BUILDERS += container-manifest
 container-manifest: PUSH_ARG = $(if $(findstring t,$(CONTAINER_MANIFEST_PUSH)),--push)
 container-manifest: $(CONTAINER_PLATFORMS:%=$(BINARY_DIR)/%/$(BINARY_NAME))
 	@docker buildx build $(CONTAINER_PLATFORMS:%=--platform %) $(PUSH_ARG) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) .
+
+HELM_CHART_DIR := $(PROJECT_DIR)/deploy/charts/dr-job
+HELM_CHART_FILES := $(shell find $(HELM_CHART_DIR) -type f)
+HELM_PACKAGE = $(BUILD_DIR)/helm/dr-job-$(VERSION).tgz
+$(HELM_PACKAGE): $(HELM_CHART_FILES)
+	@mkdir -p "$(@D)"
+	@helm package "$(HELM_CHART_DIR)" --dependency-update --version "$(VERSION)" --app-version "$(VERSION:v%=%)" --destination "$(@D)"
+
+PHONY += helm
+LOCAL_BUILDERS += helm
+ALL_BUILDERS += helm
+helm: $(HELM_PACKAGE)
 
 PHONY += clean
 CLEANERS += clean
