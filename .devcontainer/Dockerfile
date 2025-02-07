@@ -38,7 +38,9 @@ RUN helm plugin install https://github.com/jkroepke/helm-secrets --version v4.6.
     helm plugin install https://github.com/databus23/helm-diff --version v3.9.11
 RUN sed -i 's/main/main contrib non-free non-free-firmware/g' /etc/apt/sources.list.d/debian.sources && \
     apt update && \
-    apt install -y --no-install-recommends zfsutils-linux
+    apt install -y --no-install-recommends zfsutils-linux && \
+    # Needed for e2e tests for user to create dataset
+    chmod u+s "$(which zfs)"
 
 # Autocomplete
 RUN \
