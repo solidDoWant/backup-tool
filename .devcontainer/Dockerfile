@@ -25,7 +25,7 @@ RUN go install \
     k8s.io/code-generator/cmd/lister-gen@latest
 
 # Mockery
-RUN go install github.com/vektra/mockery/v2@latest \
+RUN go install github.com/vektra/mockery/v2@v2.51.0 \
     mockery completion bash | sudo tee /etc/bash_completion.d/mockery.bash > /dev/null
 
 # Misc. development tools

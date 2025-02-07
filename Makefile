@@ -1,4 +1,6 @@
 PROJECT_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+BUILD_DIR := $(PROJECT_DIR)/build
+WORKING_DIR := $(PROJECT_DIR)/working
 
 PROTOBUF_SRC_DIR = pkg/grpc
 PROTOBUF_GEN_DIR = pkg/grpc/gen
@@ -12,7 +14,7 @@ PROTOC_FLAGS := --go_out=. "--go_opt=module=$(MODULE_NAME)" --go_opt=default_api
 PROTOC_FLAGS += --go-grpc_out=. "--go-grpc_opt=module=$(MODULE_NAME)" 
 PROTOC_FLAGS += --go-grpcmock_out=. "--go-grpcmock_opt=module=$(MODULE_NAME)" --go-grpcmock_opt=framework=testify
 
-PHONY += (generate-protobuf-code)
+PHONY += generate-protobuf-code
 GENERATORS += generate-protobuf-code
 generate-protobuf-code: $(PROTOBUF_GEN_FILES)
 
@@ -23,7 +25,7 @@ KUBE_CODEGEN_VERSION ?= kubernetes-1.32.0
 
 # Temp setting to main until v1.25.1/later release
 CNPG_VERSION := main # $(shell go list -f '{{ .Version }}' -m github.com/cloudnative-pg/cloudnative-pg)
-CNPG_CODEGEN_WORKING_DIR = /tmp/cnpg-gen
+CNPG_CODEGEN_WORKING_DIR := $(WORKING_DIR)/cnpg-gen
 CNPG_KUBE_CODEGEN = $(CNPG_CODEGEN_WORKING_DIR)/kube_codegen.sh
 CNPG_GIT_DIR = $(CNPG_CODEGEN_WORKING_DIR)/repo
 CNPG_GEN_DIR = $(PROJECT_DIR)/pkg/kubecluster/primatives/cnpg/gen
@@ -35,12 +37,18 @@ $(CNPG_KUBE_CODEGEN):
 	@curl -fsSL https://raw.githubusercontent.com/kubernetes/code-generator/refs/tags/$(KUBE_CODEGEN_VERSION)/kube_codegen.sh | \
 		sed 's/^[^#]*go install.*//' > $(CNPG_KUBE_CODEGEN)
 
+$(CNPG_GIT_DIR): SHELL := bash
 $(CNPG_GIT_DIR):
 	@mkdir -p $(shell dirname "$(CNPG_GIT_DIR)")
 	@git -c advice.detachedHead=false \
 		clone --quiet --branch $(CNPG_VERSION) --single-branch https://github.com/cloudnative-pg/cloudnative-pg.git $(CNPG_GIT_DIR)
+	@# Do a really rudementary semver comparison to determine if the CNPG Go version should be downgraded
+	@# This is useful for when the base devcontainer image has not been updated to the latest Go version
+	@if (( "$$(go mod edit -json $(CNPG_GIT_DIR)/go.mod | jq -r .Go | sed 's/\.//g')" > "$$(go version | sed -r 's/.*go([0-9])\.([0-9]+)\.([0-9]+).*/\1\2\3/')" )); then \
+		go mod edit -go="$$(go version | sed -r 's/.*go([0-9][^ ]+).*/\1/')" $(CNPG_GIT_DIR)/go.mod; \
+	fi
 
-PHONY += (generate-cnpg-client)
+PHONY += generate-cnpg-client
 GENERATORS += generate-cnpg-client
 generate-cnpg-client: SHELL := bash
 generate-cnpg-client: $(CNPG_KUBE_CODEGEN) $(CNPG_GIT_DIR)
@@ -53,7 +61,7 @@ generate-cnpg-client: $(CNPG_KUBE_CODEGEN) $(CNPG_GIT_DIR)
 # Needed until https://github.com/cert-manager/approver-policy/pull/571 is released
 APPROVER_POLICY_VERSION := main # $(shell go list -f '{{ .Version }}' -m github.com/cert-manager/approver-policy)
 APPROVER_POLICY_REPO = https://github.com/cert-manager/approver-policy.git
-APPROVER_POLICY_CODEGEN_WORKING_DIR = /tmp/approver-policy-gen
+APPROVER_POLICY_CODEGEN_WORKING_DIR := $(WORKING_DIR)/approver-policy-gen
 APPROVER_POLICY_KUBE_CODEGEN = $(APPROVER_POLICY_CODEGEN_WORKING_DIR)/kube_codegen.sh
 APPROVER_POLICY_GIT_DIR = $(APPROVER_POLICY_CODEGEN_WORKING_DIR)/repo
 APPROVER_POLICY_GEN_DIR = $(PROJECT_DIR)/pkg/kubecluster/primatives/approverpolicy/gen
@@ -70,7 +78,7 @@ $(APPROVER_POLICY_GIT_DIR):
 	@git -c advice.detachedHead=false \
 		clone --quiet --branch $(APPROVER_POLICY_VERSION) --single-branch $(APPROVER_POLICY_REPO) $(APPROVER_POLICY_GIT_DIR)
 
-PHONY += (generate-approver-policy-client)
+PHONY += generate-approver-policy-client
 GENERATORS += generate-approver-policy-client
 generate-approver-policy-client: SHELL := bash
 generate-approver-policy-client: $(APPROVER_POLICY_KUBE_CODEGEN) $(APPROVER_POLICY_GIT_DIR)
@@ -78,23 +86,23 @@ generate-approver-policy-client: $(APPROVER_POLICY_KUBE_CODEGEN) $(APPROVER_POLI
 		. $(APPROVER_POLICY_KUBE_CODEGEN) && \
 		kube::codegen::gen_client --output-dir $(APPROVER_POLICY_GEN_DIR) --output-pkg $(MODULE_NAME)/$(APPROVER_POLICY_GEN_DIR:$(PROJECT_DIR)/%=%) --boilerplate /dev/null .
 
-PHONY += (generate-mocks)
+PHONY += generate-mocks
 GENERATORS += generate-mocks
 generate-mocks:
 	@mockery
 
-PHONY += (test)
+PHONY += test
 test:
 	@go test -timeout 30s -failfast -v ./...
 
-PHONY += (dep-licenses)
+PHONY += dep-licenses
 dep-licenses:
 	@go run github.com/google/go-licenses@latest report ./...
 
 VERSION = v0.0.1-dev
 CONTAINER_REGISTRY = ghcr.io/soliddowant
 
-BUILD_DIR = build
+BINARY_DIR = $(BUILD_DIR)/binaries
 BINARY_PLATFORMS = linux/amd64 linux/arm64
 BINARY_NAME = backup-tool
 GO_SOURCE_FILES := $(shell find . \( -name '*.go' ! -name '*_test.go' ! -name '*_mock*.go' ! -path './pkg/testhelpers/*' ! -path '*/fake/*' \))
@@ -103,20 +111,21 @@ GO_LDFLAGS := $(GO_CONSTANTS:%=-X $(MODULE_NAME)/pkg/constants.%)
 
 LOCALOS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 LOCALARCH := $(shell uname -m | sed 's/x86_64/amd64/')
-LOCAL_BINARY_PATH := $(BUILD_DIR)/$(LOCALOS)/$(LOCALARCH)/$(BINARY_NAME)
+LOCAL_BINARY_PATH := $(BINARY_DIR)/$(LOCALOS)/$(LOCALARCH)/$(BINARY_NAME)
 
-$(BUILD_DIR)/%/$(BINARY_NAME): $(GO_SOURCE_FILES)
-	@mkdir -p $(@D)
-	@GOOS=$(word 1,$(subst /, ,$*)) GOARCH=$(word 2,$(subst /, ,$*)) go build -ldflags="$(GO_LDFLAGS)" -o $@ .
+$(BINARY_DIR):
+	@mkdir -p "$@"
 
-PHONY += (binary)
-binary: build
+$(BINARY_DIR)/%/$(BINARY_NAME): $(GO_SOURCE_FILES)
+	@GOOS="$(word 1,$(subst /, ,$*))" GOARCH="$(word 2,$(subst /, ,$*))" go build -ldflags="$(GO_LDFLAGS)" -o "$@" .
 
-PHONY += (build)
-build: $(LOCAL_BINARY_PATH)
+PHONY += binary
+LOCAL_BUILDERS += binary
+binary: $(LOCAL_BINARY_PATH)
 
-PHONY += (build-all)
-build-all: $(BINARY_PLATFORMS:%=$(BUILD_DIR)/%/$(BINARY_NAME))
+PHONY += binary-all
+ALL_BUILDERS += binary-all
+binary-all: $(BINARY_PLATFORMS:%=$(BINARY_DIR)/%/$(BINARY_NAME))
 
 DEBIAN_IMAGE_VERSION = 12.9-slim
 POSTGRES_MAJOR_VERSION = 17
@@ -126,30 +135,32 @@ CONTAINER_BUILD_ARG_VARS = DEBIAN_IMAGE_VERSION POSTGRES_MAJOR_VERSION
 CONTAINER_BUILD_ARGS := $(foreach var,$(CONTAINER_BUILD_ARG_VARS),--build-arg $(var)=$($(var)))
 CONTAINER_PLATFORMS := $(BINARY_PLATFORMS)
 
-PHONY += (container-image)
-container-image: build
-	@docker buildx build --platform linux/$(LOCALARCH) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) .
+PHONY += container-image
+LOCAL_BUILDERS += container-image
+container-image: binary
+	@docker buildx build --platform linux/$(LOCALARCH) -t $(CONTAINER_IMAGE_TAG) --load $(CONTAINER_BUILD_ARGS) .
 
-PHONY += (container-image-tag)
+PHONY += container-image-tag
 container-image-tag:
 	@echo $(CONTAINER_IMAGE_TAG)
 
 CONTAINER_MANIFEST_PUSH ?= false
 
-PHONY += (container-manifest-image)
+PHONY += container-manifest
+ALL_BUILDERS += container-manifest
 container-manifest: PUSH_ARG = $(if $(findstring t,$(CONTAINER_MANIFEST_PUSH)),--push)
-container-manifest: $(CONTAINER_PLATFORMS:%=$(BUILD_DIR)/%/$(BINARY_NAME))
+container-manifest: $(CONTAINER_PLATFORMS:%=$(BINARY_DIR)/%/$(BINARY_NAME))
 	@docker buildx build $(CONTAINER_PLATFORMS:%=--platform %) $(PUSH_ARG) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) .
 
-PHONY += (clean)
+PHONY += clean
 CLEANERS += clean
 clean:
-	@rm -rf $(BUILD_DIR)
+	@rm -rf $(BUILD_DIR) $(WORKING_DIR)
 	@docker image rm -f $(CONTAINER_IMAGE_TAG) 2> /dev/null > /dev/null || true
 
 # When e2e tests fail during setup or teardown, they can leave resources behind.
 # This target is intended to clean up those resources.
-PHONY += (clean-e2e)
+PHONY += clean-e2e
 CLEANERS += clean-e2e
 clean-e2e: FILTERS = name=my-cluster* name=registry*
 clean-e2e: GET_CONTAINERS = docker ps $(FILTERS:%=-f "%") -a -q
@@ -169,17 +180,23 @@ $(DR_SCHEMAS_DIR):
 	@mkdir -p "$@"
 
 $(DR_SCHEMAS_DIR)/%.schema.json: MAYBE_PRETTIFY = $(if $(findstring t,$(DR_SCHEMAS_PRETTY)),| jq)
-$(DR_SCHEMAS_DIR)/%.schema.json: build $(DR_SCHEMAS_DIR)
+$(DR_SCHEMAS_DIR)/%.schema.json: binary $(DR_SCHEMAS_DIR)
 	@$(LOCAL_BINARY_PATH) dr $* gen-config-schema $(MAYBE_PRETTIFY) > "$@"
 
-PHONY += (generate-dr-schemas)
+PHONY += build
+build: $(LOCAL_BUILDERS)
+
+PHONY += build-all
+build-all: $(ALL_BUILDERS)
+
+PHONY += generate-dr-schemas
 GENERATORS += generate-dr-schemas
 generate-dr-schemas: $(DR_SCHEMAS:%=$(DR_SCHEMAS_DIR)/%.schema.json)
 
-PHONY += (clean-all)
+PHONY += clean-all
 generate-all: $(GENERATORS)
 
-PHONY += (clean-all)
+PHONY += clean-all
 clean-all: $(CLEANERS)
 
 .PHONY: $(PHONY)

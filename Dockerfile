@@ -14,7 +14,7 @@ RUN apt update && \
 # Install the tool
 ARG TARGETOS
 ARG TARGETARCH
-ARG SOURCE_BINARY_PATH="build/${TARGETOS}/${TARGETARCH}/backup-tool"
+ARG SOURCE_BINARY_PATH="build/binaries/${TARGETOS}/${TARGETARCH}/backup-tool"
 COPY "${SOURCE_BINARY_PATH}" /bin/backup-tool
 
 # Configure runtime settings
