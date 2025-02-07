@@ -136,9 +136,10 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 		return backup, trace.Wrap(err, "failed to create client for backup tool GRPC server")
 	}
 
-	err = backupToolClient.Files().SyncFiles(ctx, clonedVolumeMountPath, drVolumeMountPath)
+	drDataVolPath := filepath.Join(drVolumeMountPath, "data-vol")
+	err = backupToolClient.Files().SyncFiles(ctx, clonedVolumeMountPath, drDataVolPath)
 	if err != nil {
-		return backup, trace.Wrap(err, "failed to sync data directory files at %q to the disaster recovery volume at %q", clonedVolumeMountPath, drVolumeMountPath)
+		return backup, trace.Wrap(err, "failed to sync data directory files at %q to the disaster recovery volume at %q", clonedVolumeMountPath, drDataVolPath)
 	}
 
 	// 6. Perform a CNPG logical backup with PITR set to the PVC snapshot time
