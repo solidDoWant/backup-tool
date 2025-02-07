@@ -1,14 +1,17 @@
 package servers
 
 import (
+	"context"
 	"fmt"
 	"net"
-	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	grpchealth_v1 "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func TestStartServerListener(t *testing.T) {
@@ -71,6 +74,7 @@ func TestRegisterServers(t *testing.T) {
 	// Verify all services are registered
 	assert.Contains(t, serviceInfo, "Files")
 	assert.Contains(t, serviceInfo, "Postgres")
+	assert.Contains(t, serviceInfo, "grpc.health.v1.Health")
 }
 
 func TestStartServer(t *testing.T) {
@@ -132,7 +136,7 @@ func TestStartServer(t *testing.T) {
 			select {
 			case serverErr = <-errChan:
 				// Assume the server has failed to start
-			case <-time.After(3 * time.Millisecond):
+			case <-time.After(100 * time.Millisecond):
 				// Assume server started successfully
 			}
 
@@ -145,10 +149,15 @@ func TestStartServer(t *testing.T) {
 			assert.True(t, calledStartServerListener)
 			assert.True(t, calledRegisterServers)
 
-			// Try connecting to verify server is running
-			conn, err := net.DialTCP("tcp", nil, net.TCPAddrFromAddrPort(netip.MustParseAddrPort(address)))
-			assert.NoError(t, err)
+			// Try connecting to verify server is running, and reportedly healthy
+			conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			require.NoError(t, err)
 			defer conn.Close()
+
+			client := grpchealth_v1.NewHealthClient(conn)
+			resp, err := client.Check(context.Background(), &grpchealth_v1.HealthCheckRequest{Service: ""})
+			require.NoError(t, err)
+			assert.Equal(t, grpchealth_v1.HealthCheckResponse_SERVING, resp.Status)
 
 			assert.NotNil(t, conn)
 		})

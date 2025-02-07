@@ -80,6 +80,19 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 			Run()
 	}
 
+	probe := &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			GRPC: &corev1.GRPCAction{
+				Port:    servers.GRPCPort,
+				Service: ptr.To(servers.SystemService),
+			},
+		},
+		TimeoutSeconds:   1,
+		PeriodSeconds:    3,
+		SuccessThreshold: 1,
+		FailureThreshold: 2, // TODO maybe set this to 1. If the probe fails three seconds apart, then it's probably not going to succeed on the next try.
+	}
+
 	container := corev1.Container{
 		Name:         constants.ToolName,
 		Image:        constants.FullImageName,
@@ -97,7 +110,9 @@ func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, inst
 		// This does not require root on the host - just on the container.
 		// Note: this is not compatible with pod-security.kubernetes.io/enforce: baseline
 		SecurityContext: core.PrivilegedContainerSecurityContext(),
-		ImagePullPolicy: corev1.PullAlways, // TODO DEBUGGING REMOVE
+		StartupProbe:    probe,
+		ReadinessProbe:  probe,
+		LivenessProbe:   probe,
 	}
 
 	pod := &corev1.Pod{
