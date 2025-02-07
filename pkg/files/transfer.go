@@ -70,12 +70,18 @@ func (lr *LocalRuntime) SyncFiles(ctx context.Context, src, dest string) error {
 		return err
 	}
 
-	// If the source is not a directory, don't attempt to walk over it
-	fileInfo, err := os.Lstat(src)
+	// If the source is not a directory, or destination does not exist yet, don't attempt to walk over the destination
+	srcFileInfo, err := os.Lstat(src)
 	if err != nil {
 		return trace.Wrap(err, "failed to get file info for %q", src)
 	}
-	if fileInfo.IsDir() {
+
+	_, err = os.Lstat(dest)
+	if err != nil && !os.IsNotExist(err) {
+		return trace.Wrap(err, "failed to get file info for %q", dest)
+	}
+
+	if srcFileInfo.IsDir() && err == nil {
 		// Delete all files that don't exist in the source
 		err := filepath.WalkDir(dest, func(pathInDest string, d fs.DirEntry, err error) error {
 			if err != nil {
