@@ -93,9 +93,15 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 
 	// 3. Clone the CNPG cluster
 	clonedClusterName := helpers.CleanName(fmt.Sprintf("%s-%s", cnpgClusterName, backup.GetFullName()))
+
 	if backupOptions.CloneClusterOptions.CleanupTimeout == 0 {
 		backupOptions.CloneClusterOptions.CleanupTimeout = backupOptions.CleanupTimeout
 	}
+
+	if backupOptions.CloneClusterOptions.RecoveryTargetTime == "" {
+		backupOptions.CloneClusterOptions.RecoveryTargetTime = clonedPVC.CreationTimestamp.Format(time.RFC3339)
+	}
+
 	clonedCluster, err := vw.kubernetesClient.CloneCluster(ctx, namespace, cnpgClusterName,
 		clonedClusterName, servingCertIssuerName, clientCertIssuerName,
 		backupOptions.CloneClusterOptions)

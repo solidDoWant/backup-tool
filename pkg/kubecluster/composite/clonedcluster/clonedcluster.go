@@ -78,7 +78,7 @@ type CloneClusterOptions struct {
 	WaitForBackupTimeout  helpers.MaxWaitTime             `yaml:"waitForBackupTimeout,omitempty"`
 	Certificates          CloneClusterOptionsCertificates `yaml:"certificates,omitempty"`
 	ClientCAIssuer        CloneClusterOptionsCAIssuer     `yaml:"clientCAIssuer,omitempty"`
-	RecoveryTargetTime    string                          `yaml:"recoveryTargetTime,omitempty"`
+	RecoveryTargetTime    string                          `yaml:"recoveryTargetTime,omitempty" jsonschema:"description=The time to roll back to in RFC3339 format"`
 	WaitForClusterTimeout helpers.MaxWaitTime             `yaml:"waitForClusterTimeout,omitempty"`
 	CleanupTimeout        helpers.MaxWaitTime             `yaml:"cleanupTimeout,omitempty"`
 	// TODO maybe provide an option for additional client auth CAs?

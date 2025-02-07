@@ -141,7 +141,8 @@
           "$ref": "#/$defs/CloneClusterOptionsCAIssuer"
         },
         "RecoveryTargetTime": {
-          "type": "string"
+          "type": "string",
+          "description": "The time to roll back to in RFC3339 format"
         },
         "WaitForClusterTimeout": {
           "type": "integer"
