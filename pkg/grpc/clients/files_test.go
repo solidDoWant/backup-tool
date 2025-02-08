@@ -1,11 +1,11 @@
 package clients
 
 import (
-	"context"
 	"testing"
 
 	"github.com/solidDoWant/backup-tool/pkg/files"
 	files_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/files/v1"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
@@ -62,7 +62,8 @@ func TestFilesClient_CopyFiles(t *testing.T) {
 	dest := "dest"
 	FilesTransferTest(t,
 		func(fc *FilesClient) error {
-			return fc.CopyFiles(context.Background(), src, dest)
+			ctx := th.NewTestContext()
+			return fc.CopyFiles(ctx, src, dest)
 		},
 		"CopyFiles",
 		files_v1.CopyFilesRequest_builder{Source: &src, Dest: &dest}.Build(),
@@ -75,7 +76,8 @@ func TestFilesClient_SyncFiles(t *testing.T) {
 	dest := "dest"
 	FilesTransferTest(t,
 		func(fc *FilesClient) error {
-			return fc.SyncFiles(context.Background(), src, dest)
+			ctx := th.NewTestContext()
+			return fc.SyncFiles(ctx, src, dest)
 		},
 		"SyncFiles",
 		files_v1.SyncFilesRequest_builder{Source: &src, Dest: &dest}.Build(),

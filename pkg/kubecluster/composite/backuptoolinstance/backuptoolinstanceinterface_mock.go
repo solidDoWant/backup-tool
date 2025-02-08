@@ -3,8 +3,7 @@
 package backuptoolinstance
 
 import (
-	context "context"
-
+	contexts "github.com/solidDoWant/backup-tool/pkg/contexts"
 	clients "github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 
 	mock "github.com/stretchr/testify/mock"
@@ -26,7 +25,7 @@ func (_m *MockBackupToolInstanceInterface) EXPECT() *MockBackupToolInstanceInter
 }
 
 // Delete provides a mock function with given fields: ctx
-func (_m *MockBackupToolInstanceInterface) Delete(ctx context.Context) error {
+func (_m *MockBackupToolInstanceInterface) Delete(ctx *contexts.Context) error {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
@@ -34,7 +33,7 @@ func (_m *MockBackupToolInstanceInterface) Delete(ctx context.Context) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context) error); ok {
 		r0 = rf(ctx)
 	} else {
 		r0 = ret.Error(0)
@@ -49,14 +48,14 @@ type MockBackupToolInstanceInterface_Delete_Call struct {
 }
 
 // Delete is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 func (_e *MockBackupToolInstanceInterface_Expecter) Delete(ctx interface{}) *MockBackupToolInstanceInterface_Delete_Call {
 	return &MockBackupToolInstanceInterface_Delete_Call{Call: _e.mock.On("Delete", ctx)}
 }
 
-func (_c *MockBackupToolInstanceInterface_Delete_Call) Run(run func(ctx context.Context)) *MockBackupToolInstanceInterface_Delete_Call {
+func (_c *MockBackupToolInstanceInterface_Delete_Call) Run(run func(ctx *contexts.Context)) *MockBackupToolInstanceInterface_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(*contexts.Context))
 	})
 	return _c
 }
@@ -66,13 +65,13 @@ func (_c *MockBackupToolInstanceInterface_Delete_Call) Return(_a0 error) *MockBa
 	return _c
 }
 
-func (_c *MockBackupToolInstanceInterface_Delete_Call) RunAndReturn(run func(context.Context) error) *MockBackupToolInstanceInterface_Delete_Call {
+func (_c *MockBackupToolInstanceInterface_Delete_Call) RunAndReturn(run func(*contexts.Context) error) *MockBackupToolInstanceInterface_Delete_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetGRPCClient provides a mock function with given fields: ctx, searchDomains
-func (_m *MockBackupToolInstanceInterface) GetGRPCClient(ctx context.Context, searchDomains ...string) (clients.ClientInterface, error) {
+func (_m *MockBackupToolInstanceInterface) GetGRPCClient(ctx *contexts.Context, searchDomains ...string) (clients.ClientInterface, error) {
 	_va := make([]interface{}, len(searchDomains))
 	for _i := range searchDomains {
 		_va[_i] = searchDomains[_i]
@@ -88,10 +87,10 @@ func (_m *MockBackupToolInstanceInterface) GetGRPCClient(ctx context.Context, se
 
 	var r0 clients.ClientInterface
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ...string) (clients.ClientInterface, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, ...string) (clients.ClientInterface, error)); ok {
 		return rf(ctx, searchDomains...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ...string) clients.ClientInterface); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, ...string) clients.ClientInterface); ok {
 		r0 = rf(ctx, searchDomains...)
 	} else {
 		if ret.Get(0) != nil {
@@ -99,7 +98,7 @@ func (_m *MockBackupToolInstanceInterface) GetGRPCClient(ctx context.Context, se
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, ...string) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, ...string) error); ok {
 		r1 = rf(ctx, searchDomains...)
 	} else {
 		r1 = ret.Error(1)
@@ -114,14 +113,14 @@ type MockBackupToolInstanceInterface_GetGRPCClient_Call struct {
 }
 
 // GetGRPCClient is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - searchDomains ...string
 func (_e *MockBackupToolInstanceInterface_Expecter) GetGRPCClient(ctx interface{}, searchDomains ...interface{}) *MockBackupToolInstanceInterface_GetGRPCClient_Call {
 	return &MockBackupToolInstanceInterface_GetGRPCClient_Call{Call: _e.mock.On("GetGRPCClient",
 		append([]interface{}{ctx}, searchDomains...)...)}
 }
 
-func (_c *MockBackupToolInstanceInterface_GetGRPCClient_Call) Run(run func(ctx context.Context, searchDomains ...string)) *MockBackupToolInstanceInterface_GetGRPCClient_Call {
+func (_c *MockBackupToolInstanceInterface_GetGRPCClient_Call) Run(run func(ctx *contexts.Context, searchDomains ...string)) *MockBackupToolInstanceInterface_GetGRPCClient_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		variadicArgs := make([]string, len(args)-1)
 		for i, a := range args[1:] {
@@ -129,7 +128,7 @@ func (_c *MockBackupToolInstanceInterface_GetGRPCClient_Call) Run(run func(ctx c
 				variadicArgs[i] = a.(string)
 			}
 		}
-		run(args[0].(context.Context), variadicArgs...)
+		run(args[0].(*contexts.Context), variadicArgs...)
 	})
 	return _c
 }
@@ -139,7 +138,7 @@ func (_c *MockBackupToolInstanceInterface_GetGRPCClient_Call) Return(_a0 clients
 	return _c
 }
 
-func (_c *MockBackupToolInstanceInterface_GetGRPCClient_Call) RunAndReturn(run func(context.Context, ...string) (clients.ClientInterface, error)) *MockBackupToolInstanceInterface_GetGRPCClient_Call {
+func (_c *MockBackupToolInstanceInterface_GetGRPCClient_Call) RunAndReturn(run func(*contexts.Context, ...string) (clients.ClientInterface, error)) *MockBackupToolInstanceInterface_GetGRPCClient_Call {
 	_c.Call.Return(run)
 	return _c
 }

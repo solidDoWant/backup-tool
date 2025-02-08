@@ -1,13 +1,12 @@
 package backuptoolinstance
 
 import (
-	context "context"
-
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 )
 
 type ProviderInterface interface {
-	CreateBackupToolInstance(ctx context.Context, namespace, instance string, opts CreateBackupToolInstanceOptions) (btInstance BackupToolInstanceInterface, err error)
+	CreateBackupToolInstance(ctx *contexts.Context, namespace, instance string, opts CreateBackupToolInstanceOptions) (btInstance BackupToolInstanceInterface, err error)
 }
 
 type providerInterfaceInternal interface {

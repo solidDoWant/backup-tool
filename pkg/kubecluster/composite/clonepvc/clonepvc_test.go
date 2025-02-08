@@ -1,10 +1,10 @@
 package clonepvc
 
 import (
-	context "context"
 	"testing"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
@@ -366,7 +366,7 @@ func TestClonePVC(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			p := newMockProvider(t)
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			// This makes the logic for setting up mocks/expected calls easier, because once an error
 			// becomes expected, the function can be returned from
@@ -378,7 +378,7 @@ func TestClonePVC(t *testing.T) {
 					return
 				}
 
-				p.esClient.EXPECT().DeleteSnapshot(mock.Anything, namespace, snapshotName).RunAndReturn(func(cleanupCtx context.Context, _, _ string) error {
+				p.esClient.EXPECT().DeleteSnapshot(mock.Anything, namespace, snapshotName).RunAndReturn(func(cleanupCtx *contexts.Context, _, _ string) error {
 					require.NotEqual(t, ctx, cleanupCtx)
 					return nil
 				})
@@ -389,7 +389,7 @@ func TestClonePVC(t *testing.T) {
 					return
 				}
 
-				p.coreClient.EXPECT().GetPVC(ctx, namespace, pvcName).RunAndReturn(func(ctx context.Context, namespace, pvcName string) (*corev1.PersistentVolumeClaim, error) {
+				p.coreClient.EXPECT().GetPVC(ctx, namespace, pvcName).RunAndReturn(func(ctx *contexts.Context, namespace, pvcName string) (*corev1.PersistentVolumeClaim, error) {
 					if tt.initialPVC != nil {
 						return th.ErrOr1Val(tt.initialPVC, tt.simulateQueryExistingErr)
 					}
@@ -424,7 +424,7 @@ func TestClonePVC(t *testing.T) {
 				}
 
 				p.coreClient.EXPECT().CreatePVC(ctx, namespace, newPVCName, size, opts).
-					RunAndReturn(func(ctx context.Context, s1, s2 string, q resource.Quantity, cp core.CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+					RunAndReturn(func(ctx *contexts.Context, namespace, newPVCName string, size resource.Quantity, opts core.CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
 						pvc := tt.clonedPVC
 						if pvc == nil {
 							pvc = tt.expectedPVC
@@ -445,7 +445,7 @@ func TestClonePVC(t *testing.T) {
 				}
 
 				p.coreClient.EXPECT().CreatePod(ctx, namespace, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
+					RunAndReturn(func(ctx *contexts.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
 						assert.Contains(t, pod.Name, "force-bind")
 						assert.Len(t, pod.Spec.Containers, 1)
 						assert.Len(t, pod.Spec.Volumes, 1)

@@ -44,9 +44,10 @@ func decodeDumpAllOptions(encodedOptions *postgres_v1.DumpAllOptions) postgres.D
 }
 
 func (ps *PostgresServer) DumpAll(ctx context.Context, req *postgres_v1.DumpAllRequest) (*postgres_v1.DumpAllResponse, error) {
-	err := ps.runtime.DumpAll(ctx, decodeCredentials(req.GetCredentials()), req.GetOutputFilePath(), decodeDumpAllOptions(req.GetOptions()))
+	grpcCtx := detatchHandlerContext(ctx)
+	err := ps.runtime.DumpAll(grpcCtx, decodeCredentials(req.GetCredentials()), req.GetOutputFilePath(), decodeDumpAllOptions(req.GetOptions()))
 	if err != nil {
-		return nil, trail.Send(ctx, err)
+		return nil, trail.Send(grpcCtx, err)
 	}
 
 	return &postgres_v1.DumpAllResponse{}, nil

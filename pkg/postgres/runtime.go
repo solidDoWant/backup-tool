@@ -1,15 +1,16 @@
 package postgres
 
 import (
-	"context"
 	"io"
 	"os"
 	"os/exec"
+
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 )
 
 // Represents a place (i.e. local or remote) where commands can run.
 type Runtime interface {
-	DumpAll(context.Context, Credentials, string, DumpAllOptions) error
+	DumpAll(*contexts.Context, Credentials, string, DumpAllOptions) error
 }
 
 type LocalRuntime struct {

@@ -1,7 +1,6 @@
 package disasterrecovery
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +8,7 @@ import (
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
@@ -177,7 +177,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				kubernetesClient: mockClient,
 			}
 
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			wantErr := th.ErrExpected(
 				tt.simulateClonePVCError,
@@ -199,7 +199,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				// Step 1
 				var fullBackupName string
 				mockClient.EXPECT().ClonePVC(ctx, namespace, dataPVC, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace, dataPVC string, opts clonepvc.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+					RunAndReturn(func(ctx *contexts.Context, namespace, dataPVC string, opts clonepvc.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error) {
 						fullBackupName = opts.DestPvcNamePrefix
 						require.True(t, strings.HasPrefix(fullBackupName, backupName))
 						require.Equal(t, tt.backupOptions.CleanupTimeout, opts.CleanupTimeout)
@@ -208,14 +208,14 @@ func TestVaultWardenBackup(t *testing.T) {
 				if tt.simulateClonePVCError {
 					return
 				}
-				mockCoreClient.EXPECT().DeletePVC(mock.Anything, namespace, clonedPVCName).RunAndReturn(func(cleanupCtx context.Context, _, _ string) error {
+				mockCoreClient.EXPECT().DeletePVC(mock.Anything, namespace, clonedPVCName).RunAndReturn(func(cleanupCtx *contexts.Context, _, _ string) error {
 					require.NotEqual(t, ctx, cleanupCtx)
 					return th.ErrIfTrue(tt.simulatePVCCleanupError)
 				})
 
 				// Step 2
 				mockCoreClient.EXPECT().EnsurePVCExists(ctx, namespace, backupName, mock.Anything, core.CreatePVCOptions{StorageClassName: tt.backupOptions.VolumeStorageClass}).
-					RunAndReturn(func(ctx context.Context, namespace, pvcName string, size resource.Quantity, opts core.CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+					RunAndReturn(func(ctx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts core.CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
 						require.Equal(t, backupName, pvcName)
 						require.GreaterOrEqual(t, size.AsFloat64Slow(), ptr.To(clonedPVC.Spec.Resources.Requests[corev1.ResourceStorage]).AsFloat64Slow())
 						return th.ErrOr1Val(clonedPVC, tt.simulateEnsurePVCError)
@@ -226,7 +226,7 @@ func TestVaultWardenBackup(t *testing.T) {
 
 				// Step 3
 				mockClient.EXPECT().CloneCluster(ctx, namespace, clusterName, mock.Anything, servingIssuerName, clientIssuerName, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
+					RunAndReturn(func(ctx *contexts.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
 						require.True(t, strings.Contains(newClusterName, existingClusterName))
 						require.True(t, strings.Contains(newClusterName, helpers.CleanName(fullBackupName)))
 
@@ -235,7 +235,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				if tt.simulateCloneClusterErr {
 					return
 				}
-				clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx context.Context) error {
+				clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
 					require.NotEqual(t, ctx, cleanupCtx)
 					return th.ErrIfTrue(tt.simulateCloneClusterCleanupErr)
 				})
@@ -246,7 +246,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				clonedCluster.EXPECT().GetPostgresUserCert().Return(userCert)
 				userCert.EXPECT().GetCertificate().Return(&postgresCertificate)
 				mockClient.EXPECT().CreateBackupToolInstance(ctx, namespace, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace, instance string, opts backuptoolinstance.CreateBackupToolInstanceOptions) (backuptoolinstance.BackupToolInstanceInterface, error) {
+					RunAndReturn(func(ctx *contexts.Context, namespace, instance string, opts backuptoolinstance.CreateBackupToolInstanceOptions) (backuptoolinstance.BackupToolInstanceInterface, error) {
 						require.Contains(t, opts.NamePrefix, fullBackupName)
 						require.Contains(t, opts.NamePrefix, constants.ToolName)
 						// TODO add test to ensure that the secrets are attached, along with the DR and cloned data PVCs
@@ -256,13 +256,13 @@ func TestVaultWardenBackup(t *testing.T) {
 				if tt.simulateBTICreateError {
 					return
 				}
-				btInstance.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx context.Context) error {
+				btInstance.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
 					require.NotEqual(t, ctx, cleanupCtx)
 					return th.ErrIfTrue(tt.simulateBTICleanupError)
 				})
 
 				// Step 5
-				btInstance.EXPECT().GetGRPCClient(ctx, mock.Anything).RunAndReturn(func(ctx context.Context, searchDomains ...string) (clients.ClientInterface, error) {
+				btInstance.EXPECT().GetGRPCClient(ctx, mock.Anything).RunAndReturn(func(ctx *contexts.Context, searchDomains ...string) (clients.ClientInterface, error) {
 					require.Equal(t, tt.backupOptions.ClusterServiceSearchDomains, searchDomains)
 					return th.ErrOr1Val(mockGRPCClient, tt.simulateGRPCClientErr)
 				})
@@ -270,7 +270,7 @@ func TestVaultWardenBackup(t *testing.T) {
 					return
 				}
 
-				mockFilesRuntime.EXPECT().SyncFiles(ctx, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, src, dest string) error {
+				mockFilesRuntime.EXPECT().SyncFiles(ctx, mock.Anything, mock.Anything).RunAndReturn(func(ctx *contexts.Context, src, dest string) error {
 					require.NotEqual(t, src, dest)
 					require.True(t, strings.HasPrefix(src, baseMountPath))
 					require.True(t, strings.HasPrefix(dest, baseMountPath))
@@ -296,7 +296,7 @@ func TestVaultWardenBackup(t *testing.T) {
 
 				// Step 7
 				mockESClient.EXPECT().SnapshotVolume(ctx, namespace, clonedPVCName, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace, pvcName string, opts externalsnapshotter.SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error) {
+					RunAndReturn(func(ctx *contexts.Context, namespace, pvcName string, opts externalsnapshotter.SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error) {
 						require.Equal(t, helpers.CleanName(fullBackupName), opts.Name)
 						require.Equal(t, tt.backupOptions.BackupSnapshot.SnapshotClass, opts.SnapshotClass)
 
@@ -312,7 +312,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				}
 
 				mockESClient.EXPECT().WaitForReadySnapshot(ctx, namespace, mock.Anything, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: tt.backupOptions.BackupSnapshot.ReadyTimeout}).
-					RunAndReturn(func(ctx context.Context, namespace, snapsnotName string, wfrso externalsnapshotter.WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error) {
+					RunAndReturn(func(ctx *contexts.Context, namespace, snapsnotName string, wfrso externalsnapshotter.WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error) {
 						require.Equal(t, fullBackupName, snapsnotName)
 						return th.ErrOr1Val(&volumesnapshotv1.VolumeSnapshot{}, tt.simulateWaitSnapErr)
 					})

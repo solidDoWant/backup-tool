@@ -1,7 +1,6 @@
 package backuptoolinstance
 
 import (
-	context "context"
 	"fmt"
 	"net"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/servers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
@@ -24,8 +24,8 @@ type BackupToolInstanceInterface interface {
 	GetPod() *corev1.Pod
 	setService(service *corev1.Service)
 	GetService() *corev1.Service
-	GetGRPCClient(ctx context.Context, searchDomains ...string) (clients.ClientInterface, error)
-	Delete(ctx context.Context) error
+	GetGRPCClient(ctx *contexts.Context, searchDomains ...string) (clients.ClientInterface, error)
+	Delete(ctx *contexts.Context) error
 }
 
 type BackupToolInstance struct {
@@ -63,7 +63,7 @@ type CreateBackupToolInstanceOptions struct {
 	ServiceWaitTimeout helpers.MaxWaitTime          `yaml:"serviceWaitTimeout,omitempty"`
 }
 
-func (p *Provider) CreateBackupToolInstance(ctx context.Context, namespace, instance string, opts CreateBackupToolInstanceOptions) (btInstance BackupToolInstanceInterface, err error) {
+func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, instance string, opts CreateBackupToolInstanceOptions) (btInstance BackupToolInstanceInterface, err error) {
 	btInstance = p.newBackupToolInstance()
 
 	namePrefix := opts.NamePrefix
@@ -192,7 +192,7 @@ func (b *BackupToolInstance) GetService() *corev1.Service {
 	return b.service
 }
 
-func (b *BackupToolInstance) GetGRPCClient(ctx context.Context, searchDomains ...string) (clients.ClientInterface, error) {
+func (b *BackupToolInstance) GetGRPCClient(ctx *contexts.Context, searchDomains ...string) (clients.ClientInterface, error) {
 	endpoint, err := b.findReachableServiceAddress(searchDomains)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to find reachable service address for backup tool instance")
@@ -260,7 +260,7 @@ func (b *BackupToolInstance) findReachableServiceAddress(searchDomains []string)
 	return "", trace.NotFound("no reachable service address found")
 }
 
-func (b *BackupToolInstance) Delete(ctx context.Context) error {
+func (b *BackupToolInstance) Delete(ctx *contexts.Context) error {
 	cleanupErrs := make([]error, 0, 2)
 
 	if b.pod != nil {

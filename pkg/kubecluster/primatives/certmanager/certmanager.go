@@ -1,7 +1,6 @@
 package certmanager
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
@@ -32,7 +32,7 @@ type CreateCertificateOptions struct {
 	KeyAlgorithm  certmanagerv1.PrivateKeyAlgorithm
 }
 
-func (cmc *Client) CreateCertificate(ctx context.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
 	certificate := &certmanagerv1.Certificate{
 		Spec: certmanagerv1.CertificateSpec{
 			IsCA:                  opts.IsCA,
@@ -97,8 +97,8 @@ type WaitForReadyCertificateOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (cmc *Client) WaitForReadyCertificate(ctx context.Context, namespace, name string, opts WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error) {
-	precondition := func(ctx context.Context, certificate *certmanagerv1.Certificate) (*certmanagerv1.Certificate, bool, error) {
+func (cmc *Client) WaitForReadyCertificate(ctx *contexts.Context, namespace, name string, opts WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error) {
+	precondition := func(ctx *contexts.Context, certificate *certmanagerv1.Certificate) (*certmanagerv1.Certificate, bool, error) {
 		isReady := false
 		for _, condition := range certificate.Status.Conditions {
 			if condition.Type != certmanagerv1.CertificateConditionReady {
@@ -124,7 +124,7 @@ func (cmc *Client) WaitForReadyCertificate(ctx context.Context, namespace, name 
 }
 
 // Trigger an immediate re-issuance of a certificate
-func (cmc *Client) ReissueCertificate(ctx context.Context, namespace, name string) (*certmanagerv1.Certificate, error) {
+func (cmc *Client) ReissueCertificate(ctx *contexts.Context, namespace, name string) (*certmanagerv1.Certificate, error) {
 	var updatedCert *certmanagerv1.Certificate
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		cert, err := cmc.client.CertmanagerV1().Certificates(namespace).Get(ctx, name, metav1.GetOptions{})
@@ -143,7 +143,7 @@ func (cmc *Client) ReissueCertificate(ctx context.Context, namespace, name strin
 	return updatedCert, nil
 }
 
-func (cmc *Client) DeleteCertificate(ctx context.Context, namespace, name string) error {
+func (cmc *Client) DeleteCertificate(ctx *contexts.Context, namespace, name string) error {
 	err := cmc.client.CertmanagerV1().Certificates(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete certificate %q", helpers.FullNameStr(namespace, name))
 }
@@ -152,7 +152,7 @@ type CreateIssuerOptions struct {
 	helpers.GenerateName
 }
 
-func (cmc *Client) CreateIssuer(ctx context.Context, namespace, name, caCertSecretName string, opts CreateIssuerOptions) (*certmanagerv1.Issuer, error) {
+func (cmc *Client) CreateIssuer(ctx *contexts.Context, namespace, name, caCertSecretName string, opts CreateIssuerOptions) (*certmanagerv1.Issuer, error) {
 	issuer := &certmanagerv1.Issuer{
 		Spec: certmanagerv1.IssuerSpec{
 			IssuerConfig: certmanagerv1.IssuerConfig{
@@ -177,8 +177,8 @@ type WaitForReadyIssuerOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (cmc *Client) WaitForReadyIssuer(ctx context.Context, namespace, name string, opts WaitForReadyIssuerOpts) (*certmanagerv1.Issuer, error) {
-	precondition := func(ctx context.Context, issuer *certmanagerv1.Issuer) (*certmanagerv1.Issuer, bool, error) {
+func (cmc *Client) WaitForReadyIssuer(ctx *contexts.Context, namespace, name string, opts WaitForReadyIssuerOpts) (*certmanagerv1.Issuer, error) {
+	precondition := func(ctx *contexts.Context, issuer *certmanagerv1.Issuer) (*certmanagerv1.Issuer, bool, error) {
 		isReady := false
 		for _, condition := range issuer.Status.Conditions {
 			if condition.Type != certmanagerv1.IssuerConditionReady {
@@ -203,7 +203,7 @@ func (cmc *Client) WaitForReadyIssuer(ctx context.Context, namespace, name strin
 	return issuer, nil
 }
 
-func (cmc *Client) DeleteIssuer(ctx context.Context, namespace, name string) error {
+func (cmc *Client) DeleteIssuer(ctx *contexts.Context, namespace, name string) error {
 	err := cmc.client.CertmanagerV1().Issuers(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete issuer %q", helpers.FullNameStr(namespace, name))
 }

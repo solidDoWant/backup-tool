@@ -1,16 +1,16 @@
 package createcrpforcertificate
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
-	"github.com/solidDoWant/backup-tool/pkg/testhelpers"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -208,13 +208,13 @@ func TestCreateCRPForCertificate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			c := newMockProvider(t)
 
 			func() {
 				var crp *policyv1alpha1.CertificateRequestPolicy
 				c.apClient.EXPECT().CreateCertificateRequestPolicy(ctx, tt.cert.Name, mock.Anything, approverpolicy.CreateCertificateRequestPolicyOptions{GenerateName: true}).
-					RunAndReturn(func(ctx context.Context, name string, spec policyv1alpha1.CertificateRequestPolicySpec, opts approverpolicy.CreateCertificateRequestPolicyOptions) (*policyv1alpha1.CertificateRequestPolicy, error) {
+					RunAndReturn(func(ctx *contexts.Context, name string, spec policyv1alpha1.CertificateRequestPolicySpec, opts approverpolicy.CreateCertificateRequestPolicyOptions) (*policyv1alpha1.CertificateRequestPolicy, error) {
 						crp = &policyv1alpha1.CertificateRequestPolicy{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: name,
@@ -222,20 +222,20 @@ func TestCreateCRPForCertificate(t *testing.T) {
 							Spec: spec,
 						}
 
-						return testhelpers.ErrOr1Val(crp, tt.simulateCreateCertificateRequestPolicyError)
+						return th.ErrOr1Val(crp, tt.simulateCreateCertificateRequestPolicyError)
 					})
 				if tt.simulateCreateCertificateRequestPolicyError {
 					return
 				}
 
 				c.apClient.EXPECT().WaitForReadyCertificateRequestPolicy(ctx, tt.cert.Name, approverpolicy.WaitForReadyCertificateRequestPolicyOpts{MaxWaitTime: tt.opts.MaxWaitTime}).
-					RunAndReturn(func(ctx context.Context, name string, wfrcrpo approverpolicy.WaitForReadyCertificateRequestPolicyOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
-						return testhelpers.ErrOr1Val(crp, tt.simulateWaitForReadyCertificateRequestPolicyError)
+					RunAndReturn(func(ctx *contexts.Context, name string, wfrcrpo approverpolicy.WaitForReadyCertificateRequestPolicyOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
+						return th.ErrOr1Val(crp, tt.simulateWaitForReadyCertificateRequestPolicyError)
 					})
 			}()
 
 			createdCRP, err := c.CreateCRPForCertificate(ctx, tt.cert, tt.opts)
-			if testhelpers.ErrExpected(tt.simulateCreateCertificateRequestPolicyError, tt.simulateWaitForReadyCertificateRequestPolicyError) {
+			if th.ErrExpected(tt.simulateCreateCertificateRequestPolicyError, tt.simulateWaitForReadyCertificateRequestPolicyError) {
 				assert.Error(t, err)
 				assert.Nil(t, createdCRP)
 				return

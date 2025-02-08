@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 )
 
 var DefaultCleanupTimeout = 10 * time.Minute
@@ -25,19 +26,22 @@ func To(cleanupLogic func() error) *Cleanup {
 	}
 }
 
-func WithTimeoutTo(timeout time.Duration, cleanupLogic func(context.Context) error) *Cleanup {
-	return &Cleanup{
+func WithTimeoutTo(timeout time.Duration, cleanupLogic func(*contexts.Context) error) *Cleanup {
+	c := &Cleanup{
 		cleanupLogic: func() error {
 			if timeout == 0 {
 				timeout = DefaultCleanupTimeout
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			ctx := contexts.NewContext(context.Background())
+			ctx, cancel := contexts.WithTimeout(ctx, timeout)
 			defer cancel()
 
 			return cleanupLogic(ctx)
 		},
 	}
+
+	return c
 }
 
 func (c *Cleanup) WithErrMessage(errMessage string, args ...interface{}) *Cleanup {

@@ -1,11 +1,11 @@
 package clients
 
 import (
-	"context"
 	"net"
 
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	"google.golang.org/grpc"
@@ -24,7 +24,7 @@ type Client struct {
 	postgres *PostgresClient
 }
 
-func NewClient(ctx context.Context, serverAddress string) (ClientInterface, error) {
+func NewClient(ctx *contexts.Context, serverAddress string) (ClientInterface, error) {
 	// Leave authz to be handled by other cluster services, such as Istio.
 	// TODO add option for this
 	conn, err := grpc.NewClient(serverAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))

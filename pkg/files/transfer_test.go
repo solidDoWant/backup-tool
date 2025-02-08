@@ -1,7 +1,6 @@
 package files
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/user"
@@ -9,6 +8,7 @@ import (
 	"syscall"
 	"testing"
 
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -310,7 +310,7 @@ func TestCopyFiles(t *testing.T) {
 				tC.setup(t, tC.src, tC.dest)
 			}
 
-			err := runtime.CopyFiles(context.Background(), tC.src, tC.dest)
+			err := runtime.CopyFiles(th.NewTestContext(), tC.src, tC.dest)
 			tC.errFunc(t, err)
 
 			if tC.verify != nil {
@@ -384,7 +384,7 @@ func TestSyncFiles(t *testing.T) {
 				tC.setup(t, tC.src, tC.dest)
 			}
 
-			err := runtime.SyncFiles(context.Background(), tC.src, tC.dest)
+			err := runtime.SyncFiles(th.NewTestContext(), tC.src, tC.dest)
 			tC.errFunc(t, err)
 
 			if tC.verify != nil {

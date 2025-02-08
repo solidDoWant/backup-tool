@@ -1,10 +1,10 @@
 package core
 
 import (
-	"context"
 	"testing"
 
 	"dario.cat/mergo"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -89,7 +89,7 @@ func TestCreatePVC(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.simulateClientError {
 				mockK8s.PrependReactor("create", "persistentvolumeclaims", func(action kubetesting.Action) (bool, runtime.Object, error) {
@@ -141,7 +141,7 @@ func TestGetPVC(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialPVC != nil {
 				_, err := mockK8s.CoreV1().PersistentVolumeClaims(namespace).Create(ctx, tt.initialPVC, metav1.CreateOptions{})
@@ -195,7 +195,7 @@ func TestDoesPVCExist(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialPVC != nil {
 				_, err := mockK8s.CoreV1().PersistentVolumeClaims(namespace).Create(ctx, tt.initialPVC, metav1.CreateOptions{})
@@ -291,7 +291,7 @@ func TestEnsurePVCExists(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialPVC != nil {
 				_, err := mockK8s.CoreV1().PersistentVolumeClaims(namespace).Create(ctx, tt.initialPVC, metav1.CreateOptions{})
@@ -354,7 +354,7 @@ func TestDeleteVolume(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialPVC != nil {
 				_, err := mockK8s.CoreV1().PersistentVolumeClaims(namespace).Create(ctx, tt.initialPVC, metav1.CreateOptions{})

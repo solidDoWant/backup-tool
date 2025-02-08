@@ -1,10 +1,9 @@
 package cnpg
 
 import (
-	"context"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg/gen/clientset/versioned"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -12,13 +11,13 @@ import (
 )
 
 type ClientInterface interface {
-	CreateBackup(ctx context.Context, namespace, backupName, clusterName string, opts CreateBackupOptions) (*apiv1.Backup, error)
-	WaitForReadyBackup(ctx context.Context, namespace, name string, opts WaitForReadyBackupOpts) (*apiv1.Backup, error)
-	DeleteBackup(ctx context.Context, namespace, name string) error
-	CreateCluster(ctx context.Context, namespace, clusterName string, volumeSize resource.Quantity, servingCertificateSecretName, clientCASecretName, replicationUserCertName string, opts CreateClusterOptions) (*apiv1.Cluster, error)
-	WaitForReadyCluster(ctx context.Context, namespace, name string, opts WaitForReadyClusterOpts) (*apiv1.Cluster, error)
-	GetCluster(ctx context.Context, namespace, name string) (*apiv1.Cluster, error)
-	DeleteCluster(ctx context.Context, namespace, name string) error
+	CreateBackup(ctx *contexts.Context, namespace, backupName, clusterName string, opts CreateBackupOptions) (*apiv1.Backup, error)
+	WaitForReadyBackup(ctx *contexts.Context, namespace, name string, opts WaitForReadyBackupOpts) (*apiv1.Backup, error)
+	DeleteBackup(ctx *contexts.Context, namespace, name string) error
+	CreateCluster(ctx *contexts.Context, namespace, clusterName string, volumeSize resource.Quantity, servingCertificateSecretName, clientCASecretName, replicationUserCertName string, opts CreateClusterOptions) (*apiv1.Cluster, error)
+	WaitForReadyCluster(ctx *contexts.Context, namespace, name string, opts WaitForReadyClusterOpts) (*apiv1.Cluster, error)
+	GetCluster(ctx *contexts.Context, namespace, name string) (*apiv1.Cluster, error)
+	DeleteCluster(ctx *contexts.Context, namespace, name string) error
 }
 
 type Client struct {

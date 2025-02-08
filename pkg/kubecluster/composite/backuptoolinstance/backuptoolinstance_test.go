@@ -1,7 +1,6 @@
 package backuptoolinstance
 
 import (
-	context "context"
 	"fmt"
 	"net"
 	"reflect"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/servers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
@@ -126,7 +126,7 @@ func TestCreateBackupToolInstance(t *testing.T) {
 			t.Parallel()
 
 			p := newMockProvider(t)
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			errExpected := th.ErrExpected(
 				tt.simulateBackupToolInstanceCleanupError,
@@ -138,14 +138,14 @@ func TestCreateBackupToolInstance(t *testing.T) {
 
 			func() {
 				if errExpected {
-					p.backupToolInstance.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx context.Context) error {
+					p.backupToolInstance.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
 						require.NotEqual(t, ctx, cleanupCtx)
 						return th.ErrIfTrue(tt.simulateBackupToolInstanceCleanupError)
 					})
 				}
 
 				var createdPod *corev1.Pod
-				p.coreClient.EXPECT().CreatePod(ctx, namespace, mock.Anything).RunAndReturn(func(_ context.Context, _ string, pod *corev1.Pod) (*corev1.Pod, error) {
+				p.coreClient.EXPECT().CreatePod(ctx, namespace, mock.Anything).RunAndReturn(func(_ *contexts.Context, _ string, pod *corev1.Pod) (*corev1.Pod, error) {
 					createdPod = pod
 
 					require.Len(t, pod.Spec.Containers, 1)
@@ -185,7 +185,7 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				})
 
 				p.coreClient.EXPECT().WaitForReadyPod(ctx, namespace, mock.Anything, core.WaitForReadyPodOpts{MaxWaitTime: tt.opts.PodWaitTimeout}).
-					RunAndReturn(func(ctx context.Context, s1, s2 string, wfrpo core.WaitForReadyPodOpts) (*corev1.Pod, error) {
+					RunAndReturn(func(ctx *contexts.Context, namespace, name string, wfrpo core.WaitForReadyPodOpts) (*corev1.Pod, error) {
 						return th.ErrOr1Val(createdPod, tt.simulateWaitForPodError)
 					})
 				if tt.simulateWaitForPodError {
@@ -193,7 +193,7 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				}
 
 				var createdService *corev1.Service
-				p.coreClient.EXPECT().CreateService(ctx, namespace, mock.Anything).RunAndReturn(func(_ context.Context, _ string, service *corev1.Service) (*corev1.Service, error) {
+				p.coreClient.EXPECT().CreateService(ctx, namespace, mock.Anything).RunAndReturn(func(_ *contexts.Context, _ string, service *corev1.Service) (*corev1.Service, error) {
 					createdService = service
 					require.Equal(t, createdPod.ObjectMeta.Labels, service.Spec.Selector)
 
@@ -423,7 +423,7 @@ func TestBackupToolInstanceDelete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			p := newMockProvider(t)
 			tt.btInstance.p = p
 

@@ -1,12 +1,12 @@
 package clonepvc
 
 import (
-	context "context"
 	"time"
 
 	"github.com/gravitational/trace"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
@@ -26,13 +26,13 @@ type ClonePVCOptions struct {
 }
 
 // Snapshots a given volume and clones it. Callers are responsible for ensuring consistency.
-func (p *Provider) ClonePVC(ctx context.Context, namespace, pvcName string, opts ClonePVCOptions) (clonedPvc *corev1.PersistentVolumeClaim, err error) {
+func (p *Provider) ClonePVC(ctx *contexts.Context, namespace, pvcName string, opts ClonePVCOptions) (clonedPvc *corev1.PersistentVolumeClaim, err error) {
 	snapshot, err := p.esClient.SnapshotVolume(ctx, namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{})
 	if err != nil {
 		err = trace.Wrap(err, "failed to snapshot %q", helpers.FullNameStr(namespace, pvcName))
 		return
 	}
-	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
+	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
 		return p.esClient.DeleteSnapshot(ctx, namespace, snapshot.Name)
 	}).WithErrMessage("failed to delete created snapshot for PVC %q", helpers.FullNameStr(namespace, pvcName)).WithOriginalErr(&err).Run()
 
@@ -86,7 +86,7 @@ func (p *Provider) ClonePVC(ctx context.Context, namespace, pvcName string, opts
 		err = trace.Wrap(err, "failed to create volume from created snapshot %q", helpers.FullName(readySnapshot))
 		return
 	}
-	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
+	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
 		if err == nil {
 			return nil
 		}
@@ -121,7 +121,7 @@ func (p *Provider) ClonePVC(ctx context.Context, namespace, pvcName string, opts
 			err = trace.Wrap(err, "failed to create 'force bind' pod for PVC %q", helpers.FullName(clonedPvc))
 			return
 		}
-		defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
+		defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
 			return p.coreClient.DeletePod(ctx, namespace, pod.Name)
 		}).WithErrMessage("failed to delete 'force bind' pod for PVC %q", helpers.FullName(clonedPvc)).WithOriginalErr(&err).Run()
 

@@ -1,16 +1,16 @@
 package core
 
 import (
-	"context"
 	"time"
 
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *Client) GetEndpoint(ctx context.Context, namespace, name string) (*corev1.Endpoints, error) {
+func (c *Client) GetEndpoint(ctx *contexts.Context, namespace, name string) (*corev1.Endpoints, error) {
 	endpoint, err := c.client.CoreV1().Endpoints(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to get endpoint %q", helpers.FullNameStr(namespace, name))
@@ -24,8 +24,8 @@ type WaitForReadyEndpointOpts struct {
 }
 
 // Wait for at least one ready endpoint to be available.
-func (c *Client) WaitForReadyEndpoint(ctx context.Context, namespace, name string, opts WaitForReadyEndpointOpts) (*corev1.Endpoints, error) {
-	processEvent := func(_ context.Context, endpoint *corev1.Endpoints) (*corev1.Endpoints, bool, error) {
+func (c *Client) WaitForReadyEndpoint(ctx *contexts.Context, namespace, name string, opts WaitForReadyEndpointOpts) (*corev1.Endpoints, error) {
+	processEvent := func(_ *contexts.Context, endpoint *corev1.Endpoints) (*corev1.Endpoints, bool, error) {
 		for _, subset := range endpoint.Subsets {
 			for _, address := range subset.Addresses {
 				if address.IP != "" {

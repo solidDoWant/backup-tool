@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestErrIfTrue(t *testing.T) {
@@ -81,4 +82,10 @@ func TestOptStructTest(t *testing.T) {
 	}
 
 	OptStructTest[BasicTestCase](t)
+}
+
+func TestNewTestContext(t *testing.T) {
+	ctx := NewTestContext()
+	require.NotNil(t, ctx)
+	assert.NotNil(t, ctx.Context)
 }

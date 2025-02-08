@@ -1,7 +1,6 @@
 package disasterrecovery
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
@@ -61,7 +61,7 @@ func NewVaultWarden(client kubecluster.ClientInterface) *VaultWarden {
 // 6. Copy the logical backup to the DR mount
 // 7. Take a snapshot of the DR volume
 // 8. Exit the tool instance, delete all created resources except for DR volume snapshot
-func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPVC, cnpgClusterName, servingCertIssuerName, clientCertIssuerName string, backupOptions VaultWardenBackupOptions) (backup *Backup, err error) {
+func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, dataPVC, cnpgClusterName, servingCertIssuerName, clientCertIssuerName string, backupOptions VaultWardenBackupOptions) (backup *Backup, err error) {
 	backup = NewBackupNow(backupName)
 	defer backup.Stop()
 
@@ -70,7 +70,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to clone data PVC")
 	}
-	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
+	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
 		return vw.kubernetesClient.Core().DeletePVC(ctx, namespace, clonedPVC.Name)
 	}).WithErrMessage("failed to cleanup PVC %q", helpers.FullName(clonedPVC)).WithOriginalErr(&err).Run()
 
@@ -131,7 +131,7 @@ func (vw *VaultWarden) Backup(ctx context.Context, namespace, backupName, dataPV
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to create %s instance", constants.ToolName)
 	}
-	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
+	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
 		return btInstance.Delete(ctx)
 	}).WithErrMessage("failed to cleanup backup tool instance %q resources", backup.GetFullName()).
 		WithOriginalErr(&err).Run()

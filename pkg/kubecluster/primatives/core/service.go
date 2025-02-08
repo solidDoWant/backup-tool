@@ -1,11 +1,11 @@
 package core
 
 import (
-	"context"
 	"time"
 
 	"github.com/gravitational/trace"
 	"github.com/samber/lo"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +30,7 @@ func ContainerPortToServicePort(containerPort corev1.ContainerPort) corev1.Servi
 
 // TODO resolve service dialer func?
 
-func (c *Client) CreateService(ctx context.Context, namespce string, service *corev1.Service) (*corev1.Service, error) {
+func (c *Client) CreateService(ctx *contexts.Context, namespce string, service *corev1.Service) (*corev1.Service, error) {
 	service, err := c.client.CoreV1().Services(namespce).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create service %q", helpers.FullNameStr(namespce, service.Name))
@@ -43,8 +43,8 @@ type WaitForReadyServiceOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (c *Client) WaitForReadyService(ctx context.Context, namespace, name string, opts WaitForReadyServiceOpts) (*corev1.Service, error) {
-	processEvent := func(_ context.Context, service *corev1.Service) (*corev1.Service, bool, error) {
+func (c *Client) WaitForReadyService(ctx *contexts.Context, namespace, name string, opts WaitForReadyServiceOpts) (*corev1.Service, error) {
+	processEvent := func(_ *contexts.Context, service *corev1.Service) (*corev1.Service, bool, error) {
 		switch service.Spec.Type {
 		case corev1.ServiceTypeExternalName:
 			fallthrough
@@ -82,7 +82,7 @@ func (c *Client) WaitForReadyService(ctx context.Context, namespace, name string
 	return service, nil
 }
 
-func (c *Client) DeleteService(ctx context.Context, namespace, name string) error {
+func (c *Client) DeleteService(ctx *contexts.Context, namespace, name string) error {
 	err := c.client.CoreV1().Services(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete service %q", helpers.FullNameStr(namespace, name))
 }

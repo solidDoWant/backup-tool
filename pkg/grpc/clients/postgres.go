@@ -1,12 +1,12 @@
 package clients
 
 import (
-	"context"
 	"maps"
 	"slices"
 
 	"github.com/gravitational/trace"
 	"github.com/gravitational/trace/trail"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	postgres_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/postgres/v1"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	"google.golang.org/grpc"
@@ -71,7 +71,7 @@ func encodeDumpAllOptions(opts postgres.DumpAllOptions) *postgres_v1.DumpAllOpti
 	return encodedOpts
 }
 
-func (pc *PostgresClient) DumpAll(ctx context.Context, credentials postgres.Credentials, outputFilePath string, opts postgres.DumpAllOptions) error {
+func (pc *PostgresClient) DumpAll(ctx *contexts.Context, credentials postgres.Credentials, outputFilePath string, opts postgres.DumpAllOptions) error {
 	encodedCredentials, err := encodeCredentials(credentials)
 	if err != nil {
 		return trace.Wrap(err, "failed to encode credentials")

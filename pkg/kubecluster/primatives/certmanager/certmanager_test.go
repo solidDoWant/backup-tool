@@ -12,6 +12,7 @@ import (
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/cert-manager/cert-manager/pkg/client/clientset/versioned"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -136,7 +137,7 @@ func TestCreateCertificate(t *testing.T) {
 				})
 			}
 
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			cert, err := client.CreateCertificate(ctx, namespace, certName, issuer, tt.opts)
 
 			if tt.simulateClientFailure {
@@ -228,7 +229,7 @@ func TestWaitForReadyCertificate(t *testing.T) {
 			t.Parallel()
 
 			client, fakeClientset := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialCert != nil {
 				_, err := fakeClientset.CertmanagerV1().Certificates(certNamespace).Create(ctx, tt.initialCert, metav1.CreateOptions{})
@@ -283,7 +284,7 @@ func TestDeleteCertificate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			client, _ := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			var existingCert *certmanagerv1.Certificate
 			if tt.shouldSetupCert {
@@ -371,7 +372,7 @@ func TestCreateIssuer(t *testing.T) {
 				})
 			}
 
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			issuer, err := client.CreateIssuer(ctx, namespace, issuerName, caCertSecretName, tt.opts)
 
 			if tt.simulateClientFailure {
@@ -466,7 +467,7 @@ func TestWaitForReadyIssuer(t *testing.T) {
 			t.Parallel()
 
 			client, fakeClientset := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialIssuer != nil {
 				_, err := fakeClientset.CertmanagerV1().Issuers(issuerNamespace).Create(ctx, tt.initialIssuer, metav1.CreateOptions{})
@@ -543,7 +544,7 @@ func TestReissueCertificate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			client, fakeClientset := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.setupCert != nil {
 				_, err := client.client.CertmanagerV1().Certificates(namespace).Create(ctx, tt.setupCert, metav1.CreateOptions{})
@@ -608,7 +609,7 @@ func TestDeleteIssuer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			client, _ := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			var existingIssuer *certmanagerv1.Issuer
 			if tt.shouldSetupIssuer {

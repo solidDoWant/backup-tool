@@ -1,15 +1,14 @@
 package clusterusercert
 
 import (
-	context "context"
-
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 )
 
 type ProviderInterface interface {
-	NewClusterUserCert(ctx context.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error)
+	NewClusterUserCert(ctx *contexts.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error)
 }
 
 type providerInterfaceInternal interface {

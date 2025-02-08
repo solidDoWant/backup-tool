@@ -1,15 +1,14 @@
 package clonedcluster
 
 import (
-	context "context"
-
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 )
 
 type ProviderInterface interface {
-	CloneCluster(ctx context.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error)
+	CloneCluster(ctx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error)
 }
 
 type providerInterfaceInternal interface {

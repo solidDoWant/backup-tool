@@ -3,8 +3,7 @@
 package files
 
 import (
-	context "context"
-
+	contexts "github.com/solidDoWant/backup-tool/pkg/contexts"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -22,7 +21,7 @@ func (_m *MockRuntime) EXPECT() *MockRuntime_Expecter {
 }
 
 // CopyFiles provides a mock function with given fields: ctx, src, dest
-func (_m *MockRuntime) CopyFiles(ctx context.Context, src string, dest string) error {
+func (_m *MockRuntime) CopyFiles(ctx *contexts.Context, src string, dest string) error {
 	ret := _m.Called(ctx, src, dest)
 
 	if len(ret) == 0 {
@@ -30,7 +29,7 @@ func (_m *MockRuntime) CopyFiles(ctx context.Context, src string, dest string) e
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) error); ok {
 		r0 = rf(ctx, src, dest)
 	} else {
 		r0 = ret.Error(0)
@@ -45,16 +44,16 @@ type MockRuntime_CopyFiles_Call struct {
 }
 
 // CopyFiles is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - src string
 //   - dest string
 func (_e *MockRuntime_Expecter) CopyFiles(ctx interface{}, src interface{}, dest interface{}) *MockRuntime_CopyFiles_Call {
 	return &MockRuntime_CopyFiles_Call{Call: _e.mock.On("CopyFiles", ctx, src, dest)}
 }
 
-func (_c *MockRuntime_CopyFiles_Call) Run(run func(ctx context.Context, src string, dest string)) *MockRuntime_CopyFiles_Call {
+func (_c *MockRuntime_CopyFiles_Call) Run(run func(ctx *contexts.Context, src string, dest string)) *MockRuntime_CopyFiles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -64,13 +63,13 @@ func (_c *MockRuntime_CopyFiles_Call) Return(_a0 error) *MockRuntime_CopyFiles_C
 	return _c
 }
 
-func (_c *MockRuntime_CopyFiles_Call) RunAndReturn(run func(context.Context, string, string) error) *MockRuntime_CopyFiles_Call {
+func (_c *MockRuntime_CopyFiles_Call) RunAndReturn(run func(*contexts.Context, string, string) error) *MockRuntime_CopyFiles_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // SyncFiles provides a mock function with given fields: ctx, src, dest
-func (_m *MockRuntime) SyncFiles(ctx context.Context, src string, dest string) error {
+func (_m *MockRuntime) SyncFiles(ctx *contexts.Context, src string, dest string) error {
 	ret := _m.Called(ctx, src, dest)
 
 	if len(ret) == 0 {
@@ -78,7 +77,7 @@ func (_m *MockRuntime) SyncFiles(ctx context.Context, src string, dest string) e
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) error); ok {
 		r0 = rf(ctx, src, dest)
 	} else {
 		r0 = ret.Error(0)
@@ -93,16 +92,16 @@ type MockRuntime_SyncFiles_Call struct {
 }
 
 // SyncFiles is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - src string
 //   - dest string
 func (_e *MockRuntime_Expecter) SyncFiles(ctx interface{}, src interface{}, dest interface{}) *MockRuntime_SyncFiles_Call {
 	return &MockRuntime_SyncFiles_Call{Call: _e.mock.On("SyncFiles", ctx, src, dest)}
 }
 
-func (_c *MockRuntime_SyncFiles_Call) Run(run func(ctx context.Context, src string, dest string)) *MockRuntime_SyncFiles_Call {
+func (_c *MockRuntime_SyncFiles_Call) Run(run func(ctx *contexts.Context, src string, dest string)) *MockRuntime_SyncFiles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -112,7 +111,7 @@ func (_c *MockRuntime_SyncFiles_Call) Return(_a0 error) *MockRuntime_SyncFiles_C
 	return _c
 }
 
-func (_c *MockRuntime_SyncFiles_Call) RunAndReturn(run func(context.Context, string, string) error) *MockRuntime_SyncFiles_Call {
+func (_c *MockRuntime_SyncFiles_Call) RunAndReturn(run func(*contexts.Context, string, string) error) *MockRuntime_SyncFiles_Call {
 	_c.Call.Return(run)
 	return _c
 }

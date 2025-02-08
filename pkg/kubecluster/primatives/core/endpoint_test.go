@@ -1,12 +1,13 @@
 package core
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -43,7 +44,7 @@ func TestGetEndpoint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.endpoint != nil {
 				_, err := mockK8s.CoreV1().Endpoints(namespace).Create(ctx, tt.endpoint, metav1.CreateOptions{})
@@ -95,7 +96,7 @@ func TestWaitForReadyEndpoint(t *testing.T) {
 		desc                string
 		initialEndpoint     *corev1.Endpoints
 		shouldError         bool
-		afterStartedWaiting func(*testing.T, context.Context, k8s.Interface)
+		afterStartedWaiting func(*testing.T, *contexts.Context, k8s.Interface)
 	}{
 		{
 			desc:            "endpoint starts ready",
@@ -123,7 +124,7 @@ func TestWaitForReadyEndpoint(t *testing.T) {
 		{
 			desc:            "endpoint becomes ready",
 			initialEndpoint: noIPEndpoint,
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client k8s.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
 				_, err := client.CoreV1().Endpoints(namespace).Update(ctx, readyEndpoint, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
@@ -135,7 +136,7 @@ func TestWaitForReadyEndpoint(t *testing.T) {
 			t.Parallel()
 
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialEndpoint != nil {
 				_, err := mockK8s.CoreV1().Endpoints(namespace).Create(ctx, tt.initialEndpoint, metav1.CreateOptions{})

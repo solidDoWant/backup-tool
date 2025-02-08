@@ -1,12 +1,13 @@
 package core
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -44,7 +45,7 @@ func TestCreatePod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.simulateClientError {
 				mockK8s.PrependReactor("create", "pods", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -93,7 +94,7 @@ func TestWaitForReadyPod(t *testing.T) {
 		desc                string
 		initialPod          *corev1.Pod
 		shouldError         bool
-		afterStartedWaiting func(*testing.T, context.Context, k8s.Interface)
+		afterStartedWaiting func(*testing.T, *contexts.Context, k8s.Interface)
 	}{
 		{
 			desc:       "pod starts ready",
@@ -116,7 +117,7 @@ func TestWaitForReadyPod(t *testing.T) {
 		{
 			desc:       "pod becomes ready",
 			initialPod: notReadyPod,
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client k8s.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
 				_, err := client.CoreV1().Pods(podNamespace).Update(ctx, readyPod, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
@@ -124,7 +125,7 @@ func TestWaitForReadyPod(t *testing.T) {
 		{
 			desc:       "multiple conditions",
 			initialPod: notReadyPod,
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client k8s.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
 				_, err := client.CoreV1().Pods(podNamespace).Update(ctx, multipleConditionsPod, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
@@ -136,7 +137,7 @@ func TestWaitForReadyPod(t *testing.T) {
 			t.Parallel()
 
 			kc, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialPod != nil {
 				_, err := mockK8s.CoreV1().Pods(podNamespace).Create(ctx, tt.initialPod, metav1.CreateOptions{})
@@ -191,7 +192,7 @@ func TestDeletePod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			var existingPod *corev1.Pod
 			if tt.shouldSetupPod {

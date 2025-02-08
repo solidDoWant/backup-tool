@@ -1,7 +1,7 @@
 package helpers
 
 import (
-	"context"
+	context "context"
 	"fmt"
 	"math"
 	"strings"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -79,13 +80,13 @@ type ListerWatcher[TList runtime.Object] interface {
 // Callback for determining if a provided k8s object (`T`, such as corev1.Pod) matches an awaited condition.
 // The function returns result `V` (can be `nil`/`interface{}` type if not needed), whether or not the object
 // matches the condition, and an error if one occurred during processing.
-type WaitEventProcessor[T runtime.Object, V interface{}] func(context.Context, T) (V, bool, error)
+type WaitEventProcessor[T runtime.Object, V interface{}] func(*contexts.Context, T) (V, bool, error)
 
 // Wait for a check to pass on a given resource, optionally returning a value when the condition passes.
 // Will not return until the condition is met, or an error occurs.
-func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interface{}](ctx context.Context, timeout time.Duration, client ListerWatcher[TList], name string, processEvent WaitEventProcessor[T, V]) (V, error) {
+func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interface{}](ctx *contexts.Context, timeout time.Duration, client ListerWatcher[TList], name string, processEvent WaitEventProcessor[T, V]) (V, error) {
 	// Setup a timeout context
-	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	timeoutCtx, cancel := contexts.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	// Setup the k8s API calls

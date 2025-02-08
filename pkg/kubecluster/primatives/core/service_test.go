@@ -1,12 +1,13 @@
 package core
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -94,7 +95,7 @@ func TestCreateService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.simulateClientError {
 				mockK8s.PrependReactor("create", "services", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -162,7 +163,7 @@ func TestWaitForReadyService(t *testing.T) {
 		initialService      *corev1.Service
 		initialEndpoints    *corev1.Endpoints
 		shouldError         bool
-		afterStartedWaiting func(*testing.T, context.Context, k8s.Interface)
+		afterStartedWaiting func(*testing.T, *contexts.Context, k8s.Interface)
 	}{
 		{
 			desc:             "service starts ready and endpoints exist",
@@ -188,7 +189,7 @@ func TestWaitForReadyService(t *testing.T) {
 			desc:             "loadbalancer service becomes ready",
 			initialService:   loadBalancerService,
 			initialEndpoints: readyEndpoints,
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client k8s.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
 				_, err := client.CoreV1().Services(namespace).Update(ctx, readyLoadBalancerService, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
@@ -197,7 +198,7 @@ func TestWaitForReadyService(t *testing.T) {
 			desc:             "clusterip service becomes ready",
 			initialService:   clusterIPService,
 			initialEndpoints: readyEndpoints,
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client k8s.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
 				_, err := client.CoreV1().Services(namespace).Update(ctx, readyClusterIPService, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
@@ -216,7 +217,7 @@ func TestWaitForReadyService(t *testing.T) {
 			desc:             "service and endpoints become ready",
 			initialService:   clusterIPService,
 			initialEndpoints: notReadyEndpoints,
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client k8s.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
 				_, err := client.CoreV1().Services(namespace).Update(ctx, readyClusterIPService, metav1.UpdateOptions{})
 				require.NoError(t, err)
 				_, err = client.CoreV1().Endpoints(namespace).Update(ctx, readyEndpoints, metav1.UpdateOptions{})
@@ -230,7 +231,7 @@ func TestWaitForReadyService(t *testing.T) {
 			t.Parallel()
 
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialService != nil {
 				_, err := mockK8s.CoreV1().Services(namespace).Create(ctx, tt.initialService, metav1.CreateOptions{})
@@ -295,7 +296,7 @@ func TestDeleteService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			c, mockK8s := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialService != nil {
 				_, err := mockK8s.CoreV1().Services(namespace).Create(ctx, tt.initialService, metav1.CreateOptions{})

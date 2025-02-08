@@ -1,7 +1,6 @@
 package clusterusercert
 
 import (
-	context "context"
 	"fmt"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
@@ -20,7 +20,7 @@ type ClusterUserCertInterface interface {
 	GetCertificate() *certmanagerv1.Certificate
 	setCRP(*policyv1alpha1.CertificateRequestPolicy)
 	GetCertificateRequestPolicy() *policyv1alpha1.CertificateRequestPolicy
-	Delete(ctx context.Context) error
+	Delete(ctx *contexts.Context) error
 }
 
 type ClusterUserCert struct {
@@ -46,7 +46,7 @@ func newClusterUserCert(p providerInterfaceInternal) ClusterUserCertInterface {
 	return &ClusterUserCert{p: p}
 }
 
-func (p *Provider) NewClusterUserCert(ctx context.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error) {
+func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error) {
 	cuc := p.newClusterUserCert()
 
 	errHandler := func(originalErr error, args ...interface{}) (*ClusterUserCert, error) {
@@ -119,7 +119,7 @@ func (cuc *ClusterUserCert) GetCertificateRequestPolicy() *policyv1alpha1.Certif
 	return cuc.crp
 }
 
-func (cuc *ClusterUserCert) Delete(ctx context.Context) error {
+func (cuc *ClusterUserCert) Delete(ctx *contexts.Context) error {
 	cleanupErrs := make([]error, 0, 2)
 
 	if cuc.crp != nil {

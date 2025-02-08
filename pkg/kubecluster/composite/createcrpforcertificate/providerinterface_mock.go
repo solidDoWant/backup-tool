@@ -3,10 +3,10 @@
 package createcrpforcertificate
 
 import (
-	context "context"
+	contexts "github.com/solidDoWant/backup-tool/pkg/contexts"
+	mock "github.com/stretchr/testify/mock"
 
 	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	mock "github.com/stretchr/testify/mock"
 
 	v1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 )
@@ -25,7 +25,7 @@ func (_m *MockProviderInterface) EXPECT() *MockProviderInterface_Expecter {
 }
 
 // CreateCRPForCertificate provides a mock function with given fields: ctx, cert, opts
-func (_m *MockProviderInterface) CreateCRPForCertificate(ctx context.Context, cert *v1.Certificate, opts CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error) {
+func (_m *MockProviderInterface) CreateCRPForCertificate(ctx *contexts.Context, cert *v1.Certificate, opts CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error) {
 	ret := _m.Called(ctx, cert, opts)
 
 	if len(ret) == 0 {
@@ -34,10 +34,10 @@ func (_m *MockProviderInterface) CreateCRPForCertificate(ctx context.Context, ce
 
 	var r0 *v1alpha1.CertificateRequestPolicy
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Certificate, CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, *v1.Certificate, CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error)); ok {
 		return rf(ctx, cert, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Certificate, CreateCRPForCertificateOpts) *v1alpha1.CertificateRequestPolicy); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, *v1.Certificate, CreateCRPForCertificateOpts) *v1alpha1.CertificateRequestPolicy); ok {
 		r0 = rf(ctx, cert, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -45,7 +45,7 @@ func (_m *MockProviderInterface) CreateCRPForCertificate(ctx context.Context, ce
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Certificate, CreateCRPForCertificateOpts) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, *v1.Certificate, CreateCRPForCertificateOpts) error); ok {
 		r1 = rf(ctx, cert, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -60,16 +60,16 @@ type MockProviderInterface_CreateCRPForCertificate_Call struct {
 }
 
 // CreateCRPForCertificate is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - cert *v1.Certificate
 //   - opts CreateCRPForCertificateOpts
 func (_e *MockProviderInterface_Expecter) CreateCRPForCertificate(ctx interface{}, cert interface{}, opts interface{}) *MockProviderInterface_CreateCRPForCertificate_Call {
 	return &MockProviderInterface_CreateCRPForCertificate_Call{Call: _e.mock.On("CreateCRPForCertificate", ctx, cert, opts)}
 }
 
-func (_c *MockProviderInterface_CreateCRPForCertificate_Call) Run(run func(ctx context.Context, cert *v1.Certificate, opts CreateCRPForCertificateOpts)) *MockProviderInterface_CreateCRPForCertificate_Call {
+func (_c *MockProviderInterface_CreateCRPForCertificate_Call) Run(run func(ctx *contexts.Context, cert *v1.Certificate, opts CreateCRPForCertificateOpts)) *MockProviderInterface_CreateCRPForCertificate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Certificate), args[2].(CreateCRPForCertificateOpts))
+		run(args[0].(*contexts.Context), args[1].(*v1.Certificate), args[2].(CreateCRPForCertificateOpts))
 	})
 	return _c
 }
@@ -79,7 +79,7 @@ func (_c *MockProviderInterface_CreateCRPForCertificate_Call) Return(_a0 *v1alph
 	return _c
 }
 
-func (_c *MockProviderInterface_CreateCRPForCertificate_Call) RunAndReturn(run func(context.Context, *v1.Certificate, CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error)) *MockProviderInterface_CreateCRPForCertificate_Call {
+func (_c *MockProviderInterface_CreateCRPForCertificate_Call) RunAndReturn(run func(*contexts.Context, *v1.Certificate, CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error)) *MockProviderInterface_CreateCRPForCertificate_Call {
 	_c.Call.Return(run)
 	return _c
 }

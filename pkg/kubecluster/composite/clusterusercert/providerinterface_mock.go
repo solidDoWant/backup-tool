@@ -3,8 +3,7 @@
 package clusterusercert
 
 import (
-	context "context"
-
+	contexts "github.com/solidDoWant/backup-tool/pkg/contexts"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -22,7 +21,7 @@ func (_m *MockProviderInterface) EXPECT() *MockProviderInterface_Expecter {
 }
 
 // NewClusterUserCert provides a mock function with given fields: ctx, namespace, username, issuerName, clusterName, opts
-func (_m *MockProviderInterface) NewClusterUserCert(ctx context.Context, namespace string, username string, issuerName string, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error) {
+func (_m *MockProviderInterface) NewClusterUserCert(ctx *contexts.Context, namespace string, username string, issuerName string, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error) {
 	ret := _m.Called(ctx, namespace, username, issuerName, clusterName, opts)
 
 	if len(ret) == 0 {
@@ -31,10 +30,10 @@ func (_m *MockProviderInterface) NewClusterUserCert(ctx context.Context, namespa
 
 	var r0 ClusterUserCertInterface
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, NewClusterUserCertOpts) (ClusterUserCertInterface, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, string, NewClusterUserCertOpts) (ClusterUserCertInterface, error)); ok {
 		return rf(ctx, namespace, username, issuerName, clusterName, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, NewClusterUserCertOpts) ClusterUserCertInterface); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, string, NewClusterUserCertOpts) ClusterUserCertInterface); ok {
 		r0 = rf(ctx, namespace, username, issuerName, clusterName, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -42,7 +41,7 @@ func (_m *MockProviderInterface) NewClusterUserCert(ctx context.Context, namespa
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, NewClusterUserCertOpts) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, string, string, NewClusterUserCertOpts) error); ok {
 		r1 = rf(ctx, namespace, username, issuerName, clusterName, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -57,7 +56,7 @@ type MockProviderInterface_NewClusterUserCert_Call struct {
 }
 
 // NewClusterUserCert is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - username string
 //   - issuerName string
@@ -67,9 +66,9 @@ func (_e *MockProviderInterface_Expecter) NewClusterUserCert(ctx interface{}, na
 	return &MockProviderInterface_NewClusterUserCert_Call{Call: _e.mock.On("NewClusterUserCert", ctx, namespace, username, issuerName, clusterName, opts)}
 }
 
-func (_c *MockProviderInterface_NewClusterUserCert_Call) Run(run func(ctx context.Context, namespace string, username string, issuerName string, clusterName string, opts NewClusterUserCertOpts)) *MockProviderInterface_NewClusterUserCert_Call {
+func (_c *MockProviderInterface_NewClusterUserCert_Call) Run(run func(ctx *contexts.Context, namespace string, username string, issuerName string, clusterName string, opts NewClusterUserCertOpts)) *MockProviderInterface_NewClusterUserCert_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(NewClusterUserCertOpts))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(NewClusterUserCertOpts))
 	})
 	return _c
 }
@@ -79,7 +78,7 @@ func (_c *MockProviderInterface_NewClusterUserCert_Call) Return(_a0 ClusterUserC
 	return _c
 }
 
-func (_c *MockProviderInterface_NewClusterUserCert_Call) RunAndReturn(run func(context.Context, string, string, string, string, NewClusterUserCertOpts) (ClusterUserCertInterface, error)) *MockProviderInterface_NewClusterUserCert_Call {
+func (_c *MockProviderInterface_NewClusterUserCert_Call) RunAndReturn(run func(*contexts.Context, string, string, string, string, NewClusterUserCertOpts) (ClusterUserCertInterface, error)) *MockProviderInterface_NewClusterUserCert_Call {
 	_c.Call.Return(run)
 	return _c
 }

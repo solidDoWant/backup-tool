@@ -1,9 +1,8 @@
 package core
 
 import (
-	"context"
-
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -17,7 +16,7 @@ type CreatePVCOptions struct {
 	Source           *corev1.TypedObjectReference
 }
 
-func (c *Client) CreatePVC(ctx context.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+func (c *Client) CreatePVC(ctx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
 	pvc := &corev1.PersistentVolumeClaim{
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -46,7 +45,7 @@ func (c *Client) CreatePVC(ctx context.Context, namespace, pvcName string, size 
 	return pvc, nil
 }
 
-func (kc *Client) GetPVC(ctx context.Context, namespace, name string) (*corev1.PersistentVolumeClaim, error) {
+func (kc *Client) GetPVC(ctx *contexts.Context, namespace, name string) (*corev1.PersistentVolumeClaim, error) {
 	pvc, err := kc.client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, meta_v1.GetOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to query cluster for PVC %q", helpers.FullNameStr(namespace, name))
@@ -55,7 +54,7 @@ func (kc *Client) GetPVC(ctx context.Context, namespace, name string) (*corev1.P
 	return pvc, nil
 }
 
-func (c *Client) DoesPVCExist(ctx context.Context, namespace, name string) (bool, error) {
+func (c *Client) DoesPVCExist(ctx *contexts.Context, namespace, name string) (bool, error) {
 	_, err := c.GetPVC(ctx, namespace, name)
 	if err == nil {
 		return true, nil
@@ -68,7 +67,7 @@ func (c *Client) DoesPVCExist(ctx context.Context, namespace, name string) (bool
 	return false, trace.Wrap(err, "failed to query cluster for PVC %q", helpers.FullNameStr(namespace, name))
 }
 
-func (c *Client) EnsurePVCExists(ctx context.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+func (c *Client) EnsurePVCExists(ctx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
 	pvc, err := c.GetPVC(ctx, namespace, pvcName)
 	if err == nil {
 		return pvc, nil
@@ -86,7 +85,7 @@ func (c *Client) EnsurePVCExists(ctx context.Context, namespace, pvcName string,
 	return pvc, nil
 }
 
-func (c *Client) DeletePVC(ctx context.Context, namespace, volumeName string) error {
+func (c *Client) DeletePVC(ctx *contexts.Context, namespace, volumeName string) error {
 	err := c.client.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, volumeName, meta_v1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete volume %q in namespace %q", volumeName, namespace)
 }

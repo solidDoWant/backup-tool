@@ -1,14 +1,15 @@
 package externalsnapshotter
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +51,8 @@ func TestSnapshotVolume(t *testing.T) {
 				})
 			}
 
-			vol, err := client.SnapshotVolume(context.Background(), namespace, pvcName, tt.opts)
+			ctx := th.NewTestContext()
+			vol, err := client.SnapshotVolume(ctx, namespace, pvcName, tt.opts)
 			if tt.simulateClientError {
 				require.Error(t, err)
 				require.Nil(t, vol)
@@ -91,7 +93,7 @@ func TestWaitForReadySnapshot(t *testing.T) {
 		desc                string
 		initialSnapshot     *volumesnapshotv1.VolumeSnapshot
 		shouldError         bool
-		afterStartedWaiting func(*testing.T, context.Context, versioned.Interface)
+		afterStartedWaiting func(*testing.T, *contexts.Context, versioned.Interface)
 	}{
 		{
 			desc:            "snapshot starts ready",
@@ -119,7 +121,7 @@ func TestWaitForReadySnapshot(t *testing.T) {
 		{
 			desc:            "snapshot becomes ready",
 			initialSnapshot: noStatusSnapshot,
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client versioned.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client versioned.Interface) {
 				_, err := client.SnapshotV1().VolumeSnapshots(podNamespace).Update(ctx, readySnapshot, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
@@ -127,7 +129,7 @@ func TestWaitForReadySnapshot(t *testing.T) {
 		{
 			desc:            "snapshot errors after creation",
 			initialSnapshot: noStatusSnapshot,
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client versioned.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client versioned.Interface) {
 				_, err := client.SnapshotV1().VolumeSnapshots(podNamespace).Update(ctx, failedSnapshot, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
@@ -140,7 +142,7 @@ func TestWaitForReadySnapshot(t *testing.T) {
 			t.Parallel()
 
 			c, mockES := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialSnapshot != nil {
 				_, err := mockES.SnapshotV1().VolumeSnapshots(podNamespace).Create(ctx, tt.initialSnapshot, metav1.CreateOptions{})
@@ -200,7 +202,7 @@ func TestDeleteSnapshot(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, mockES := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialSnapshot != nil {
 				mockES.SnapshotV1().VolumeSnapshots(namespace).Create(ctx, tt.initialSnapshot, metav1.CreateOptions{})

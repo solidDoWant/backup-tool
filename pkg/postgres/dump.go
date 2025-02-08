@@ -11,6 +11,7 @@ import (
 
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 )
 
 // Depending on a CLI tool is unfortunate but there are no viable golang replacements for this.
@@ -42,7 +43,7 @@ type DumpAllOptions struct {
 	CleanupTimeout time.Duration
 }
 
-func (lr *LocalRuntime) DumpAll(ctx context.Context, credentials Credentials, outputFilePath string, opts DumpAllOptions) (err error) {
+func (lr *LocalRuntime) DumpAll(ctx *contexts.Context, credentials Credentials, outputFilePath string, opts DumpAllOptions) (err error) {
 	// This will cause the process to be terminated if the function returns before the process is done.
 	commandCtx, ctxCancel := context.WithCancel(ctx)
 	defer ctxCancel()
@@ -67,7 +68,7 @@ func (lr *LocalRuntime) DumpAll(ctx context.Context, credentials Credentials, ou
 		return trace.Wrap(err, "failed to open SQL dump output file %q for writing", outputFilePath)
 	}
 	outputFileWriter := bufio.NewWriter(outputFile) // This is used to avoid writing to the file one (potentially small) line at a time.
-	defer cleanup.WithTimeoutTo(opts.CleanupTimeout, func(ctx context.Context) error {
+	defer cleanup.WithTimeoutTo(opts.CleanupTimeout, func(ctx *contexts.Context) error {
 		flushErr := outputFileWriter.Flush()
 		closeErr := outputFile.Close()
 		return trace.NewAggregate(

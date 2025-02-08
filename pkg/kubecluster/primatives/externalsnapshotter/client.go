@@ -1,18 +1,17 @@
 package externalsnapshotter
 
 import (
-	"context"
-
 	"github.com/gravitational/trace"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"k8s.io/client-go/rest"
 )
 
 type ClientInterface interface {
-	SnapshotVolume(context.Context, string, string, SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error)
-	WaitForReadySnapshot(ctx context.Context, namespace, name string, opts WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error)
-	DeleteSnapshot(context.Context, string, string) error
+	SnapshotVolume(*contexts.Context, string, string, SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error)
+	WaitForReadySnapshot(ctx *contexts.Context, namespace, name string, opts WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error)
+	DeleteSnapshot(*contexts.Context, string, string) error
 }
 
 type Client struct {

@@ -1,12 +1,12 @@
 package clusterusercert
 
 import (
-	context "context"
 	"testing"
 
 	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
@@ -92,7 +92,7 @@ func TestNewClusterUserCert(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			c := newMockProvider(t)
 
 			createdCert := &certmanagerv1.Certificate{
@@ -117,7 +117,7 @@ func TestNewClusterUserCert(t *testing.T) {
 
 			func() {
 				if errExpected {
-					c.clusterUserCert.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx context.Context) error {
+					c.clusterUserCert.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
 						require.NotEqual(t, ctx, cleanupCtx) // This should be a different context with a timeout
 						return th.ErrIfTrue(tt.simulateClusterCleanupError)
 					})
@@ -125,7 +125,7 @@ func TestNewClusterUserCert(t *testing.T) {
 
 				// 1.
 				c.cmClient.EXPECT().CreateCertificate(ctx, namespace, mock.Anything, issuerName, mock.Anything).
-					RunAndReturn(func(ctx context.Context, namespace, certName, issuerName string, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+					RunAndReturn(func(ctx *contexts.Context, namespace, certName, issuerName string, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
 						assert.Contains(t, certName, clusterName)
 						assert.Contains(t, certName, username)
 						assert.Equal(t, opts.CommonName, username)
@@ -301,7 +301,7 @@ func TestClusterUserCertDelete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			p := newMockProvider(t)
 			tt.cuc.p = p
 

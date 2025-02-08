@@ -3,9 +3,8 @@
 package clonedcluster
 
 import (
-	context "context"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	contexts "github.com/solidDoWant/backup-tool/pkg/contexts"
 	clusterusercert "github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
 
 	mock "github.com/stretchr/testify/mock"
@@ -29,7 +28,7 @@ func (_m *MockClonedClusterInterface) EXPECT() *MockClonedClusterInterface_Expec
 }
 
 // Delete provides a mock function with given fields: ctx
-func (_m *MockClonedClusterInterface) Delete(ctx context.Context) error {
+func (_m *MockClonedClusterInterface) Delete(ctx *contexts.Context) error {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
@@ -37,7 +36,7 @@ func (_m *MockClonedClusterInterface) Delete(ctx context.Context) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context) error); ok {
 		r0 = rf(ctx)
 	} else {
 		r0 = ret.Error(0)
@@ -52,14 +51,14 @@ type MockClonedClusterInterface_Delete_Call struct {
 }
 
 // Delete is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 func (_e *MockClonedClusterInterface_Expecter) Delete(ctx interface{}) *MockClonedClusterInterface_Delete_Call {
 	return &MockClonedClusterInterface_Delete_Call{Call: _e.mock.On("Delete", ctx)}
 }
 
-func (_c *MockClonedClusterInterface_Delete_Call) Run(run func(ctx context.Context)) *MockClonedClusterInterface_Delete_Call {
+func (_c *MockClonedClusterInterface_Delete_Call) Run(run func(ctx *contexts.Context)) *MockClonedClusterInterface_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(*contexts.Context))
 	})
 	return _c
 }
@@ -69,7 +68,7 @@ func (_c *MockClonedClusterInterface_Delete_Call) Return(_a0 error) *MockClonedC
 	return _c
 }
 
-func (_c *MockClonedClusterInterface_Delete_Call) RunAndReturn(run func(context.Context) error) *MockClonedClusterInterface_Delete_Call {
+func (_c *MockClonedClusterInterface_Delete_Call) RunAndReturn(run func(*contexts.Context) error) *MockClonedClusterInterface_Delete_Call {
 	_c.Call.Return(run)
 	return _c
 }

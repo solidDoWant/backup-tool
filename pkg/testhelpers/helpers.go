@@ -1,12 +1,14 @@
 package testhelpers
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"slices"
 	"testing"
 
 	"github.com/fatih/structtag"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -92,4 +94,8 @@ func OptStructTest[T interface{}](t runnableTB) {
 			},
 		)
 	}
+}
+
+func NewTestContext() *contexts.Context {
+	return contexts.NewContext(context.Background())
 }

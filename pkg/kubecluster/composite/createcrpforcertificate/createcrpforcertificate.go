@@ -1,11 +1,10 @@
 package createcrpforcertificate
 
 import (
-	context "context"
-
 	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
 	"k8s.io/utils/ptr"
@@ -16,7 +15,7 @@ type CreateCRPForCertificateOpts struct {
 }
 
 // Create a Certificate Request Policy that matches the given certificate as closely as possible.
-func (p *Provider) CreateCRPForCertificate(ctx context.Context, cert *certmanagerv1.Certificate, opts CreateCRPForCertificateOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
+func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmanagerv1.Certificate, opts CreateCRPForCertificateOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
 	spec := policyv1alpha1.CertificateRequestPolicySpec{
 		Selector: policyv1alpha1.CertificateRequestPolicySelector{
 			Namespace: &policyv1alpha1.CertificateRequestPolicySelectorNamespace{

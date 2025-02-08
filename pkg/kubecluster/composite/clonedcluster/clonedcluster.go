@@ -1,7 +1,6 @@
 package clonedcluster
 
 import (
-	context "context"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
@@ -21,7 +21,7 @@ import (
 
 type ClonedClusterInterface interface {
 	GetCredentials(servingCertMountDirectory, clientCertMountDirectory string) postgres.Credentials
-	Delete(ctx context.Context) error
+	Delete(ctx *contexts.Context) error
 	setServingCert(cert *certmanagerv1.Certificate)
 	GetServingCert() *certmanagerv1.Certificate
 	setClientCACert(cert *certmanagerv1.Certificate)
@@ -90,7 +90,7 @@ func newClonedCluster(p providerInterfaceInternal) ClonedClusterInterface {
 
 // Clone an existing CNPG cluster, with separate certificates for authentication.
 // It is assumed that all required resources for approving certificats (such as Certificate Request Policies) are already in place.
-func (p *Provider) CloneCluster(ctx context.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
+func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
 	cluster = p.newClonedCluster()
 
 	// Prepare to handle resource cleanup in the event of an error
@@ -119,7 +119,7 @@ func (p *Provider) CloneCluster(ctx context.Context, namespace, existingClusterN
 	if err != nil {
 		return errHandler(err, "failed to create backup of existing cluster %q", helpers.FullNameStr(namespace, existingClusterName))
 	}
-	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx context.Context) error {
+	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
 		cleanupErr := p.cnpgClient.DeleteBackup(ctx, namespace, backup.Name)
 		if cleanupErr == nil {
 			return nil
@@ -358,7 +358,7 @@ func (cc *ClonedCluster) GetCredentials(servingCertMountDirectory, clientCertMou
 	}
 }
 
-func (cc *ClonedCluster) Delete(ctx context.Context) error {
+func (cc *ClonedCluster) Delete(ctx *contexts.Context) error {
 	cleanupErrs := make([]error, 0, 6)
 
 	if cc.cluster != nil {

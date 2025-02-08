@@ -1,14 +1,15 @@
 package approverpolicy
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
 
 	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy/gen/clientset/versioned"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -66,7 +67,7 @@ func TestCreateCertificateRequestPolicy(t *testing.T) {
 				})
 			}
 
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			policy, err := client.CreateCertificateRequestPolicy(ctx, "test-policy", tt.spec, tt.opts)
 
 			if tt.simulateClientFailure {
@@ -109,7 +110,7 @@ func TestWaitForReadyCertificateRequestPolicy(t *testing.T) {
 		desc                string
 		initialCRP          *policyv1alpha1.CertificateRequestPolicy
 		shouldError         bool
-		afterStartedWaiting func(*testing.T, context.Context, versioned.Interface)
+		afterStartedWaiting func(*testing.T, *contexts.Context, versioned.Interface)
 	}{
 		{
 			desc:       "CRP starts ready",
@@ -127,7 +128,7 @@ func TestWaitForReadyCertificateRequestPolicy(t *testing.T) {
 		{
 			desc:       "CRP becomes ready",
 			initialCRP: notReadyCRP,
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client versioned.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client versioned.Interface) {
 				_, err := client.PolicyV1alpha1().CertificateRequestPolicies().Update(ctx, readyCRP, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
@@ -135,7 +136,7 @@ func TestWaitForReadyCertificateRequestPolicy(t *testing.T) {
 		{
 			desc:       "multiple conditions",
 			initialCRP: notReadyCRP,
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client versioned.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client versioned.Interface) {
 				_, err := client.PolicyV1alpha1().CertificateRequestPolicies().Update(ctx, multipleConditionsCRP, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
@@ -147,7 +148,7 @@ func TestWaitForReadyCertificateRequestPolicy(t *testing.T) {
 			t.Parallel()
 
 			client, fakeClientset := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialCRP != nil {
 				_, err := fakeClientset.PolicyV1alpha1().CertificateRequestPolicies().Create(ctx, tt.initialCRP, metav1.CreateOptions{})
@@ -201,7 +202,7 @@ func TestDeleteCertificateRequestPolicy(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			client, _ := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			var existingCRP *policyv1alpha1.CertificateRequestPolicy
 			if tt.shouldSetupCRP {

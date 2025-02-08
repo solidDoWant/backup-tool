@@ -1,11 +1,11 @@
 package approverpolicy
 
 import (
-	"context"
 	"time"
 
 	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,7 +15,7 @@ type CreateCertificateRequestPolicyOptions struct {
 	helpers.GenerateName
 }
 
-func (c *Client) CreateCertificateRequestPolicy(ctx context.Context, name string, spec policyv1alpha1.CertificateRequestPolicySpec, opts CreateCertificateRequestPolicyOptions) (*policyv1alpha1.CertificateRequestPolicy, error) {
+func (c *Client) CreateCertificateRequestPolicy(ctx *contexts.Context, name string, spec policyv1alpha1.CertificateRequestPolicySpec, opts CreateCertificateRequestPolicyOptions) (*policyv1alpha1.CertificateRequestPolicy, error) {
 	policy := &policyv1alpha1.CertificateRequestPolicy{
 		Spec: spec,
 	}
@@ -34,8 +34,8 @@ type WaitForReadyCertificateRequestPolicyOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (c *Client) WaitForReadyCertificateRequestPolicy(ctx context.Context, name string, opts WaitForReadyCertificateRequestPolicyOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
-	precondition := func(ctx context.Context, policy *policyv1alpha1.CertificateRequestPolicy) (*policyv1alpha1.CertificateRequestPolicy, bool, error) {
+func (c *Client) WaitForReadyCertificateRequestPolicy(ctx *contexts.Context, name string, opts WaitForReadyCertificateRequestPolicyOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
+	precondition := func(ctx *contexts.Context, policy *policyv1alpha1.CertificateRequestPolicy) (*policyv1alpha1.CertificateRequestPolicy, bool, error) {
 		isReady := false
 		for _, condition := range policy.Status.Conditions {
 			if condition.Type != policyv1alpha1.CertificateRequestPolicyConditionReady {
@@ -61,7 +61,7 @@ func (c *Client) WaitForReadyCertificateRequestPolicy(ctx context.Context, name 
 	return policy, nil
 }
 
-func (c *Client) DeleteCertificateRequestPolicy(ctx context.Context, name string) error {
+func (c *Client) DeleteCertificateRequestPolicy(ctx *contexts.Context, name string) error {
 	err := c.client.PolicyV1alpha1().CertificateRequestPolicies().Delete(ctx, name, v1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete certificate request policy %q", name)
 }

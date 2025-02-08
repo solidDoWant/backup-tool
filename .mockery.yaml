@@ -22,8 +22,14 @@ packages:
     <<: *baseline_config
     interfaces:
       ClientInterface:
-  github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate: &kube_composite_config
+  ? github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance
+  : &kube_composite_config
     <<: *baseline_config
+    interfaces:
+      ProviderInterface:
+      BackupToolInstanceInterface:
+  ? github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate
+  : <<: *baseline_config
     interfaces:
       ProviderInterface:
   github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert:
@@ -32,12 +38,13 @@ packages:
       ProviderInterface:
       ClusterUserCertInterface:
   github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonepvc: *kube_composite_config
-  github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster: 
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster:
     <<: *baseline_config
     interfaces:
       ProviderInterface:
       ClonedClusterInterface:
-  github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy: &kube_primative_config
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy:
+    &kube_primative_config
     <<: *baseline_config
     interfaces:
       ClientInterface:

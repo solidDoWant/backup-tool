@@ -1,11 +1,12 @@
 package helpers
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -170,7 +171,7 @@ func TestWaitForResourceCondition(t *testing.T) {
 		useWrongListerType  bool
 		useWrongWatcherType bool
 		processEvent        WaitEventProcessor[*corev1.Pod, string]
-		afterStartedWaiting func(*testing.T, context.Context, k8s.Interface)
+		afterStartedWaiting func(*testing.T, *contexts.Context, k8s.Interface)
 		expectedResult      string
 		wantErr             bool
 	}{
@@ -191,7 +192,7 @@ func TestWaitForResourceCondition(t *testing.T) {
 		{
 			desc:           "pod doesnt initially exist but is added later",
 			expectedResult: podIP,
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client k8s.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
 				_, err := client.CoreV1().Pods(namespace).Create(ctx, matchingPodWithIP, metav1.CreateOptions{})
 				require.NoError(t, err)
 			},
@@ -200,7 +201,7 @@ func TestWaitForResourceCondition(t *testing.T) {
 			desc:             "pod doesnt initially exist without matching, but matches later",
 			expectedResult:   podIP,
 			initialResources: []runtime.Object{matchingPodWithoutIP},
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client k8s.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
 				_, err := client.CoreV1().Pods(namespace).Update(ctx, matchingPodWithIP, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
@@ -213,7 +214,7 @@ func TestWaitForResourceCondition(t *testing.T) {
 		},
 		{
 			desc: "pod matches but lister is the wrong type",
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client k8s.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
 				_, err := client.CoreV1().Namespaces().Create(ctx, matchingNamespace, metav1.CreateOptions{})
 				require.NoError(t, err)
 			},
@@ -223,7 +224,7 @@ func TestWaitForResourceCondition(t *testing.T) {
 		{
 			desc:             "pod initially exists without matching, and then is deleted",
 			initialResources: []runtime.Object{matchingPodWithoutIP},
-			afterStartedWaiting: func(t *testing.T, ctx context.Context, client k8s.Interface) {
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
 				err := client.CoreV1().Pods(namespace).Delete(ctx, matchingPodWithIP.Name, metav1.DeleteOptions{})
 				require.NoError(t, err)
 			},
@@ -235,11 +236,11 @@ func TestWaitForResourceCondition(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			t.Parallel()
 			client := fake.NewClientset(tt.initialResources...)
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.processEvent == nil {
 				// Default implementation that should be logically sound
-				tt.processEvent = func(ctx context.Context, pod *corev1.Pod) (string, bool, error) {
+				tt.processEvent = func(ctx *contexts.Context, pod *corev1.Pod) (string, bool, error) {
 					if pod.Status.PodIP == "" {
 						return "", false, nil
 					}

@@ -1,7 +1,6 @@
 package clonedcluster
 
 import (
-	context "context"
 	"fmt"
 	"testing"
 	"time"
@@ -10,6 +9,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
@@ -306,7 +306,7 @@ func TestCloneCluster(t *testing.T) {
 			t.Parallel()
 
 			// Track creation parameters
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			namespace := "test-ns"
 			existingClusterName := "existing-cluster"
 			newClusterName := "new-cluster"
@@ -413,7 +413,7 @@ func TestCloneCluster(t *testing.T) {
 			func() {
 				// 0. Setup
 				if errorExpected {
-					p.clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx context.Context) error {
+					p.clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
 						require.NotEqual(t, ctx, cleanupCtx) // This should be a different context with a timeout
 						return th.ErrIfTrue(tt.simulateErrorOnClusterCleanup)
 					})
@@ -497,7 +497,7 @@ func TestCloneCluster(t *testing.T) {
 
 				// 3.2
 				p.cmClient.EXPECT().CreateIssuer(ctx, namespace, mock.Anything, clientCACertName, certmanager.CreateIssuerOptions{}).
-					RunAndReturn(func(ctx context.Context, namespace, name, clientCACertName string, opts certmanager.CreateIssuerOptions) (*certmanagerv1.Issuer, error) {
+					RunAndReturn(func(ctx *contexts.Context, namespace, name, clientCACertName string, opts certmanager.CreateIssuerOptions) (*certmanagerv1.Issuer, error) {
 						assert.Contains(t, name, clientCACertName)
 						return th.ErrOr1Val(createdClientCAIssuer, tt.simulateClientCAIssuerCreationError)
 					})
@@ -575,7 +575,7 @@ func TestCloneCluster(t *testing.T) {
 
 func TestClonedClusterWhenFailToParseExistingClusterStorageSize(t *testing.T) {
 	p := newMockProvider(t)
-	ctx := context.Background()
+	ctx := th.NewTestContext()
 
 	p.cnpgClient.EXPECT().GetCluster(ctx, "test-ns", "existing-cluster").Return(&apiv1.Cluster{
 		Spec: apiv1.ClusterSpec{
@@ -699,7 +699,7 @@ func TestClonedClusterDelete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			p := newMockProvider(t)
 			tt.cc.p = p
 

@@ -1,11 +1,11 @@
 package clients
 
 import (
-	"context"
 	"net"
 	"testing"
 	"time"
 
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -70,7 +70,9 @@ func TestNewClient(t *testing.T) {
 				time.Sleep(3 * time.Millisecond)
 			}
 
-			client, err := NewClient(context.Background(), tt.addr)
+			ctx := th.NewTestContext()
+
+			client, err := NewClient(ctx, tt.addr)
 			if err == nil {
 				defer func() {
 					err = client.Close()

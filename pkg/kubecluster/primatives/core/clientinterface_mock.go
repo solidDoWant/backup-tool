@@ -3,9 +3,9 @@
 package core
 
 import (
-	context "context"
-
+	contexts "github.com/solidDoWant/backup-tool/pkg/contexts"
 	mock "github.com/stretchr/testify/mock"
+
 	resource "k8s.io/apimachinery/pkg/api/resource"
 
 	v1 "k8s.io/api/core/v1"
@@ -25,7 +25,7 @@ func (_m *MockClientInterface) EXPECT() *MockClientInterface_Expecter {
 }
 
 // CreatePVC provides a mock function with given fields: ctx, namespace, pvcName, size, opts
-func (_m *MockClientInterface) CreatePVC(ctx context.Context, namespace string, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*v1.PersistentVolumeClaim, error) {
+func (_m *MockClientInterface) CreatePVC(ctx *contexts.Context, namespace string, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*v1.PersistentVolumeClaim, error) {
 	ret := _m.Called(ctx, namespace, pvcName, size, opts)
 
 	if len(ret) == 0 {
@@ -34,10 +34,10 @@ func (_m *MockClientInterface) CreatePVC(ctx context.Context, namespace string, 
 
 	var r0 *v1.PersistentVolumeClaim
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, resource.Quantity, CreatePVCOptions) (*v1.PersistentVolumeClaim, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, resource.Quantity, CreatePVCOptions) (*v1.PersistentVolumeClaim, error)); ok {
 		return rf(ctx, namespace, pvcName, size, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, resource.Quantity, CreatePVCOptions) *v1.PersistentVolumeClaim); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, resource.Quantity, CreatePVCOptions) *v1.PersistentVolumeClaim); ok {
 		r0 = rf(ctx, namespace, pvcName, size, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -45,7 +45,7 @@ func (_m *MockClientInterface) CreatePVC(ctx context.Context, namespace string, 
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, resource.Quantity, CreatePVCOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, resource.Quantity, CreatePVCOptions) error); ok {
 		r1 = rf(ctx, namespace, pvcName, size, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -60,7 +60,7 @@ type MockClientInterface_CreatePVC_Call struct {
 }
 
 // CreatePVC is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - pvcName string
 //   - size resource.Quantity
@@ -69,9 +69,9 @@ func (_e *MockClientInterface_Expecter) CreatePVC(ctx interface{}, namespace int
 	return &MockClientInterface_CreatePVC_Call{Call: _e.mock.On("CreatePVC", ctx, namespace, pvcName, size, opts)}
 }
 
-func (_c *MockClientInterface_CreatePVC_Call) Run(run func(ctx context.Context, namespace string, pvcName string, size resource.Quantity, opts CreatePVCOptions)) *MockClientInterface_CreatePVC_Call {
+func (_c *MockClientInterface_CreatePVC_Call) Run(run func(ctx *contexts.Context, namespace string, pvcName string, size resource.Quantity, opts CreatePVCOptions)) *MockClientInterface_CreatePVC_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(resource.Quantity), args[4].(CreatePVCOptions))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(resource.Quantity), args[4].(CreatePVCOptions))
 	})
 	return _c
 }
@@ -81,13 +81,13 @@ func (_c *MockClientInterface_CreatePVC_Call) Return(_a0 *v1.PersistentVolumeCla
 	return _c
 }
 
-func (_c *MockClientInterface_CreatePVC_Call) RunAndReturn(run func(context.Context, string, string, resource.Quantity, CreatePVCOptions) (*v1.PersistentVolumeClaim, error)) *MockClientInterface_CreatePVC_Call {
+func (_c *MockClientInterface_CreatePVC_Call) RunAndReturn(run func(*contexts.Context, string, string, resource.Quantity, CreatePVCOptions) (*v1.PersistentVolumeClaim, error)) *MockClientInterface_CreatePVC_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // CreatePod provides a mock function with given fields: ctx, namespace, pod
-func (_m *MockClientInterface) CreatePod(ctx context.Context, namespace string, pod *v1.Pod) (*v1.Pod, error) {
+func (_m *MockClientInterface) CreatePod(ctx *contexts.Context, namespace string, pod *v1.Pod) (*v1.Pod, error) {
 	ret := _m.Called(ctx, namespace, pod)
 
 	if len(ret) == 0 {
@@ -96,10 +96,10 @@ func (_m *MockClientInterface) CreatePod(ctx context.Context, namespace string, 
 
 	var r0 *v1.Pod
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v1.Pod) (*v1.Pod, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, *v1.Pod) (*v1.Pod, error)); ok {
 		return rf(ctx, namespace, pod)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v1.Pod) *v1.Pod); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, *v1.Pod) *v1.Pod); ok {
 		r0 = rf(ctx, namespace, pod)
 	} else {
 		if ret.Get(0) != nil {
@@ -107,7 +107,7 @@ func (_m *MockClientInterface) CreatePod(ctx context.Context, namespace string, 
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v1.Pod) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, *v1.Pod) error); ok {
 		r1 = rf(ctx, namespace, pod)
 	} else {
 		r1 = ret.Error(1)
@@ -122,16 +122,16 @@ type MockClientInterface_CreatePod_Call struct {
 }
 
 // CreatePod is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - pod *v1.Pod
 func (_e *MockClientInterface_Expecter) CreatePod(ctx interface{}, namespace interface{}, pod interface{}) *MockClientInterface_CreatePod_Call {
 	return &MockClientInterface_CreatePod_Call{Call: _e.mock.On("CreatePod", ctx, namespace, pod)}
 }
 
-func (_c *MockClientInterface_CreatePod_Call) Run(run func(ctx context.Context, namespace string, pod *v1.Pod)) *MockClientInterface_CreatePod_Call {
+func (_c *MockClientInterface_CreatePod_Call) Run(run func(ctx *contexts.Context, namespace string, pod *v1.Pod)) *MockClientInterface_CreatePod_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*v1.Pod))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(*v1.Pod))
 	})
 	return _c
 }
@@ -141,13 +141,13 @@ func (_c *MockClientInterface_CreatePod_Call) Return(_a0 *v1.Pod, _a1 error) *Mo
 	return _c
 }
 
-func (_c *MockClientInterface_CreatePod_Call) RunAndReturn(run func(context.Context, string, *v1.Pod) (*v1.Pod, error)) *MockClientInterface_CreatePod_Call {
+func (_c *MockClientInterface_CreatePod_Call) RunAndReturn(run func(*contexts.Context, string, *v1.Pod) (*v1.Pod, error)) *MockClientInterface_CreatePod_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // CreateService provides a mock function with given fields: ctx, namespce, service
-func (_m *MockClientInterface) CreateService(ctx context.Context, namespce string, service *v1.Service) (*v1.Service, error) {
+func (_m *MockClientInterface) CreateService(ctx *contexts.Context, namespce string, service *v1.Service) (*v1.Service, error) {
 	ret := _m.Called(ctx, namespce, service)
 
 	if len(ret) == 0 {
@@ -156,10 +156,10 @@ func (_m *MockClientInterface) CreateService(ctx context.Context, namespce strin
 
 	var r0 *v1.Service
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v1.Service) (*v1.Service, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, *v1.Service) (*v1.Service, error)); ok {
 		return rf(ctx, namespce, service)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v1.Service) *v1.Service); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, *v1.Service) *v1.Service); ok {
 		r0 = rf(ctx, namespce, service)
 	} else {
 		if ret.Get(0) != nil {
@@ -167,7 +167,7 @@ func (_m *MockClientInterface) CreateService(ctx context.Context, namespce strin
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v1.Service) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, *v1.Service) error); ok {
 		r1 = rf(ctx, namespce, service)
 	} else {
 		r1 = ret.Error(1)
@@ -182,16 +182,16 @@ type MockClientInterface_CreateService_Call struct {
 }
 
 // CreateService is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespce string
 //   - service *v1.Service
 func (_e *MockClientInterface_Expecter) CreateService(ctx interface{}, namespce interface{}, service interface{}) *MockClientInterface_CreateService_Call {
 	return &MockClientInterface_CreateService_Call{Call: _e.mock.On("CreateService", ctx, namespce, service)}
 }
 
-func (_c *MockClientInterface_CreateService_Call) Run(run func(ctx context.Context, namespce string, service *v1.Service)) *MockClientInterface_CreateService_Call {
+func (_c *MockClientInterface_CreateService_Call) Run(run func(ctx *contexts.Context, namespce string, service *v1.Service)) *MockClientInterface_CreateService_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*v1.Service))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(*v1.Service))
 	})
 	return _c
 }
@@ -201,13 +201,13 @@ func (_c *MockClientInterface_CreateService_Call) Return(_a0 *v1.Service, _a1 er
 	return _c
 }
 
-func (_c *MockClientInterface_CreateService_Call) RunAndReturn(run func(context.Context, string, *v1.Service) (*v1.Service, error)) *MockClientInterface_CreateService_Call {
+func (_c *MockClientInterface_CreateService_Call) RunAndReturn(run func(*contexts.Context, string, *v1.Service) (*v1.Service, error)) *MockClientInterface_CreateService_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DeletePVC provides a mock function with given fields: ctx, namespace, volumeName
-func (_m *MockClientInterface) DeletePVC(ctx context.Context, namespace string, volumeName string) error {
+func (_m *MockClientInterface) DeletePVC(ctx *contexts.Context, namespace string, volumeName string) error {
 	ret := _m.Called(ctx, namespace, volumeName)
 
 	if len(ret) == 0 {
@@ -215,7 +215,7 @@ func (_m *MockClientInterface) DeletePVC(ctx context.Context, namespace string, 
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) error); ok {
 		r0 = rf(ctx, namespace, volumeName)
 	} else {
 		r0 = ret.Error(0)
@@ -230,16 +230,16 @@ type MockClientInterface_DeletePVC_Call struct {
 }
 
 // DeletePVC is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - volumeName string
 func (_e *MockClientInterface_Expecter) DeletePVC(ctx interface{}, namespace interface{}, volumeName interface{}) *MockClientInterface_DeletePVC_Call {
 	return &MockClientInterface_DeletePVC_Call{Call: _e.mock.On("DeletePVC", ctx, namespace, volumeName)}
 }
 
-func (_c *MockClientInterface_DeletePVC_Call) Run(run func(ctx context.Context, namespace string, volumeName string)) *MockClientInterface_DeletePVC_Call {
+func (_c *MockClientInterface_DeletePVC_Call) Run(run func(ctx *contexts.Context, namespace string, volumeName string)) *MockClientInterface_DeletePVC_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -249,13 +249,13 @@ func (_c *MockClientInterface_DeletePVC_Call) Return(_a0 error) *MockClientInter
 	return _c
 }
 
-func (_c *MockClientInterface_DeletePVC_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClientInterface_DeletePVC_Call {
+func (_c *MockClientInterface_DeletePVC_Call) RunAndReturn(run func(*contexts.Context, string, string) error) *MockClientInterface_DeletePVC_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DeletePod provides a mock function with given fields: ctx, namespace, name
-func (_m *MockClientInterface) DeletePod(ctx context.Context, namespace string, name string) error {
+func (_m *MockClientInterface) DeletePod(ctx *contexts.Context, namespace string, name string) error {
 	ret := _m.Called(ctx, namespace, name)
 
 	if len(ret) == 0 {
@@ -263,7 +263,7 @@ func (_m *MockClientInterface) DeletePod(ctx context.Context, namespace string, 
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) error); ok {
 		r0 = rf(ctx, namespace, name)
 	} else {
 		r0 = ret.Error(0)
@@ -278,16 +278,16 @@ type MockClientInterface_DeletePod_Call struct {
 }
 
 // DeletePod is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 func (_e *MockClientInterface_Expecter) DeletePod(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_DeletePod_Call {
 	return &MockClientInterface_DeletePod_Call{Call: _e.mock.On("DeletePod", ctx, namespace, name)}
 }
 
-func (_c *MockClientInterface_DeletePod_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockClientInterface_DeletePod_Call {
+func (_c *MockClientInterface_DeletePod_Call) Run(run func(ctx *contexts.Context, namespace string, name string)) *MockClientInterface_DeletePod_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -297,13 +297,13 @@ func (_c *MockClientInterface_DeletePod_Call) Return(_a0 error) *MockClientInter
 	return _c
 }
 
-func (_c *MockClientInterface_DeletePod_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClientInterface_DeletePod_Call {
+func (_c *MockClientInterface_DeletePod_Call) RunAndReturn(run func(*contexts.Context, string, string) error) *MockClientInterface_DeletePod_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DeleteService provides a mock function with given fields: ctx, namespace, name
-func (_m *MockClientInterface) DeleteService(ctx context.Context, namespace string, name string) error {
+func (_m *MockClientInterface) DeleteService(ctx *contexts.Context, namespace string, name string) error {
 	ret := _m.Called(ctx, namespace, name)
 
 	if len(ret) == 0 {
@@ -311,7 +311,7 @@ func (_m *MockClientInterface) DeleteService(ctx context.Context, namespace stri
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) error); ok {
 		r0 = rf(ctx, namespace, name)
 	} else {
 		r0 = ret.Error(0)
@@ -326,16 +326,16 @@ type MockClientInterface_DeleteService_Call struct {
 }
 
 // DeleteService is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 func (_e *MockClientInterface_Expecter) DeleteService(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_DeleteService_Call {
 	return &MockClientInterface_DeleteService_Call{Call: _e.mock.On("DeleteService", ctx, namespace, name)}
 }
 
-func (_c *MockClientInterface_DeleteService_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockClientInterface_DeleteService_Call {
+func (_c *MockClientInterface_DeleteService_Call) Run(run func(ctx *contexts.Context, namespace string, name string)) *MockClientInterface_DeleteService_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -345,13 +345,13 @@ func (_c *MockClientInterface_DeleteService_Call) Return(_a0 error) *MockClientI
 	return _c
 }
 
-func (_c *MockClientInterface_DeleteService_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClientInterface_DeleteService_Call {
+func (_c *MockClientInterface_DeleteService_Call) RunAndReturn(run func(*contexts.Context, string, string) error) *MockClientInterface_DeleteService_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DoesPVCExist provides a mock function with given fields: ctx, namespace, name
-func (_m *MockClientInterface) DoesPVCExist(ctx context.Context, namespace string, name string) (bool, error) {
+func (_m *MockClientInterface) DoesPVCExist(ctx *contexts.Context, namespace string, name string) (bool, error) {
 	ret := _m.Called(ctx, namespace, name)
 
 	if len(ret) == 0 {
@@ -360,16 +360,16 @@ func (_m *MockClientInterface) DoesPVCExist(ctx context.Context, namespace strin
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) (bool, error)); ok {
 		return rf(ctx, namespace, name)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) bool); ok {
 		r0 = rf(ctx, namespace, name)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string) error); ok {
 		r1 = rf(ctx, namespace, name)
 	} else {
 		r1 = ret.Error(1)
@@ -384,16 +384,16 @@ type MockClientInterface_DoesPVCExist_Call struct {
 }
 
 // DoesPVCExist is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 func (_e *MockClientInterface_Expecter) DoesPVCExist(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_DoesPVCExist_Call {
 	return &MockClientInterface_DoesPVCExist_Call{Call: _e.mock.On("DoesPVCExist", ctx, namespace, name)}
 }
 
-func (_c *MockClientInterface_DoesPVCExist_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockClientInterface_DoesPVCExist_Call {
+func (_c *MockClientInterface_DoesPVCExist_Call) Run(run func(ctx *contexts.Context, namespace string, name string)) *MockClientInterface_DoesPVCExist_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -403,13 +403,13 @@ func (_c *MockClientInterface_DoesPVCExist_Call) Return(_a0 bool, _a1 error) *Mo
 	return _c
 }
 
-func (_c *MockClientInterface_DoesPVCExist_Call) RunAndReturn(run func(context.Context, string, string) (bool, error)) *MockClientInterface_DoesPVCExist_Call {
+func (_c *MockClientInterface_DoesPVCExist_Call) RunAndReturn(run func(*contexts.Context, string, string) (bool, error)) *MockClientInterface_DoesPVCExist_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // EnsurePVCExists provides a mock function with given fields: ctx, namespace, pvcName, size, opts
-func (_m *MockClientInterface) EnsurePVCExists(ctx context.Context, namespace string, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*v1.PersistentVolumeClaim, error) {
+func (_m *MockClientInterface) EnsurePVCExists(ctx *contexts.Context, namespace string, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*v1.PersistentVolumeClaim, error) {
 	ret := _m.Called(ctx, namespace, pvcName, size, opts)
 
 	if len(ret) == 0 {
@@ -418,10 +418,10 @@ func (_m *MockClientInterface) EnsurePVCExists(ctx context.Context, namespace st
 
 	var r0 *v1.PersistentVolumeClaim
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, resource.Quantity, CreatePVCOptions) (*v1.PersistentVolumeClaim, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, resource.Quantity, CreatePVCOptions) (*v1.PersistentVolumeClaim, error)); ok {
 		return rf(ctx, namespace, pvcName, size, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, resource.Quantity, CreatePVCOptions) *v1.PersistentVolumeClaim); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, resource.Quantity, CreatePVCOptions) *v1.PersistentVolumeClaim); ok {
 		r0 = rf(ctx, namespace, pvcName, size, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -429,7 +429,7 @@ func (_m *MockClientInterface) EnsurePVCExists(ctx context.Context, namespace st
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, resource.Quantity, CreatePVCOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, resource.Quantity, CreatePVCOptions) error); ok {
 		r1 = rf(ctx, namespace, pvcName, size, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -444,7 +444,7 @@ type MockClientInterface_EnsurePVCExists_Call struct {
 }
 
 // EnsurePVCExists is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - pvcName string
 //   - size resource.Quantity
@@ -453,9 +453,9 @@ func (_e *MockClientInterface_Expecter) EnsurePVCExists(ctx interface{}, namespa
 	return &MockClientInterface_EnsurePVCExists_Call{Call: _e.mock.On("EnsurePVCExists", ctx, namespace, pvcName, size, opts)}
 }
 
-func (_c *MockClientInterface_EnsurePVCExists_Call) Run(run func(ctx context.Context, namespace string, pvcName string, size resource.Quantity, opts CreatePVCOptions)) *MockClientInterface_EnsurePVCExists_Call {
+func (_c *MockClientInterface_EnsurePVCExists_Call) Run(run func(ctx *contexts.Context, namespace string, pvcName string, size resource.Quantity, opts CreatePVCOptions)) *MockClientInterface_EnsurePVCExists_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(resource.Quantity), args[4].(CreatePVCOptions))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(resource.Quantity), args[4].(CreatePVCOptions))
 	})
 	return _c
 }
@@ -465,13 +465,13 @@ func (_c *MockClientInterface_EnsurePVCExists_Call) Return(_a0 *v1.PersistentVol
 	return _c
 }
 
-func (_c *MockClientInterface_EnsurePVCExists_Call) RunAndReturn(run func(context.Context, string, string, resource.Quantity, CreatePVCOptions) (*v1.PersistentVolumeClaim, error)) *MockClientInterface_EnsurePVCExists_Call {
+func (_c *MockClientInterface_EnsurePVCExists_Call) RunAndReturn(run func(*contexts.Context, string, string, resource.Quantity, CreatePVCOptions) (*v1.PersistentVolumeClaim, error)) *MockClientInterface_EnsurePVCExists_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetEndpoint provides a mock function with given fields: ctx, namespace, name
-func (_m *MockClientInterface) GetEndpoint(ctx context.Context, namespace string, name string) (*v1.Endpoints, error) {
+func (_m *MockClientInterface) GetEndpoint(ctx *contexts.Context, namespace string, name string) (*v1.Endpoints, error) {
 	ret := _m.Called(ctx, namespace, name)
 
 	if len(ret) == 0 {
@@ -480,10 +480,10 @@ func (_m *MockClientInterface) GetEndpoint(ctx context.Context, namespace string
 
 	var r0 *v1.Endpoints
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*v1.Endpoints, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) (*v1.Endpoints, error)); ok {
 		return rf(ctx, namespace, name)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.Endpoints); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) *v1.Endpoints); ok {
 		r0 = rf(ctx, namespace, name)
 	} else {
 		if ret.Get(0) != nil {
@@ -491,7 +491,7 @@ func (_m *MockClientInterface) GetEndpoint(ctx context.Context, namespace string
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string) error); ok {
 		r1 = rf(ctx, namespace, name)
 	} else {
 		r1 = ret.Error(1)
@@ -506,16 +506,16 @@ type MockClientInterface_GetEndpoint_Call struct {
 }
 
 // GetEndpoint is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 func (_e *MockClientInterface_Expecter) GetEndpoint(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_GetEndpoint_Call {
 	return &MockClientInterface_GetEndpoint_Call{Call: _e.mock.On("GetEndpoint", ctx, namespace, name)}
 }
 
-func (_c *MockClientInterface_GetEndpoint_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockClientInterface_GetEndpoint_Call {
+func (_c *MockClientInterface_GetEndpoint_Call) Run(run func(ctx *contexts.Context, namespace string, name string)) *MockClientInterface_GetEndpoint_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -525,13 +525,13 @@ func (_c *MockClientInterface_GetEndpoint_Call) Return(_a0 *v1.Endpoints, _a1 er
 	return _c
 }
 
-func (_c *MockClientInterface_GetEndpoint_Call) RunAndReturn(run func(context.Context, string, string) (*v1.Endpoints, error)) *MockClientInterface_GetEndpoint_Call {
+func (_c *MockClientInterface_GetEndpoint_Call) RunAndReturn(run func(*contexts.Context, string, string) (*v1.Endpoints, error)) *MockClientInterface_GetEndpoint_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetPVC provides a mock function with given fields: ctx, namespace, name
-func (_m *MockClientInterface) GetPVC(ctx context.Context, namespace string, name string) (*v1.PersistentVolumeClaim, error) {
+func (_m *MockClientInterface) GetPVC(ctx *contexts.Context, namespace string, name string) (*v1.PersistentVolumeClaim, error) {
 	ret := _m.Called(ctx, namespace, name)
 
 	if len(ret) == 0 {
@@ -540,10 +540,10 @@ func (_m *MockClientInterface) GetPVC(ctx context.Context, namespace string, nam
 
 	var r0 *v1.PersistentVolumeClaim
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*v1.PersistentVolumeClaim, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) (*v1.PersistentVolumeClaim, error)); ok {
 		return rf(ctx, namespace, name)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.PersistentVolumeClaim); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) *v1.PersistentVolumeClaim); ok {
 		r0 = rf(ctx, namespace, name)
 	} else {
 		if ret.Get(0) != nil {
@@ -551,7 +551,7 @@ func (_m *MockClientInterface) GetPVC(ctx context.Context, namespace string, nam
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string) error); ok {
 		r1 = rf(ctx, namespace, name)
 	} else {
 		r1 = ret.Error(1)
@@ -566,16 +566,16 @@ type MockClientInterface_GetPVC_Call struct {
 }
 
 // GetPVC is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 func (_e *MockClientInterface_Expecter) GetPVC(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_GetPVC_Call {
 	return &MockClientInterface_GetPVC_Call{Call: _e.mock.On("GetPVC", ctx, namespace, name)}
 }
 
-func (_c *MockClientInterface_GetPVC_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockClientInterface_GetPVC_Call {
+func (_c *MockClientInterface_GetPVC_Call) Run(run func(ctx *contexts.Context, namespace string, name string)) *MockClientInterface_GetPVC_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -585,13 +585,13 @@ func (_c *MockClientInterface_GetPVC_Call) Return(_a0 *v1.PersistentVolumeClaim,
 	return _c
 }
 
-func (_c *MockClientInterface_GetPVC_Call) RunAndReturn(run func(context.Context, string, string) (*v1.PersistentVolumeClaim, error)) *MockClientInterface_GetPVC_Call {
+func (_c *MockClientInterface_GetPVC_Call) RunAndReturn(run func(*contexts.Context, string, string) (*v1.PersistentVolumeClaim, error)) *MockClientInterface_GetPVC_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // WaitForReadyEndpoint provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyEndpoint(ctx context.Context, namespace string, name string, opts WaitForReadyEndpointOpts) (*v1.Endpoints, error) {
+func (_m *MockClientInterface) WaitForReadyEndpoint(ctx *contexts.Context, namespace string, name string, opts WaitForReadyEndpointOpts) (*v1.Endpoints, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
@@ -600,10 +600,10 @@ func (_m *MockClientInterface) WaitForReadyEndpoint(ctx context.Context, namespa
 
 	var r0 *v1.Endpoints
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyEndpointOpts) (*v1.Endpoints, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyEndpointOpts) (*v1.Endpoints, error)); ok {
 		return rf(ctx, namespace, name, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyEndpointOpts) *v1.Endpoints); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyEndpointOpts) *v1.Endpoints); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -611,7 +611,7 @@ func (_m *MockClientInterface) WaitForReadyEndpoint(ctx context.Context, namespa
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyEndpointOpts) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, WaitForReadyEndpointOpts) error); ok {
 		r1 = rf(ctx, namespace, name, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -626,7 +626,7 @@ type MockClientInterface_WaitForReadyEndpoint_Call struct {
 }
 
 // WaitForReadyEndpoint is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 //   - opts WaitForReadyEndpointOpts
@@ -634,9 +634,9 @@ func (_e *MockClientInterface_Expecter) WaitForReadyEndpoint(ctx interface{}, na
 	return &MockClientInterface_WaitForReadyEndpoint_Call{Call: _e.mock.On("WaitForReadyEndpoint", ctx, namespace, name, opts)}
 }
 
-func (_c *MockClientInterface_WaitForReadyEndpoint_Call) Run(run func(ctx context.Context, namespace string, name string, opts WaitForReadyEndpointOpts)) *MockClientInterface_WaitForReadyEndpoint_Call {
+func (_c *MockClientInterface_WaitForReadyEndpoint_Call) Run(run func(ctx *contexts.Context, namespace string, name string, opts WaitForReadyEndpointOpts)) *MockClientInterface_WaitForReadyEndpoint_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(WaitForReadyEndpointOpts))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(WaitForReadyEndpointOpts))
 	})
 	return _c
 }
@@ -646,13 +646,13 @@ func (_c *MockClientInterface_WaitForReadyEndpoint_Call) Return(_a0 *v1.Endpoint
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyEndpoint_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyEndpointOpts) (*v1.Endpoints, error)) *MockClientInterface_WaitForReadyEndpoint_Call {
+func (_c *MockClientInterface_WaitForReadyEndpoint_Call) RunAndReturn(run func(*contexts.Context, string, string, WaitForReadyEndpointOpts) (*v1.Endpoints, error)) *MockClientInterface_WaitForReadyEndpoint_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // WaitForReadyPod provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyPod(ctx context.Context, namespace string, name string, opts WaitForReadyPodOpts) (*v1.Pod, error) {
+func (_m *MockClientInterface) WaitForReadyPod(ctx *contexts.Context, namespace string, name string, opts WaitForReadyPodOpts) (*v1.Pod, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
@@ -661,10 +661,10 @@ func (_m *MockClientInterface) WaitForReadyPod(ctx context.Context, namespace st
 
 	var r0 *v1.Pod
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyPodOpts) (*v1.Pod, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyPodOpts) (*v1.Pod, error)); ok {
 		return rf(ctx, namespace, name, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyPodOpts) *v1.Pod); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyPodOpts) *v1.Pod); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -672,7 +672,7 @@ func (_m *MockClientInterface) WaitForReadyPod(ctx context.Context, namespace st
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyPodOpts) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, WaitForReadyPodOpts) error); ok {
 		r1 = rf(ctx, namespace, name, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -687,7 +687,7 @@ type MockClientInterface_WaitForReadyPod_Call struct {
 }
 
 // WaitForReadyPod is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 //   - opts WaitForReadyPodOpts
@@ -695,9 +695,9 @@ func (_e *MockClientInterface_Expecter) WaitForReadyPod(ctx interface{}, namespa
 	return &MockClientInterface_WaitForReadyPod_Call{Call: _e.mock.On("WaitForReadyPod", ctx, namespace, name, opts)}
 }
 
-func (_c *MockClientInterface_WaitForReadyPod_Call) Run(run func(ctx context.Context, namespace string, name string, opts WaitForReadyPodOpts)) *MockClientInterface_WaitForReadyPod_Call {
+func (_c *MockClientInterface_WaitForReadyPod_Call) Run(run func(ctx *contexts.Context, namespace string, name string, opts WaitForReadyPodOpts)) *MockClientInterface_WaitForReadyPod_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(WaitForReadyPodOpts))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(WaitForReadyPodOpts))
 	})
 	return _c
 }
@@ -707,13 +707,13 @@ func (_c *MockClientInterface_WaitForReadyPod_Call) Return(_a0 *v1.Pod, _a1 erro
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyPod_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyPodOpts) (*v1.Pod, error)) *MockClientInterface_WaitForReadyPod_Call {
+func (_c *MockClientInterface_WaitForReadyPod_Call) RunAndReturn(run func(*contexts.Context, string, string, WaitForReadyPodOpts) (*v1.Pod, error)) *MockClientInterface_WaitForReadyPod_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // WaitForReadyService provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyService(ctx context.Context, namespace string, name string, opts WaitForReadyServiceOpts) (*v1.Service, error) {
+func (_m *MockClientInterface) WaitForReadyService(ctx *contexts.Context, namespace string, name string, opts WaitForReadyServiceOpts) (*v1.Service, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
@@ -722,10 +722,10 @@ func (_m *MockClientInterface) WaitForReadyService(ctx context.Context, namespac
 
 	var r0 *v1.Service
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyServiceOpts) (*v1.Service, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyServiceOpts) (*v1.Service, error)); ok {
 		return rf(ctx, namespace, name, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyServiceOpts) *v1.Service); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyServiceOpts) *v1.Service); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -733,7 +733,7 @@ func (_m *MockClientInterface) WaitForReadyService(ctx context.Context, namespac
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyServiceOpts) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, WaitForReadyServiceOpts) error); ok {
 		r1 = rf(ctx, namespace, name, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -748,7 +748,7 @@ type MockClientInterface_WaitForReadyService_Call struct {
 }
 
 // WaitForReadyService is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 //   - opts WaitForReadyServiceOpts
@@ -756,9 +756,9 @@ func (_e *MockClientInterface_Expecter) WaitForReadyService(ctx interface{}, nam
 	return &MockClientInterface_WaitForReadyService_Call{Call: _e.mock.On("WaitForReadyService", ctx, namespace, name, opts)}
 }
 
-func (_c *MockClientInterface_WaitForReadyService_Call) Run(run func(ctx context.Context, namespace string, name string, opts WaitForReadyServiceOpts)) *MockClientInterface_WaitForReadyService_Call {
+func (_c *MockClientInterface_WaitForReadyService_Call) Run(run func(ctx *contexts.Context, namespace string, name string, opts WaitForReadyServiceOpts)) *MockClientInterface_WaitForReadyService_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(WaitForReadyServiceOpts))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(WaitForReadyServiceOpts))
 	})
 	return _c
 }
@@ -768,7 +768,7 @@ func (_c *MockClientInterface_WaitForReadyService_Call) Return(_a0 *v1.Service, 
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyService_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyServiceOpts) (*v1.Service, error)) *MockClientInterface_WaitForReadyService_Call {
+func (_c *MockClientInterface_WaitForReadyService_Call) RunAndReturn(run func(*contexts.Context, string, string, WaitForReadyServiceOpts) (*v1.Service, error)) *MockClientInterface_WaitForReadyService_Call {
 	_c.Call.Return(run)
 	return _c
 }

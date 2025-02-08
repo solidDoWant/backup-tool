@@ -1,24 +1,23 @@
 package certmanager
 
 import (
-	"context"
-
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/cert-manager/cert-manager/pkg/client/clientset/versioned"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"k8s.io/client-go/rest"
 )
 
 type ClientInterface interface {
 	// Issuers
-	CreateIssuer(ctx context.Context, namespace, name, caCertSecretName string, opts CreateIssuerOptions) (*certmanagerv1.Issuer, error)
-	WaitForReadyIssuer(ctx context.Context, namespace, name string, opts WaitForReadyIssuerOpts) (*certmanagerv1.Issuer, error)
-	DeleteIssuer(ctx context.Context, namespace, name string) error
+	CreateIssuer(ctx *contexts.Context, namespace, name, caCertSecretName string, opts CreateIssuerOptions) (*certmanagerv1.Issuer, error)
+	WaitForReadyIssuer(ctx *contexts.Context, namespace, name string, opts WaitForReadyIssuerOpts) (*certmanagerv1.Issuer, error)
+	DeleteIssuer(ctx *contexts.Context, namespace, name string) error
 	// Certificates
-	CreateCertificate(ctx context.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error)
-	WaitForReadyCertificate(ctx context.Context, namespace, name string, opts WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error)
-	ReissueCertificate(ctx context.Context, namespace, name string) (*certmanagerv1.Certificate, error)
-	DeleteCertificate(ctx context.Context, namespace, name string) error
+	CreateCertificate(ctx *contexts.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error)
+	WaitForReadyCertificate(ctx *contexts.Context, namespace, name string, opts WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error)
+	ReissueCertificate(ctx *contexts.Context, namespace, name string) (*certmanagerv1.Certificate, error)
+	DeleteCertificate(ctx *contexts.Context, namespace, name string) error
 }
 
 type Client struct {

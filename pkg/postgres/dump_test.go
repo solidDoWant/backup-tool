@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/samber/lo"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -97,7 +98,7 @@ func TestDumpAll(t *testing.T) {
 			t.Parallel()
 
 			// Create a context for signaling when the process should pretend to be complete
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			processCtx, cancel := context.WithCancel(ctx)
 			defer cancel()
 

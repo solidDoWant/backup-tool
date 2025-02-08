@@ -1,12 +1,12 @@
 package cleanup
 
 import (
-	"context"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +49,7 @@ func TestToWithTimeout(t *testing.T) {
 			}
 
 			called := false
-			testFunc := func(ctx context.Context) error {
+			testFunc := func(ctx *contexts.Context) error {
 				called = true
 				<-ctx.Done() // Wait for the context to be canceled to simulate a timeout
 				return nil

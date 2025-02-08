@@ -1,9 +1,8 @@
 package clients
 
 import (
-	"context"
-
 	"github.com/gravitational/trace/trail"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	files_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/files/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -19,7 +18,7 @@ func NewFilesClient(grpcConnection grpc.ClientConnInterface) *FilesClient {
 	}
 }
 
-func (fc *FilesClient) CopyFiles(ctx context.Context, src, dest string) error {
+func (fc *FilesClient) CopyFiles(ctx *contexts.Context, src, dest string) error {
 	request := files_v1.CopyFilesRequest_builder{
 		Source: &src,
 		Dest:   &dest,
@@ -30,7 +29,7 @@ func (fc *FilesClient) CopyFiles(ctx context.Context, src, dest string) error {
 	return trail.FromGRPC(err, header)
 }
 
-func (fc *FilesClient) SyncFiles(ctx context.Context, src, dest string) error {
+func (fc *FilesClient) SyncFiles(ctx *contexts.Context, src, dest string) error {
 	request := files_v1.SyncFilesRequest_builder{
 		Source: &src,
 		Dest:   &dest,

@@ -1,13 +1,13 @@
 package clients
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
 
 	postgres_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/postgres/v1"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
@@ -195,7 +195,7 @@ func TestDumpAll(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := postgres_v1.NewMockPostgresClient()
 
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			credentials := postgres.Credentials(postgres.EnvironmentCredentials(tt.credentials))
 
 			// Setup the mock function call

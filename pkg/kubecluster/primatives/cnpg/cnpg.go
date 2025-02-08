@@ -1,11 +1,11 @@
 package cnpg
 
 import (
-	"context"
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	corev1 "k8s.io/api/core/v1"
@@ -23,7 +23,7 @@ type CreateBackupOptions struct {
 	Target *apiv1.BackupTarget
 }
 
-func (cnpgc *Client) CreateBackup(ctx context.Context, namespace, backupName, clusterName string, opts CreateBackupOptions) (*apiv1.Backup, error) {
+func (cnpgc *Client) CreateBackup(ctx *contexts.Context, namespace, backupName, clusterName string, opts CreateBackupOptions) (*apiv1.Backup, error) {
 	backup := &apiv1.Backup{
 		Spec: apiv1.BackupSpec{
 			Cluster: apiv1.LocalObjectReference{
@@ -60,8 +60,8 @@ type WaitForReadyBackupOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (cnpgc *Client) WaitForReadyBackup(ctx context.Context, namespace, name string, opts WaitForReadyBackupOpts) (*apiv1.Backup, error) {
-	precondition := func(_ context.Context, backup *apiv1.Backup) (*apiv1.Backup, bool, error) {
+func (cnpgc *Client) WaitForReadyBackup(ctx *contexts.Context, namespace, name string, opts WaitForReadyBackupOpts) (*apiv1.Backup, error) {
+	precondition := func(_ *contexts.Context, backup *apiv1.Backup) (*apiv1.Backup, bool, error) {
 		switch backup.Status.Phase {
 		case apiv1.BackupPhaseCompleted:
 			return backup, true, nil
@@ -81,7 +81,7 @@ func (cnpgc *Client) WaitForReadyBackup(ctx context.Context, namespace, name str
 	return backup, nil
 }
 
-func (cnpgc *Client) DeleteBackup(ctx context.Context, namespace, name string) error {
+func (cnpgc *Client) DeleteBackup(ctx *contexts.Context, namespace, name string) error {
 	err := cnpgc.cnpgClient.PostgresqlV1().Backups(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 
 	// TODO maybe delete snapshot, if backup was created with snapshot and it wasn't deleted?
@@ -104,7 +104,7 @@ type CreateClusterOptions struct {
 
 // Create a cluster for backup/recovery purposes specifically. Not intended for use general use. The created cluster should not be used by applications.
 // Created cluster contains a single database server instance. Cluster can optionally be created from a backup. TLS authentication is required.
-func (cnpgc *Client) CreateCluster(ctx context.Context, namespace, clusterName string,
+func (cnpgc *Client) CreateCluster(ctx *contexts.Context, namespace, clusterName string,
 	volumeSize resource.Quantity, servingCertificateSecretName, clientCASecretName, replicationUserCertName string,
 	opts CreateClusterOptions) (*apiv1.Cluster, error) {
 	cluster := &apiv1.Cluster{
@@ -177,8 +177,8 @@ type WaitForReadyClusterOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (cnpgc *Client) WaitForReadyCluster(ctx context.Context, namespace, name string, opts WaitForReadyClusterOpts) (*apiv1.Cluster, error) {
-	precondition := func(_ context.Context, cluster *apiv1.Cluster) (*apiv1.Cluster, bool, error) {
+func (cnpgc *Client) WaitForReadyCluster(ctx *contexts.Context, namespace, name string, opts WaitForReadyClusterOpts) (*apiv1.Cluster, error) {
+	precondition := func(_ *contexts.Context, cluster *apiv1.Cluster) (*apiv1.Cluster, bool, error) {
 		isReady := false
 		for _, condition := range cluster.Status.Conditions {
 			if condition.Type != string(apiv1.ConditionClusterReady) {
@@ -202,7 +202,7 @@ func (cnpgc *Client) WaitForReadyCluster(ctx context.Context, namespace, name st
 	return cluster, nil
 }
 
-func (cnpgc *Client) GetCluster(ctx context.Context, namespace, name string) (*apiv1.Cluster, error) {
+func (cnpgc *Client) GetCluster(ctx *contexts.Context, namespace, name string) (*apiv1.Cluster, error) {
 	cluster, err := cnpgc.cnpgClient.PostgresqlV1().Clusters(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to delete CNPG cluster %q", helpers.FullNameStr(namespace, name))
@@ -211,7 +211,7 @@ func (cnpgc *Client) GetCluster(ctx context.Context, namespace, name string) (*a
 	return cluster, nil
 }
 
-func (cnpgc *Client) DeleteCluster(ctx context.Context, namespace, name string) error {
+func (cnpgc *Client) DeleteCluster(ctx *contexts.Context, namespace, name string) error {
 	err := cnpgc.cnpgClient.PostgresqlV1().Clusters(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete CNPG cluster %q", helpers.FullNameStr(namespace, name))
 }

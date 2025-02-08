@@ -12,6 +12,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg/gen/clientset/versioned"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -93,7 +94,8 @@ func TestCreateBackup(t *testing.T) {
 				})
 			}
 
-			createdBackup, err := client.CreateBackup(context.Background(), namespace, backupName, clusterName, tt.opts)
+			ctx := th.NewTestContext()
+			createdBackup, err := client.CreateBackup(ctx, namespace, backupName, clusterName, tt.opts)
 			if tt.simulateClientFailure {
 				require.Error(t, err)
 				require.Nil(t, createdBackup)
@@ -185,7 +187,7 @@ func TestWaitForReadyBackup(t *testing.T) {
 			t.Parallel()
 
 			client, cnpgFakeClient, _ := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialBackup != nil {
 				_, err := cnpgFakeClient.PostgresqlV1().Backups(backupNamespace).Create(ctx, tt.initialBackup, metav1.CreateOptions{})
@@ -240,7 +242,7 @@ func TestDeleteBackup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			client, _, _ := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			var existingbackup *apiv1.Backup
 			if tt.shouldSetupBackup {
@@ -437,7 +439,7 @@ func TestCreateCluster(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			client, cnpgFakeClient, apiExtensionsFakeClient := createTestClient()
 
 			if tt.simulateClientFailure {
@@ -546,7 +548,7 @@ func TestWaitForReadyCluster(t *testing.T) {
 			t.Parallel()
 
 			client, cnpgFakeClient, _ := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.initialCluster != nil {
 				_, err := cnpgFakeClient.PostgresqlV1().Clusters(clusterNamespace).Create(ctx, tt.initialCluster, metav1.CreateOptions{})
@@ -615,7 +617,7 @@ func TestGetCluster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			client, cnpgFakeClient, _ := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			if tt.shouldSetupCluster {
 				_, err := cnpgFakeClient.PostgresqlV1().Clusters(namespace).Create(ctx, existingCluster, metav1.CreateOptions{})
@@ -663,7 +665,7 @@ func TestDeleteCluster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			client, cnpgFakeClient, _ := createTestClient()
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 
 			var existingCluster *apiv1.Cluster
 			if tt.shouldSetupCluster {

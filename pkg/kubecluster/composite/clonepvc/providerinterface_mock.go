@@ -3,9 +3,9 @@
 package clonepvc
 
 import (
-	context "context"
-
+	contexts "github.com/solidDoWant/backup-tool/pkg/contexts"
 	mock "github.com/stretchr/testify/mock"
+
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -23,7 +23,7 @@ func (_m *MockProviderInterface) EXPECT() *MockProviderInterface_Expecter {
 }
 
 // ClonePVC provides a mock function with given fields: ctx, namespace, pvcName, opts
-func (_m *MockProviderInterface) ClonePVC(ctx context.Context, namespace string, pvcName string, opts ClonePVCOptions) (*v1.PersistentVolumeClaim, error) {
+func (_m *MockProviderInterface) ClonePVC(ctx *contexts.Context, namespace string, pvcName string, opts ClonePVCOptions) (*v1.PersistentVolumeClaim, error) {
 	ret := _m.Called(ctx, namespace, pvcName, opts)
 
 	if len(ret) == 0 {
@@ -32,10 +32,10 @@ func (_m *MockProviderInterface) ClonePVC(ctx context.Context, namespace string,
 
 	var r0 *v1.PersistentVolumeClaim
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, ClonePVCOptions) (*v1.PersistentVolumeClaim, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, ClonePVCOptions) (*v1.PersistentVolumeClaim, error)); ok {
 		return rf(ctx, namespace, pvcName, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, ClonePVCOptions) *v1.PersistentVolumeClaim); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, ClonePVCOptions) *v1.PersistentVolumeClaim); ok {
 		r0 = rf(ctx, namespace, pvcName, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -43,7 +43,7 @@ func (_m *MockProviderInterface) ClonePVC(ctx context.Context, namespace string,
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, ClonePVCOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, ClonePVCOptions) error); ok {
 		r1 = rf(ctx, namespace, pvcName, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -58,7 +58,7 @@ type MockProviderInterface_ClonePVC_Call struct {
 }
 
 // ClonePVC is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - pvcName string
 //   - opts ClonePVCOptions
@@ -66,9 +66,9 @@ func (_e *MockProviderInterface_Expecter) ClonePVC(ctx interface{}, namespace in
 	return &MockProviderInterface_ClonePVC_Call{Call: _e.mock.On("ClonePVC", ctx, namespace, pvcName, opts)}
 }
 
-func (_c *MockProviderInterface_ClonePVC_Call) Run(run func(ctx context.Context, namespace string, pvcName string, opts ClonePVCOptions)) *MockProviderInterface_ClonePVC_Call {
+func (_c *MockProviderInterface_ClonePVC_Call) Run(run func(ctx *contexts.Context, namespace string, pvcName string, opts ClonePVCOptions)) *MockProviderInterface_ClonePVC_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(ClonePVCOptions))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(ClonePVCOptions))
 	})
 	return _c
 }
@@ -78,7 +78,7 @@ func (_c *MockProviderInterface_ClonePVC_Call) Return(clonedPvc *v1.PersistentVo
 	return _c
 }
 
-func (_c *MockProviderInterface_ClonePVC_Call) RunAndReturn(run func(context.Context, string, string, ClonePVCOptions) (*v1.PersistentVolumeClaim, error)) *MockProviderInterface_ClonePVC_Call {
+func (_c *MockProviderInterface_ClonePVC_Call) RunAndReturn(run func(*contexts.Context, string, string, ClonePVCOptions) (*v1.PersistentVolumeClaim, error)) *MockProviderInterface_ClonePVC_Call {
 	_c.Call.Return(run)
 	return _c
 }

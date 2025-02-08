@@ -1,12 +1,12 @@
 package servers
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	postgres_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/postgres/v1"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"k8s.io/utils/ptr"
@@ -146,10 +146,10 @@ func TestDumpAll(t *testing.T) {
 			server := NewPostgresServer()
 			server.runtime = runtime
 
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			decodedCredentials := decodeCredentials(tc.credentials)
 			decodedOpts := decodeDumpAllOptions(tc.opts)
-			runtime.EXPECT().DumpAll(ctx, decodedCredentials, tc.outputPath, decodedOpts).Return(tc.runtimeErr)
+			runtime.EXPECT().DumpAll(detatchHandlerContext(ctx), decodedCredentials, tc.outputPath, decodedOpts).Return(tc.runtimeErr)
 
 			// Create request
 			req := postgres_v1.DumpAllRequest_builder{

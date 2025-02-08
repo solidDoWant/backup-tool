@@ -1,11 +1,11 @@
 package files
 
-import "context"
+import "github.com/solidDoWant/backup-tool/pkg/contexts"
 
 // Represents a place (i.e. local or remote) where commands can run.
 type Runtime interface {
-	CopyFiles(ctx context.Context, src, dest string) error
-	SyncFiles(ctx context.Context, src, dest string) error
+	CopyFiles(ctx *contexts.Context, src, dest string) error
+	SyncFiles(ctx *contexts.Context, src, dest string) error
 }
 
 type LocalRuntime struct{}

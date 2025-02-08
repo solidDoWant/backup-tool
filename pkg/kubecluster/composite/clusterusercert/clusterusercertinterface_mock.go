@@ -3,10 +3,10 @@
 package clusterusercert
 
 import (
-	context "context"
+	contexts "github.com/solidDoWant/backup-tool/pkg/contexts"
+	mock "github.com/stretchr/testify/mock"
 
 	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	mock "github.com/stretchr/testify/mock"
 
 	v1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 )
@@ -25,7 +25,7 @@ func (_m *MockClusterUserCertInterface) EXPECT() *MockClusterUserCertInterface_E
 }
 
 // Delete provides a mock function with given fields: ctx
-func (_m *MockClusterUserCertInterface) Delete(ctx context.Context) error {
+func (_m *MockClusterUserCertInterface) Delete(ctx *contexts.Context) error {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
@@ -33,7 +33,7 @@ func (_m *MockClusterUserCertInterface) Delete(ctx context.Context) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context) error); ok {
 		r0 = rf(ctx)
 	} else {
 		r0 = ret.Error(0)
@@ -48,14 +48,14 @@ type MockClusterUserCertInterface_Delete_Call struct {
 }
 
 // Delete is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 func (_e *MockClusterUserCertInterface_Expecter) Delete(ctx interface{}) *MockClusterUserCertInterface_Delete_Call {
 	return &MockClusterUserCertInterface_Delete_Call{Call: _e.mock.On("Delete", ctx)}
 }
 
-func (_c *MockClusterUserCertInterface_Delete_Call) Run(run func(ctx context.Context)) *MockClusterUserCertInterface_Delete_Call {
+func (_c *MockClusterUserCertInterface_Delete_Call) Run(run func(ctx *contexts.Context)) *MockClusterUserCertInterface_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(*contexts.Context))
 	})
 	return _c
 }
@@ -65,7 +65,7 @@ func (_c *MockClusterUserCertInterface_Delete_Call) Return(_a0 error) *MockClust
 	return _c
 }
 
-func (_c *MockClusterUserCertInterface_Delete_Call) RunAndReturn(run func(context.Context) error) *MockClusterUserCertInterface_Delete_Call {
+func (_c *MockClusterUserCertInterface_Delete_Call) RunAndReturn(run func(*contexts.Context) error) *MockClusterUserCertInterface_Delete_Call {
 	_c.Call.Return(run)
 	return _c
 }

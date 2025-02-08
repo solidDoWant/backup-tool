@@ -3,9 +3,9 @@
 package cnpg
 
 import (
-	context "context"
-
+	contexts "github.com/solidDoWant/backup-tool/pkg/contexts"
 	mock "github.com/stretchr/testify/mock"
+
 	resource "k8s.io/apimachinery/pkg/api/resource"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -25,7 +25,7 @@ func (_m *MockClientInterface) EXPECT() *MockClientInterface_Expecter {
 }
 
 // CreateBackup provides a mock function with given fields: ctx, namespace, backupName, clusterName, opts
-func (_m *MockClientInterface) CreateBackup(ctx context.Context, namespace string, backupName string, clusterName string, opts CreateBackupOptions) (*v1.Backup, error) {
+func (_m *MockClientInterface) CreateBackup(ctx *contexts.Context, namespace string, backupName string, clusterName string, opts CreateBackupOptions) (*v1.Backup, error) {
 	ret := _m.Called(ctx, namespace, backupName, clusterName, opts)
 
 	if len(ret) == 0 {
@@ -34,10 +34,10 @@ func (_m *MockClientInterface) CreateBackup(ctx context.Context, namespace strin
 
 	var r0 *v1.Backup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, CreateBackupOptions) (*v1.Backup, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, CreateBackupOptions) (*v1.Backup, error)); ok {
 		return rf(ctx, namespace, backupName, clusterName, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, CreateBackupOptions) *v1.Backup); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, CreateBackupOptions) *v1.Backup); ok {
 		r0 = rf(ctx, namespace, backupName, clusterName, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -45,7 +45,7 @@ func (_m *MockClientInterface) CreateBackup(ctx context.Context, namespace strin
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, CreateBackupOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, string, CreateBackupOptions) error); ok {
 		r1 = rf(ctx, namespace, backupName, clusterName, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -60,7 +60,7 @@ type MockClientInterface_CreateBackup_Call struct {
 }
 
 // CreateBackup is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - backupName string
 //   - clusterName string
@@ -69,9 +69,9 @@ func (_e *MockClientInterface_Expecter) CreateBackup(ctx interface{}, namespace 
 	return &MockClientInterface_CreateBackup_Call{Call: _e.mock.On("CreateBackup", ctx, namespace, backupName, clusterName, opts)}
 }
 
-func (_c *MockClientInterface_CreateBackup_Call) Run(run func(ctx context.Context, namespace string, backupName string, clusterName string, opts CreateBackupOptions)) *MockClientInterface_CreateBackup_Call {
+func (_c *MockClientInterface_CreateBackup_Call) Run(run func(ctx *contexts.Context, namespace string, backupName string, clusterName string, opts CreateBackupOptions)) *MockClientInterface_CreateBackup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(CreateBackupOptions))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(CreateBackupOptions))
 	})
 	return _c
 }
@@ -81,13 +81,13 @@ func (_c *MockClientInterface_CreateBackup_Call) Return(_a0 *v1.Backup, _a1 erro
 	return _c
 }
 
-func (_c *MockClientInterface_CreateBackup_Call) RunAndReturn(run func(context.Context, string, string, string, CreateBackupOptions) (*v1.Backup, error)) *MockClientInterface_CreateBackup_Call {
+func (_c *MockClientInterface_CreateBackup_Call) RunAndReturn(run func(*contexts.Context, string, string, string, CreateBackupOptions) (*v1.Backup, error)) *MockClientInterface_CreateBackup_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // CreateCluster provides a mock function with given fields: ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts
-func (_m *MockClientInterface) CreateCluster(ctx context.Context, namespace string, clusterName string, volumeSize resource.Quantity, servingCertificateSecretName string, clientCASecretName string, replicationUserCertName string, opts CreateClusterOptions) (*v1.Cluster, error) {
+func (_m *MockClientInterface) CreateCluster(ctx *contexts.Context, namespace string, clusterName string, volumeSize resource.Quantity, servingCertificateSecretName string, clientCASecretName string, replicationUserCertName string, opts CreateClusterOptions) (*v1.Cluster, error) {
 	ret := _m.Called(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts)
 
 	if len(ret) == 0 {
@@ -96,10 +96,10 @@ func (_m *MockClientInterface) CreateCluster(ctx context.Context, namespace stri
 
 	var r0 *v1.Cluster
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) (*v1.Cluster, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) (*v1.Cluster, error)); ok {
 		return rf(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) *v1.Cluster); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) *v1.Cluster); ok {
 		r0 = rf(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -107,7 +107,7 @@ func (_m *MockClientInterface) CreateCluster(ctx context.Context, namespace stri
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) error); ok {
 		r1 = rf(ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -122,7 +122,7 @@ type MockClientInterface_CreateCluster_Call struct {
 }
 
 // CreateCluster is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - clusterName string
 //   - volumeSize resource.Quantity
@@ -134,9 +134,9 @@ func (_e *MockClientInterface_Expecter) CreateCluster(ctx interface{}, namespace
 	return &MockClientInterface_CreateCluster_Call{Call: _e.mock.On("CreateCluster", ctx, namespace, clusterName, volumeSize, servingCertificateSecretName, clientCASecretName, replicationUserCertName, opts)}
 }
 
-func (_c *MockClientInterface_CreateCluster_Call) Run(run func(ctx context.Context, namespace string, clusterName string, volumeSize resource.Quantity, servingCertificateSecretName string, clientCASecretName string, replicationUserCertName string, opts CreateClusterOptions)) *MockClientInterface_CreateCluster_Call {
+func (_c *MockClientInterface_CreateCluster_Call) Run(run func(ctx *contexts.Context, namespace string, clusterName string, volumeSize resource.Quantity, servingCertificateSecretName string, clientCASecretName string, replicationUserCertName string, opts CreateClusterOptions)) *MockClientInterface_CreateCluster_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(resource.Quantity), args[4].(string), args[5].(string), args[6].(string), args[7].(CreateClusterOptions))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(resource.Quantity), args[4].(string), args[5].(string), args[6].(string), args[7].(CreateClusterOptions))
 	})
 	return _c
 }
@@ -146,13 +146,13 @@ func (_c *MockClientInterface_CreateCluster_Call) Return(_a0 *v1.Cluster, _a1 er
 	return _c
 }
 
-func (_c *MockClientInterface_CreateCluster_Call) RunAndReturn(run func(context.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) (*v1.Cluster, error)) *MockClientInterface_CreateCluster_Call {
+func (_c *MockClientInterface_CreateCluster_Call) RunAndReturn(run func(*contexts.Context, string, string, resource.Quantity, string, string, string, CreateClusterOptions) (*v1.Cluster, error)) *MockClientInterface_CreateCluster_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DeleteBackup provides a mock function with given fields: ctx, namespace, name
-func (_m *MockClientInterface) DeleteBackup(ctx context.Context, namespace string, name string) error {
+func (_m *MockClientInterface) DeleteBackup(ctx *contexts.Context, namespace string, name string) error {
 	ret := _m.Called(ctx, namespace, name)
 
 	if len(ret) == 0 {
@@ -160,7 +160,7 @@ func (_m *MockClientInterface) DeleteBackup(ctx context.Context, namespace strin
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) error); ok {
 		r0 = rf(ctx, namespace, name)
 	} else {
 		r0 = ret.Error(0)
@@ -175,16 +175,16 @@ type MockClientInterface_DeleteBackup_Call struct {
 }
 
 // DeleteBackup is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 func (_e *MockClientInterface_Expecter) DeleteBackup(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_DeleteBackup_Call {
 	return &MockClientInterface_DeleteBackup_Call{Call: _e.mock.On("DeleteBackup", ctx, namespace, name)}
 }
 
-func (_c *MockClientInterface_DeleteBackup_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockClientInterface_DeleteBackup_Call {
+func (_c *MockClientInterface_DeleteBackup_Call) Run(run func(ctx *contexts.Context, namespace string, name string)) *MockClientInterface_DeleteBackup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -194,13 +194,13 @@ func (_c *MockClientInterface_DeleteBackup_Call) Return(_a0 error) *MockClientIn
 	return _c
 }
 
-func (_c *MockClientInterface_DeleteBackup_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClientInterface_DeleteBackup_Call {
+func (_c *MockClientInterface_DeleteBackup_Call) RunAndReturn(run func(*contexts.Context, string, string) error) *MockClientInterface_DeleteBackup_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DeleteCluster provides a mock function with given fields: ctx, namespace, name
-func (_m *MockClientInterface) DeleteCluster(ctx context.Context, namespace string, name string) error {
+func (_m *MockClientInterface) DeleteCluster(ctx *contexts.Context, namespace string, name string) error {
 	ret := _m.Called(ctx, namespace, name)
 
 	if len(ret) == 0 {
@@ -208,7 +208,7 @@ func (_m *MockClientInterface) DeleteCluster(ctx context.Context, namespace stri
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) error); ok {
 		r0 = rf(ctx, namespace, name)
 	} else {
 		r0 = ret.Error(0)
@@ -223,16 +223,16 @@ type MockClientInterface_DeleteCluster_Call struct {
 }
 
 // DeleteCluster is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 func (_e *MockClientInterface_Expecter) DeleteCluster(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_DeleteCluster_Call {
 	return &MockClientInterface_DeleteCluster_Call{Call: _e.mock.On("DeleteCluster", ctx, namespace, name)}
 }
 
-func (_c *MockClientInterface_DeleteCluster_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockClientInterface_DeleteCluster_Call {
+func (_c *MockClientInterface_DeleteCluster_Call) Run(run func(ctx *contexts.Context, namespace string, name string)) *MockClientInterface_DeleteCluster_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -242,13 +242,13 @@ func (_c *MockClientInterface_DeleteCluster_Call) Return(_a0 error) *MockClientI
 	return _c
 }
 
-func (_c *MockClientInterface_DeleteCluster_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClientInterface_DeleteCluster_Call {
+func (_c *MockClientInterface_DeleteCluster_Call) RunAndReturn(run func(*contexts.Context, string, string) error) *MockClientInterface_DeleteCluster_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetCluster provides a mock function with given fields: ctx, namespace, name
-func (_m *MockClientInterface) GetCluster(ctx context.Context, namespace string, name string) (*v1.Cluster, error) {
+func (_m *MockClientInterface) GetCluster(ctx *contexts.Context, namespace string, name string) (*v1.Cluster, error) {
 	ret := _m.Called(ctx, namespace, name)
 
 	if len(ret) == 0 {
@@ -257,10 +257,10 @@ func (_m *MockClientInterface) GetCluster(ctx context.Context, namespace string,
 
 	var r0 *v1.Cluster
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*v1.Cluster, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) (*v1.Cluster, error)); ok {
 		return rf(ctx, namespace, name)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.Cluster); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) *v1.Cluster); ok {
 		r0 = rf(ctx, namespace, name)
 	} else {
 		if ret.Get(0) != nil {
@@ -268,7 +268,7 @@ func (_m *MockClientInterface) GetCluster(ctx context.Context, namespace string,
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string) error); ok {
 		r1 = rf(ctx, namespace, name)
 	} else {
 		r1 = ret.Error(1)
@@ -283,16 +283,16 @@ type MockClientInterface_GetCluster_Call struct {
 }
 
 // GetCluster is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 func (_e *MockClientInterface_Expecter) GetCluster(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_GetCluster_Call {
 	return &MockClientInterface_GetCluster_Call{Call: _e.mock.On("GetCluster", ctx, namespace, name)}
 }
 
-func (_c *MockClientInterface_GetCluster_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockClientInterface_GetCluster_Call {
+func (_c *MockClientInterface_GetCluster_Call) Run(run func(ctx *contexts.Context, namespace string, name string)) *MockClientInterface_GetCluster_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -302,13 +302,13 @@ func (_c *MockClientInterface_GetCluster_Call) Return(_a0 *v1.Cluster, _a1 error
 	return _c
 }
 
-func (_c *MockClientInterface_GetCluster_Call) RunAndReturn(run func(context.Context, string, string) (*v1.Cluster, error)) *MockClientInterface_GetCluster_Call {
+func (_c *MockClientInterface_GetCluster_Call) RunAndReturn(run func(*contexts.Context, string, string) (*v1.Cluster, error)) *MockClientInterface_GetCluster_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // WaitForReadyBackup provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyBackup(ctx context.Context, namespace string, name string, opts WaitForReadyBackupOpts) (*v1.Backup, error) {
+func (_m *MockClientInterface) WaitForReadyBackup(ctx *contexts.Context, namespace string, name string, opts WaitForReadyBackupOpts) (*v1.Backup, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
@@ -317,10 +317,10 @@ func (_m *MockClientInterface) WaitForReadyBackup(ctx context.Context, namespace
 
 	var r0 *v1.Backup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyBackupOpts) (*v1.Backup, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyBackupOpts) (*v1.Backup, error)); ok {
 		return rf(ctx, namespace, name, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyBackupOpts) *v1.Backup); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyBackupOpts) *v1.Backup); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -328,7 +328,7 @@ func (_m *MockClientInterface) WaitForReadyBackup(ctx context.Context, namespace
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyBackupOpts) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, WaitForReadyBackupOpts) error); ok {
 		r1 = rf(ctx, namespace, name, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -343,7 +343,7 @@ type MockClientInterface_WaitForReadyBackup_Call struct {
 }
 
 // WaitForReadyBackup is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 //   - opts WaitForReadyBackupOpts
@@ -351,9 +351,9 @@ func (_e *MockClientInterface_Expecter) WaitForReadyBackup(ctx interface{}, name
 	return &MockClientInterface_WaitForReadyBackup_Call{Call: _e.mock.On("WaitForReadyBackup", ctx, namespace, name, opts)}
 }
 
-func (_c *MockClientInterface_WaitForReadyBackup_Call) Run(run func(ctx context.Context, namespace string, name string, opts WaitForReadyBackupOpts)) *MockClientInterface_WaitForReadyBackup_Call {
+func (_c *MockClientInterface_WaitForReadyBackup_Call) Run(run func(ctx *contexts.Context, namespace string, name string, opts WaitForReadyBackupOpts)) *MockClientInterface_WaitForReadyBackup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(WaitForReadyBackupOpts))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(WaitForReadyBackupOpts))
 	})
 	return _c
 }
@@ -363,13 +363,13 @@ func (_c *MockClientInterface_WaitForReadyBackup_Call) Return(_a0 *v1.Backup, _a
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyBackup_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyBackupOpts) (*v1.Backup, error)) *MockClientInterface_WaitForReadyBackup_Call {
+func (_c *MockClientInterface_WaitForReadyBackup_Call) RunAndReturn(run func(*contexts.Context, string, string, WaitForReadyBackupOpts) (*v1.Backup, error)) *MockClientInterface_WaitForReadyBackup_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // WaitForReadyCluster provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyCluster(ctx context.Context, namespace string, name string, opts WaitForReadyClusterOpts) (*v1.Cluster, error) {
+func (_m *MockClientInterface) WaitForReadyCluster(ctx *contexts.Context, namespace string, name string, opts WaitForReadyClusterOpts) (*v1.Cluster, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
@@ -378,10 +378,10 @@ func (_m *MockClientInterface) WaitForReadyCluster(ctx context.Context, namespac
 
 	var r0 *v1.Cluster
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyClusterOpts) (*v1.Cluster, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyClusterOpts) (*v1.Cluster, error)); ok {
 		return rf(ctx, namespace, name, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, WaitForReadyClusterOpts) *v1.Cluster); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyClusterOpts) *v1.Cluster); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -389,7 +389,7 @@ func (_m *MockClientInterface) WaitForReadyCluster(ctx context.Context, namespac
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, WaitForReadyClusterOpts) error); ok {
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, WaitForReadyClusterOpts) error); ok {
 		r1 = rf(ctx, namespace, name, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -404,7 +404,7 @@ type MockClientInterface_WaitForReadyCluster_Call struct {
 }
 
 // WaitForReadyCluster is a helper method to define mock.On call
-//   - ctx context.Context
+//   - ctx *contexts.Context
 //   - namespace string
 //   - name string
 //   - opts WaitForReadyClusterOpts
@@ -412,9 +412,9 @@ func (_e *MockClientInterface_Expecter) WaitForReadyCluster(ctx interface{}, nam
 	return &MockClientInterface_WaitForReadyCluster_Call{Call: _e.mock.On("WaitForReadyCluster", ctx, namespace, name, opts)}
 }
 
-func (_c *MockClientInterface_WaitForReadyCluster_Call) Run(run func(ctx context.Context, namespace string, name string, opts WaitForReadyClusterOpts)) *MockClientInterface_WaitForReadyCluster_Call {
+func (_c *MockClientInterface_WaitForReadyCluster_Call) Run(run func(ctx *contexts.Context, namespace string, name string, opts WaitForReadyClusterOpts)) *MockClientInterface_WaitForReadyCluster_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(WaitForReadyClusterOpts))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(WaitForReadyClusterOpts))
 	})
 	return _c
 }
@@ -424,7 +424,7 @@ func (_c *MockClientInterface_WaitForReadyCluster_Call) Return(_a0 *v1.Cluster, 
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyCluster_Call) RunAndReturn(run func(context.Context, string, string, WaitForReadyClusterOpts) (*v1.Cluster, error)) *MockClientInterface_WaitForReadyCluster_Call {
+func (_c *MockClientInterface_WaitForReadyCluster_Call) RunAndReturn(run func(*contexts.Context, string, string, WaitForReadyClusterOpts) (*v1.Cluster, error)) *MockClientInterface_WaitForReadyCluster_Call {
 	_c.Call.Return(run)
 	return _c
 }

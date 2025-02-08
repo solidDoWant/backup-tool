@@ -1,7 +1,6 @@
 package files
 
 import (
-	"context"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -9,11 +8,12 @@ import (
 
 	"github.com/gravitational/trace"
 	cp "github.com/otiai10/copy"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 )
 
 // Copies the filesytem object (file, directory, etc.) to the destination path.
 // Special files (such as sockets or device files) are not included.
-func (*LocalRuntime) CopyFiles(_ context.Context, src, dest string) error {
+func (*LocalRuntime) CopyFiles(_ *contexts.Context, src, dest string) error {
 	if err := validateSrcDest(src, dest); err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (*LocalRuntime) CopyFiles(_ context.Context, src, dest string) error {
 
 // Make the destination path contents match the input directory contents.
 // Special files (such as sockets or device files) are not included.
-func (lr *LocalRuntime) SyncFiles(ctx context.Context, src, dest string) error {
+func (lr *LocalRuntime) SyncFiles(ctx *contexts.Context, src, dest string) error {
 	if err := validateSrcDest(src, dest); err != nil {
 		return err
 	}

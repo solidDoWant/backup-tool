@@ -4,8 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/files"
 	files_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/files/v1"
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -16,7 +18,7 @@ func TestNewFilesServer(t *testing.T) {
 	assert.NotNil(t, server.runtime)
 }
 
-func transferTest(t *testing.T, onExpectCall func(expecter *files.MockRuntime_Expecter, ctx context.Context, src, dest string) *mock.Call,
+func transferTest(t *testing.T, onExpectCall func(expecter *files.MockRuntime_Expecter, ctx *contexts.Context, src, dest string) *mock.Call,
 	call func(fs *FilesServer, ctx context.Context, src, dest string) (interface{}, error)) {
 	tests := []struct {
 		desc        string
@@ -39,10 +41,10 @@ func transferTest(t *testing.T, onExpectCall func(expecter *files.MockRuntime_Ex
 			server := NewFilesServer()
 			server.runtime = runtime
 
-			ctx := context.Background()
+			ctx := th.NewTestContext()
 			src := "src"
 			dest := "dest"
-			onExpectCall(runtime.EXPECT(), ctx, src, dest).Return(tt.returnValue)
+			onExpectCall(runtime.EXPECT(), detatchHandlerContext(ctx), src, dest).Return(tt.returnValue)
 
 			resp, err := call(server, ctx, src, dest)
 			if tt.shouldError {
@@ -57,7 +59,7 @@ func transferTest(t *testing.T, onExpectCall func(expecter *files.MockRuntime_Ex
 }
 
 func TestCopyFiles(t *testing.T) {
-	onExpectCall := func(expecter *files.MockRuntime_Expecter, ctx context.Context, src, dest string) *mock.Call {
+	onExpectCall := func(expecter *files.MockRuntime_Expecter, ctx *contexts.Context, src, dest string) *mock.Call {
 		return expecter.CopyFiles(ctx, src, dest).Call
 	}
 
@@ -74,7 +76,7 @@ func TestCopyFiles(t *testing.T) {
 }
 
 func TestSyncFiles(t *testing.T) {
-	onExpectCall := func(expecter *files.MockRuntime_Expecter, ctx context.Context, src, dest string) *mock.Call {
+	onExpectCall := func(expecter *files.MockRuntime_Expecter, ctx *contexts.Context, src, dest string) *mock.Call {
 		return expecter.SyncFiles(ctx, src, dest).Call
 	}
 
