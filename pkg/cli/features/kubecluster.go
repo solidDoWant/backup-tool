@@ -1,4 +1,4 @@
-package common
+package features
 
 import (
 	"github.com/gravitational/trace"
@@ -10,6 +10,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 )
 
+// Gives a command the ability to interact with Kubernetes clusters (all supported APIs).
 type KubeClusterCommand struct {
 	KubernetesCommand
 }

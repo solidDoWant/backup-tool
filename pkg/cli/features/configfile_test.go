@@ -1,10 +1,20 @@
-package common
+package features
 
 import (
 	"testing"
 
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCOnfigFileCommandConfigureFlags(t *testing.T) {
+	cfc := &ConfigFileCommand[string]{} // Type does not matter here
+
+	cmd := &cobra.Command{}
+	cfc.ConfigureFlags(cmd)
+	assert.True(t, cmd.Flags().HasAvailableFlags())
+}
 
 func TestGenerateConfigSchema(t *testing.T) {
 	type testConfig struct {
@@ -13,7 +23,7 @@ func TestGenerateConfigSchema(t *testing.T) {
 	}
 	expectedSchema := []byte(`{` +
 		`"$schema":"https://json-schema.org/draft/2020-12/schema",` +
-		`"$id":"https://github.com/solidDoWant/backup-tool/cmd/disasterrecovery/common/test-config",` +
+		`"$id":"https://github.com/solidDoWant/backup-tool/pkg/cli/features/test-config",` +
 		`"$ref":"#/$defs/testConfig",` +
 		`"$defs":{` +
 		`"testConfig":{` +

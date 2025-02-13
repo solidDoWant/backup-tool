@@ -1,4 +1,4 @@
-package common
+package features
 
 import (
 	"os"
@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// Gives a command the ability to interact with Kubernetes API.
 type KubernetesCommand struct {
 	ConfigOverrides    clientcmd.ConfigOverrides
 	ExplicitConfigPath string
