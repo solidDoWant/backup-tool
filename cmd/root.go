@@ -19,7 +19,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(grpcCmd)
+	rootCmd.AddCommand(GetGRPCCommand())
 	rootCmd.AddCommand(disasterrecovery.GetDRCommand())
 
 	if err := rootCmd.Execute(); err != nil {
