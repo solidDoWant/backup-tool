@@ -13,37 +13,84 @@ import (
 // downside in grouping them together.
 type Context struct {
 	context.Context
-	// *slog.Logger // TODO charm.Log
+	Log       *LoggerContext
+	Stopwatch *StopwatchContext
+	parentCtx *Context // The parent context, if there is one.
 }
 
 func NewContext(ctx context.Context) *Context {
-	return &Context{
-		Context: ctx,
-		// Logger:  logger,
+	newCtx := &Context{
+		Context:   ctx,
+		Stopwatch: NewStopwatchContext(),
+		Log:       NewLoggerContext(nullLogger),
 	}
+
+	if parentCtx, ok := ctx.(*Context); ok {
+		newCtx.parentCtx = parentCtx
+	}
+
+	return newCtx
 }
 
-// Important: this is a shallow copy, so changes to nested values will be seen in the original context.
-// However, changing the field values themselves will not be seen in the original context.
-func (c *Context) ShallowCopy() *Context {
-	// Go is copy by value, so passing the dereferenced value makes a shallow
-	// copy of it.
-	return func(c Context) *Context {
-		return &c
-	}(*c)
+func (c *Context) WithLogger(logger *LoggerContext) *Context {
+	c.Log = logger
+	return c
 }
 
-func WithTimeout(parent *Context, timeout time.Duration) (*Context, context.CancelFunc) {
+func (c *Context) Child() *Context {
+	childCtx := *c
+	childCtx.Stopwatch = NewStopwatchContext()
+	childCtx.Log = c.Log.child()
+	childCtx.parentCtx = c
+
+	return &childCtx
+}
+
+// Returns a new context with the given timeout. If the timeout is 0, the new
+// context will be cancellable, but will not have a timeout.
+func (c *Context) WithTimeout(timeout time.Duration) (*Context, context.CancelFunc) {
 	var ctx context.Context
 	var cancel context.CancelFunc
 	if timeout == 0 {
-		ctx, cancel = context.WithCancel(parent)
+		ctx, cancel = context.WithCancel(c.Context)
 	} else {
-		ctx, cancel = context.WithTimeout(parent, timeout)
+		ctx, cancel = context.WithTimeout(c.Context, timeout)
 	}
 
-	copiedCtx := parent.ShallowCopy()
-	copiedCtx.Context = ctx
+	c.Context = ctx
 
-	return copiedCtx, cancel
+	return c, cancel
+}
+
+func (c *Context) IsChildOf(maybeParentCtx *Context) bool {
+	if c.parentCtx == nil {
+		return false
+	}
+
+	if c.parentCtx == maybeParentCtx {
+		return true
+	}
+
+	return c.parentCtx.IsChildOf(maybeParentCtx)
+}
+
+// These are a workaround to provide the serve context to handler functions. Wrap the handler context
+// with the real context, and return the real context as the stdlib context type.
+func WrapHandlerContext(handlerCtx context.Context, realCtx *Context) context.Context {
+	realCtx.Context = handlerCtx
+	return realCtx
+}
+
+// Unwrap the real context from the stdlib context type. If the context was not properly attached, return a new context
+// with a message about the issue.
+func UnwrapHandlerContext(ctx context.Context) *Context {
+	if casted, ok := ctx.(*Context); ok {
+		return casted
+	}
+
+	// If this is hit, it means the context was not properly attached (which is a bug).
+	// Usually this isn't a critical issue, so return a new context with a message about the issue.
+	bugCtx := NewContext(ctx)
+	bugCtx.Log.With("bug", "context was not properly attached").Error("context was not properly attached")
+	return bugCtx
 }

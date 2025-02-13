@@ -5,28 +5,69 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewContext(t *testing.T) {
-	baseCtx := context.Background()
-	ctx := NewContext(baseCtx)
-	require.NotNil(t, ctx)
-	assert.Equal(t, baseCtx, ctx.Context)
+	tests := []struct {
+		desc              string
+		ctx               context.Context
+		shouldParentBeSet bool
+	}{
+		{
+			desc: "nil context",
+			ctx:  nil,
+		},
+		{
+			desc: "context.Context context",
+			ctx:  context.Background(),
+		},
+		{
+			desc:              "Context context",
+			ctx:               NewContext(context.Background()),
+			shouldParentBeSet: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			ctx := NewContext(tt.ctx)
+			require.NotNil(t, ctx)
+			assert.Equal(t, tt.ctx, ctx.Context)
+			assert.NotNil(t, ctx.Stopwatch)
+			assert.NotNil(t, ctx.Log)
+			assert.Equal(t, nullLogger, ctx.Log.Logger)
+
+			if tt.shouldParentBeSet {
+				assert.Equal(t, tt.ctx, ctx.parentCtx)
+			} else {
+				assert.Nil(t, ctx.parentCtx)
+			}
+		})
+	}
 }
 
-func TestShallowCopy(t *testing.T) {
-	baseCtx := context.Background()
-	originalCtx := NewContext(baseCtx)
+func TestWithLogger(t *testing.T) {
+	ctx := NewContext(context.Background())
+	logger := NewLoggerContext(log.Default())
 
-	copiedCtx := originalCtx.ShallowCopy()
-	require.NotNil(t, copiedCtx)
-	assert.Equal(t, originalCtx.Context, copiedCtx.Context)
+	returnedCtx := ctx.WithLogger(logger)
+	require.NotNil(t, returnedCtx)
+	assert.Equal(t, logger, returnedCtx.Log)
+	assert.Equal(t, ctx, returnedCtx)
+}
 
-	copiedCtx.Context = context.TODO()
-	assert.NotEqual(t, originalCtx.Context, copiedCtx.Context)
-	assert.NotEqual(t, originalCtx, copiedCtx)
+func TestChild(t *testing.T) {
+	ctx := NewContext(context.Background())
+	childCtx := ctx.Child()
+
+	require.NotNil(t, childCtx)
+	assert.NotEqual(t, ctx, childCtx)
+	assert.NotNil(t, childCtx.Stopwatch)
+	assert.NotNil(t, childCtx.Log)
+	assert.Equal(t, ctx, childCtx.parentCtx)
 }
 
 func TestWithTimeout(t *testing.T) {
@@ -48,7 +89,7 @@ func TestWithTimeout(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			parentCtx := NewContext(context.Background())
 
-			timeoutCtx, cancel := WithTimeout(parentCtx, tt.timeout)
+			timeoutCtx, cancel := parentCtx.WithTimeout(tt.timeout)
 			defer cancel()
 
 			require.NotNil(t, timeoutCtx)
@@ -57,4 +98,32 @@ func TestWithTimeout(t *testing.T) {
 			assert.Equal(t, tt.timeout != 0, isDeadlineSet)
 		})
 	}
+}
+
+func TestIsChildOf(t *testing.T) {
+	parentCtx := NewContext(context.Background())
+	childCtx := parentCtx.Child()
+	grandchildCtx := childCtx.Child()
+
+	assert.False(t, parentCtx.IsChildOf(nil))
+	assert.True(t, childCtx.IsChildOf(parentCtx))
+	assert.False(t, parentCtx.IsChildOf(childCtx))
+	assert.True(t, grandchildCtx.IsChildOf(parentCtx))
+}
+
+func TestHandlerContexts(t *testing.T) {
+	handlerCtx := context.Background()
+	realCtx := NewContext(context.TODO())
+
+	wrappedCtx := WrapHandlerContext(handlerCtx, realCtx)
+	require.NotNil(t, wrappedCtx)
+	assert.Equal(t, realCtx, wrappedCtx)
+
+	unwrappedCtx := UnwrapHandlerContext(wrappedCtx)
+	require.NotNil(t, unwrappedCtx)
+	assert.Equal(t, realCtx, unwrappedCtx)
+
+	badUnwrappedCtx := UnwrapHandlerContext(handlerCtx)
+	// Don't crash, but do log the problem
+	require.NotNil(t, badUnwrappedCtx)
 }
