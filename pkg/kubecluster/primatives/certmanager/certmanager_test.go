@@ -226,8 +226,6 @@ func TestWaitForReadyCertificate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			t.Parallel()
-
 			client, fakeClientset := createTestClient()
 			ctx := th.NewTestContext()
 

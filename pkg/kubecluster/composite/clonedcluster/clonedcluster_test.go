@@ -82,7 +82,8 @@ func TestGetClusterDomainNames(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			result := getClusterDomainNames(tt.clusterName, tt.namespace)
+			ctx := th.NewTestContext()
+			result := getClusterDomainNames(ctx, tt.clusterName, tt.namespace)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -303,8 +304,6 @@ func TestCloneCluster(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			t.Parallel()
-
 			// Track creation parameters
 			ctx := th.NewTestContext()
 			namespace := "test-ns"
@@ -419,43 +418,59 @@ func TestCloneCluster(t *testing.T) {
 					})
 				}
 
-				p.cnpgClient.EXPECT().GetCluster(ctx, namespace, existingCluster.Name).Return(th.ErrOr1Val(existingCluster, tt.simulateGetExistingClusterError))
+				p.cnpgClient.EXPECT().GetCluster(mock.Anything, namespace, existingCluster.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*apiv1.Cluster, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(existingCluster, tt.simulateGetExistingClusterError)
+					})
 				if tt.simulateGetExistingClusterError {
 					return
 				}
 
 				// 1.
-				p.cnpgClient.EXPECT().CreateBackup(ctx, namespace, createdBackup.Name, existingCluster.Name, cnpg.CreateBackupOptions{GenerateName: true}).
-					Return(th.ErrOr1Val(createdBackup, tt.simulateBackupError))
+				p.cnpgClient.EXPECT().CreateBackup(mock.Anything, namespace, createdBackup.Name, existingCluster.Name, cnpg.CreateBackupOptions{GenerateName: true}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name, clusterName string, opts cnpg.CreateBackupOptions) (*apiv1.Backup, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(createdBackup, tt.simulateBackupError)
+					})
 				if tt.simulateBackupError {
 					return
 				}
 
 				p.cnpgClient.EXPECT().DeleteBackup(mock.Anything, namespace, createdBackup.Name).Return(th.ErrIfTrue(tt.simulateBackupCleanupError))
-				p.cnpgClient.EXPECT().WaitForReadyBackup(ctx, namespace, createdBackup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: tt.opts.WaitForBackupTimeout}).
-					Return(th.ErrOr1Val(createdBackup, tt.simulateWaitingForBackupError))
+				p.cnpgClient.EXPECT().WaitForReadyBackup(mock.Anything, namespace, createdBackup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: tt.opts.WaitForBackupTimeout}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts cnpg.WaitForReadyBackupOpts) (*apiv1.Backup, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(createdBackup, tt.simulateWaitingForBackupError)
+					})
 				if tt.simulateWaitingForBackupError {
 					return
 				}
 
 				// 2.
-				p.cmClient.EXPECT().CreateCertificate(ctx, namespace, helpers.CleanName(createdServingCert.Name), servingIssuerName, certmanager.CreateCertificateOptions{
+				p.cmClient.EXPECT().CreateCertificate(mock.Anything, namespace, helpers.CleanName(createdServingCert.Name), servingIssuerName, certmanager.CreateCertificateOptions{
 					CommonName: createdServingCert.Name,
-					DNSNames:   getClusterDomainNames(newClusterName, namespace),
+					DNSNames:   getClusterDomainNames(ctx, newClusterName, namespace),
 					SecretLabels: map[string]string{
 						"cnpg.io/reload": "true",
 					},
 					Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageServerAuth},
 					IssuerKind: tt.opts.Certificates.ServingCert.IssuerKind,
 					Subject:    tt.opts.Certificates.ServingCert.Subject,
-				}).Return(th.ErrOr1Val(createdServingCert, tt.simulateServingCertCreationError))
+				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, name, issuerName string, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+					assert.True(t, calledCtx.IsChildOf(ctx))
+					return th.ErrOr1Val(createdServingCert, tt.simulateServingCertCreationError)
+				})
 				if tt.simulateServingCertCreationError {
 					return
 				}
 				p.clonedCluster.EXPECT().setServingCert(createdServingCert)
 
-				p.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdServingCert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.Certificates.ServingCert.WaitForReadyTimeout}).
-					Return(th.ErrOr1Val(createdServingCert, tt.simulateWaitForServingCertError))
+				p.cmClient.EXPECT().WaitForReadyCertificate(mock.Anything, namespace, createdServingCert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.Certificates.ServingCert.WaitForReadyTimeout}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts certmanager.WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(createdServingCert, tt.simulateWaitForServingCertError)
+					})
 				if tt.simulateWaitForServingCertError {
 					return
 				}
@@ -464,7 +479,7 @@ func TestCloneCluster(t *testing.T) {
 				// 3.
 				// 3.1
 				clientCACertName := helpers.CleanName(createdClientCACert.Name)
-				p.cmClient.EXPECT().CreateCertificate(ctx, namespace, clientCACertName, clientIssuerName, certmanager.CreateCertificateOptions{
+				p.cmClient.EXPECT().CreateCertificate(mock.Anything, namespace, clientCACertName, clientIssuerName, certmanager.CreateCertificateOptions{
 					IsCA: true,
 					CAConstraints: &certmanagerv1.NameConstraints{
 						Critical: true,
@@ -482,23 +497,30 @@ func TestCloneCluster(t *testing.T) {
 						utils.WatchedLabelName: "true",
 					},
 					IssuerKind: tt.opts.Certificates.ClientCACert.IssuerKind,
-				}).Return(th.ErrOr1Val(createdClientCACert, tt.simulateClientCACertCreationError))
+				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, name, issuerName string, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+					assert.True(t, calledCtx.IsChildOf(ctx))
+					return th.ErrOr1Val(createdClientCACert, tt.simulateClientCACertCreationError)
+				})
 				if tt.simulateClientCACertCreationError {
 					return
 				}
 				p.clonedCluster.EXPECT().setClientCACert(createdClientCACert)
 
-				p.cmClient.EXPECT().WaitForReadyCertificate(ctx, namespace, createdClientCACert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.Certificates.ClientCACert.WaitForReadyTimeout}).
-					Return(th.ErrOr1Val(createdClientCACert, tt.simulateWaitForClientCACertError))
+				p.cmClient.EXPECT().WaitForReadyCertificate(mock.Anything, namespace, createdClientCACert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.Certificates.ClientCACert.WaitForReadyTimeout}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts certmanager.WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(createdClientCACert, tt.simulateWaitForClientCACertError)
+					})
 				if tt.simulateWaitForClientCACertError {
 					return
 				}
 				p.clonedCluster.EXPECT().setClientCACert(createdClientCACert)
 
 				// 3.2
-				p.cmClient.EXPECT().CreateIssuer(ctx, namespace, mock.Anything, clientCACertName, certmanager.CreateIssuerOptions{}).
-					RunAndReturn(func(ctx *contexts.Context, namespace, name, clientCACertName string, opts certmanager.CreateIssuerOptions) (*certmanagerv1.Issuer, error) {
+				p.cmClient.EXPECT().CreateIssuer(mock.Anything, namespace, mock.Anything, clientCACertName, certmanager.CreateIssuerOptions{}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name, clientCACertName string, opts certmanager.CreateIssuerOptions) (*certmanagerv1.Issuer, error) {
 						assert.Contains(t, name, clientCACertName)
+						assert.True(t, calledCtx.IsChildOf(ctx))
 						return th.ErrOr1Val(createdClientCAIssuer, tt.simulateClientCAIssuerCreationError)
 					})
 				if tt.simulateClientCAIssuerCreationError {
@@ -506,32 +528,42 @@ func TestCloneCluster(t *testing.T) {
 				}
 				p.clonedCluster.EXPECT().setClientCAIssuer(createdClientCAIssuer)
 
-				p.cmClient.EXPECT().WaitForReadyIssuer(ctx, namespace, mock.Anything, certmanager.WaitForReadyIssuerOpts{MaxWaitTime: tt.opts.ClientCAIssuer.WaitForReadyTimeout}).
-					Return(th.ErrOr1Val(createdClientCAIssuer, tt.simulateWaitForClientCAIssuerError))
+				p.cmClient.EXPECT().WaitForReadyIssuer(mock.Anything, namespace, mock.Anything, certmanager.WaitForReadyIssuerOpts{MaxWaitTime: tt.opts.ClientCAIssuer.WaitForReadyTimeout}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts certmanager.WaitForReadyIssuerOpts) (*certmanagerv1.Issuer, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(createdClientCAIssuer, tt.simulateWaitForClientCAIssuerError)
+					})
 				if tt.simulateWaitForClientCAIssuerError {
 					return
 				}
 				p.clonedCluster.EXPECT().setClientCAIssuer(createdClientCAIssuer)
 
 				// 4.
-				p.cucp.EXPECT().NewClusterUserCert(ctx, namespace, "postgres", createdClientCAIssuer.Name, newClusterName, clusterusercert.NewClusterUserCertOpts{
+				// 4.1
+				p.cucp.EXPECT().NewClusterUserCert(mock.Anything, namespace, "postgres", createdClientCAIssuer.Name, newClusterName, clusterusercert.NewClusterUserCertOpts{
 					Subject:            tt.opts.Certificates.PostgresUserCert.Subject,
 					CRPOpts:            tt.opts.Certificates.PostgresUserCert.CRPOpts,
 					WaitForCertTimeout: tt.opts.Certificates.PostgresUserCert.WaitForReadyTimeout,
 					CleanupTimeout:     tt.opts.CleanupTimeout,
-				}).Return(th.ErrOr1Val(postgresUserCert, tt.simulatePostgresUserCertCreationError))
+				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, username, issuerName, clusterName string, opts clusterusercert.NewClusterUserCertOpts) (clusterusercert.ClusterUserCertInterface, error) {
+					assert.True(t, calledCtx.IsChildOf(ctx))
+					return th.ErrOr1Val(postgresUserCert, tt.simulatePostgresUserCertCreationError)
+				})
 				if tt.simulatePostgresUserCertCreationError {
 					return
 				}
 				p.clonedCluster.EXPECT().setPostgresUserCert(postgresUserCert)
 
-				// 5.
-				p.cucp.EXPECT().NewClusterUserCert(ctx, namespace, "streaming_replica", createdClientCAIssuer.Name, newClusterName, clusterusercert.NewClusterUserCertOpts{
+				// 4.2
+				p.cucp.EXPECT().NewClusterUserCert(mock.Anything, namespace, "streaming_replica", createdClientCAIssuer.Name, newClusterName, clusterusercert.NewClusterUserCertOpts{
 					Subject:            tt.opts.Certificates.StreamingReplicaUserCert.Subject,
 					CRPOpts:            tt.opts.Certificates.StreamingReplicaUserCert.CRPOpts,
 					WaitForCertTimeout: tt.opts.Certificates.StreamingReplicaUserCert.WaitForReadyTimeout,
 					CleanupTimeout:     tt.opts.CleanupTimeout,
-				}).Return(th.ErrOr1Val(streamingReplicaUserCert, tt.simulateStreamingReplicaUserCertCreationError))
+				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, username, issuerName, clusterName string, opts clusterusercert.NewClusterUserCertOpts) (clusterusercert.ClusterUserCertInterface, error) {
+					assert.True(t, calledCtx.IsChildOf(ctx))
+					return th.ErrOr1Val(streamingReplicaUserCert, tt.simulateStreamingReplicaUserCertCreationError)
+				})
 				if tt.simulateStreamingReplicaUserCertCreationError {
 					return
 				}
@@ -540,15 +572,21 @@ func TestCloneCluster(t *testing.T) {
 				// 6.
 				clusterOpts.DatabaseName = existingCluster.Spec.Bootstrap.InitDB.Database
 				clusterOpts.OwnerName = existingCluster.Spec.Bootstrap.InitDB.Owner
-				p.cnpgClient.EXPECT().CreateCluster(ctx, namespace, newCluster.Name, resource.MustParse(existingCluster.Spec.StorageConfiguration.Size), createdServingCert.Name, createdClientCACert.Name, streamingReplicaUserCert.GetCertificate().Name, clusterOpts).
-					Return(th.ErrOr1Val(newCluster, tt.simulateClusterCreationError))
+				p.cnpgClient.EXPECT().CreateCluster(mock.Anything, namespace, newCluster.Name, resource.MustParse(existingCluster.Spec.StorageConfiguration.Size), createdServingCert.Name, createdClientCACert.Name, streamingReplicaUserCert.GetCertificate().Name, clusterOpts).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, size resource.Quantity, servingCertName, clientCACertName, streamingReplicaUserCertName string, opts cnpg.CreateClusterOptions) (*apiv1.Cluster, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(newCluster, tt.simulateClusterCreationError)
+					})
 				if tt.simulateClusterCreationError {
 					return
 				}
 
 				p.clonedCluster.EXPECT().setCluster(newCluster).Return()
-				p.cnpgClient.EXPECT().WaitForReadyCluster(ctx, namespace, newCluster.Name, cnpg.WaitForReadyClusterOpts{MaxWaitTime: tt.opts.WaitForClusterTimeout}).
-					Return(th.ErrOr1Val(newCluster, tt.simulateWaitForClusterError))
+				p.cnpgClient.EXPECT().WaitForReadyCluster(mock.Anything, namespace, newCluster.Name, cnpg.WaitForReadyClusterOpts{MaxWaitTime: tt.opts.WaitForClusterTimeout}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts cnpg.WaitForReadyClusterOpts) (*apiv1.Cluster, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(newCluster, tt.simulateWaitForClusterError)
+					})
 				if tt.simulateWaitForClusterError {
 					return
 				}
@@ -577,13 +615,17 @@ func TestClonedClusterWhenFailToParseExistingClusterStorageSize(t *testing.T) {
 	p := newMockProvider(t)
 	ctx := th.NewTestContext()
 
-	p.cnpgClient.EXPECT().GetCluster(ctx, "test-ns", "existing-cluster").Return(&apiv1.Cluster{
-		Spec: apiv1.ClusterSpec{
-			StorageConfiguration: apiv1.StorageConfiguration{
-				Size: "not-a-size",
-			},
-		},
-	}, nil)
+	p.cnpgClient.EXPECT().GetCluster(mock.Anything, "test-ns", "existing-cluster").
+		RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*apiv1.Cluster, error) {
+			assert.True(t, calledCtx.IsChildOf(ctx))
+			return &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: "not-a-size",
+					},
+				},
+			}, nil
+		})
 	p.clonedCluster.EXPECT().Delete(mock.Anything).Return(nil)
 
 	clonedCluster, err := p.CloneCluster(ctx, "test-ns", "existing-cluster", "new-cluster", "issuer-1", "issuer-2", CloneClusterOptions{})
@@ -704,31 +746,55 @@ func TestClonedClusterDelete(t *testing.T) {
 			tt.cc.p = p
 
 			if tt.cc.cluster != nil {
-				p.cnpgClient.EXPECT().DeleteCluster(ctx, tt.cc.cluster.Namespace, tt.cc.cluster.Name).Return(th.ErrIfTrue(tt.simulateClusterDeleteError))
+				p.cnpgClient.EXPECT().DeleteCluster(mock.Anything, tt.cc.cluster.Namespace, tt.cc.cluster.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulateClusterDeleteError)
+					})
 			}
 
 			if tt.includeStreamingReplicaUserCert {
 				streamingReplicaUserCert := clusterusercert.NewMockClusterUserCertInterface(t)
 				tt.cc.streamingReplicaUserCertificate = streamingReplicaUserCert
-				streamingReplicaUserCert.EXPECT().Delete(ctx).Return(th.ErrIfTrue(tt.simulateStreamingReplicaUserCertDeleteError))
+				streamingReplicaUserCert.EXPECT().Delete(mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulateStreamingReplicaUserCertDeleteError)
+					})
 			}
 
 			if tt.includePostgresUserCert {
 				postgresUserCert := clusterusercert.NewMockClusterUserCertInterface(t)
 				tt.cc.postgresUserCertificate = postgresUserCert
-				postgresUserCert.EXPECT().Delete(ctx).Return(th.ErrIfTrue(tt.simulatePostgresUserCertDeleteError))
+				postgresUserCert.EXPECT().Delete(mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulatePostgresUserCertDeleteError)
+					})
 			}
 
 			if tt.cc.clientCAIssuer != nil {
-				p.cmClient.EXPECT().DeleteIssuer(ctx, tt.cc.clientCAIssuer.Namespace, tt.cc.clientCAIssuer.Name).Return(th.ErrIfTrue(tt.simulateClientCAIssuerDeleteError))
+				p.cmClient.EXPECT().DeleteIssuer(mock.Anything, tt.cc.clientCAIssuer.Namespace, tt.cc.clientCAIssuer.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulateClientCAIssuerDeleteError)
+					})
 			}
 
 			if tt.cc.clientCACertificate != nil {
-				p.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.clientCACertificate.Namespace, tt.cc.clientCACertificate.Name).Return(th.ErrIfTrue(tt.simulateClientCACertDeleteError))
+				p.cmClient.EXPECT().DeleteCertificate(mock.Anything, tt.cc.clientCACertificate.Namespace, tt.cc.clientCACertificate.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulateClientCACertDeleteError)
+					})
 			}
 
 			if tt.cc.servingCertificate != nil {
-				p.cmClient.EXPECT().DeleteCertificate(ctx, tt.cc.servingCertificate.Namespace, tt.cc.servingCertificate.Name).Return(th.ErrIfTrue(tt.simulateServingCertDeleteError))
+				p.cmClient.EXPECT().DeleteCertificate(mock.Anything, tt.cc.servingCertificate.Namespace, tt.cc.servingCertificate.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulateServingCertDeleteError)
+					})
 			}
 
 			err := tt.cc.Delete(ctx)

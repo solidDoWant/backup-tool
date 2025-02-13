@@ -46,18 +46,24 @@ func newClusterUserCert(p providerInterfaceInternal) ClusterUserCertInterface {
 	return &ClusterUserCert{p: p}
 }
 
-func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error) {
-	cuc := p.newClusterUserCert()
+func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (cuc ClusterUserCertInterface, err error) {
+	ctx.Log.With("username", username, "issuerName", issuerName).Info("Creating user certificate")
+	defer ctx.Log.Info("Finished creating user certificate", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
+	cuc = p.newClusterUserCert()
 
 	errHandler := func(originalErr error, args ...interface{}) (*ClusterUserCert, error) {
 		originalErr = trace.Wrap(originalErr, args...)
-		return nil, cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(10*time.Minute), cuc.Delete).
+		return nil, cleanup.To(cuc.Delete).
 			WithErrMessage("failed to cleanup user cert %q in namespace %q", username, namespace).
 			WithOriginalErr(&originalErr).
+			WithParentCtx(ctx).
+			WithTimeout(opts.CleanupTimeout.MaxWait(10 * time.Minute)).
 			Run()
 	}
 
 	// 1. Create the certificate itself
+	ctx.Log.Step().Info("Creating user certificate")
 	certName := helpers.CleanName(fmt.Sprintf("%s-%s-user", clusterName, username))
 	certOptions := certmanager.CreateCertificateOptions{
 		CommonName: username,
@@ -69,7 +75,7 @@ func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username
 		IssuerKind: opts.IssuerKind,
 	}
 
-	cert, err := p.cmClient.CreateCertificate(ctx, namespace, certName, issuerName, certOptions)
+	cert, err := p.cmClient.CreateCertificate(ctx.Child(), namespace, certName, issuerName, certOptions)
 	if err != nil {
 		return errHandler(err, "failed to create %q user cert %q", username, helpers.FullNameStr(namespace, certName))
 	}
@@ -77,15 +83,16 @@ func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username
 
 	// 2. Create the CertificateRequestPolicy, if enabled
 	if opts.CRPOpts.Enabled {
+		ctx.Log.Step().Info("Creating CertificateRequestPolicy for user certificate")
 		crpName := certName
-		crp, err := p.ccfp.CreateCRPForCertificate(ctx, cert, createcrpforcertificate.CreateCRPForCertificateOpts{MaxWaitTime: opts.CRPOpts.WaitForCRPTimeout})
+		crp, err := p.ccfp.CreateCRPForCertificate(ctx.Child(), cert, createcrpforcertificate.CreateCRPForCertificateOpts{MaxWaitTime: opts.CRPOpts.WaitForCRPTimeout})
 		if err != nil {
 			return errHandler(err, "failed to create CertificateRequestPolicy %q for user cert %q", crpName, helpers.FullName(cert))
 		}
 		cuc.setCRP(crp)
 
 		// 2.1. Re-issue the certificate, as it more than likely failed the first time
-		reissuedCert, err := p.cmClient.ReissueCertificate(ctx, cert.Namespace, cert.Name)
+		reissuedCert, err := p.cmClient.ReissueCertificate(ctx.Child(), cert.Namespace, cert.Name)
 		if err != nil {
 			return errHandler(err, "failed to re-issue user cert %q", helpers.FullName(cert))
 		}
@@ -94,7 +101,8 @@ func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username
 	}
 
 	// 3. Wait for the certificate to be ready
-	readyCert, err := p.cmClient.WaitForReadyCertificate(ctx, cert.Namespace, cert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.WaitForCertTimeout})
+	ctx.Log.Step().Info("Waiting for user certificate to be ready")
+	readyCert, err := p.cmClient.WaitForReadyCertificate(ctx.Child(), cert.Namespace, cert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.WaitForCertTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for user cert %q to be ready", helpers.FullName(cert))
 	}
@@ -119,18 +127,21 @@ func (cuc *ClusterUserCert) GetCertificateRequestPolicy() *policyv1alpha1.Certif
 	return cuc.crp
 }
 
-func (cuc *ClusterUserCert) Delete(ctx *contexts.Context) error {
+func (cuc *ClusterUserCert) Delete(ctx *contexts.Context) (err error) {
+	ctx.Log.Info("Cleaning up cluster user certificate resources")
+	defer ctx.Log.Info("Finished cleaning up cluster user certificate resources", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
 	cleanupErrs := make([]error, 0, 2)
 
 	if cuc.crp != nil {
-		err := cuc.p.ap().DeleteCertificateRequestPolicy(ctx, cuc.crp.Name)
+		err := cuc.p.ap().DeleteCertificateRequestPolicy(ctx.Child(), cuc.crp.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete certificate request policy %q", helpers.FullName(cuc.crp)))
 		}
 	}
 
 	if cuc.certificate != nil {
-		err := cuc.p.cm().DeleteCertificate(ctx, cuc.certificate.Namespace, cuc.certificate.Name)
+		err := cuc.p.cm().DeleteCertificate(ctx.Child(), cuc.certificate.Namespace, cuc.certificate.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete certificate %q", helpers.FullName(cuc.certificate)))
 		}

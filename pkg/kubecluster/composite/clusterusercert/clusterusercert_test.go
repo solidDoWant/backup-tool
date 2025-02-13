@@ -124,8 +124,9 @@ func TestNewClusterUserCert(t *testing.T) {
 				}
 
 				// 1.
-				c.cmClient.EXPECT().CreateCertificate(ctx, namespace, mock.Anything, issuerName, mock.Anything).
-					RunAndReturn(func(ctx *contexts.Context, namespace, certName, issuerName string, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+				c.cmClient.EXPECT().CreateCertificate(mock.Anything, namespace, mock.Anything, issuerName, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, certName, issuerName string, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
 						assert.Contains(t, certName, clusterName)
 						assert.Contains(t, certName, username)
 						assert.Equal(t, opts.CommonName, username)
@@ -143,15 +144,22 @@ func TestNewClusterUserCert(t *testing.T) {
 
 				// 2.
 				if tt.opts.CRPOpts.Enabled {
-					c.ccfp.EXPECT().CreateCRPForCertificate(ctx, createdCert, createcrpforcertificate.CreateCRPForCertificateOpts{MaxWaitTime: tt.opts.CRPOpts.WaitForCRPTimeout}).
-						Return(th.ErrOr1Val(createdCRP, tt.simulateCreateCRPForCertificateError))
+					c.ccfp.EXPECT().CreateCRPForCertificate(mock.Anything, createdCert, createcrpforcertificate.CreateCRPForCertificateOpts{MaxWaitTime: tt.opts.CRPOpts.WaitForCRPTimeout}).
+						RunAndReturn(func(calledCtx *contexts.Context, cert *certmanagerv1.Certificate, opts createcrpforcertificate.CreateCRPForCertificateOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
+							assert.True(t, calledCtx.IsChildOf(ctx))
+							return th.ErrOr1Val(createdCRP, tt.simulateCreateCRPForCertificateError)
+						})
 					if tt.simulateCreateCRPForCertificateError {
 						return
 					}
 					c.clusterUserCert.EXPECT().setCRP(createdCRP)
 
 					// 2.1.
-					c.cmClient.EXPECT().ReissueCertificate(ctx, createdCert.Namespace, mock.Anything).Return(th.ErrOr1Val(createdCert, tt.simulateReissueCertificateError))
+					c.cmClient.EXPECT().ReissueCertificate(mock.Anything, createdCert.Namespace, mock.Anything).
+						RunAndReturn(func(calledCtx *contexts.Context, namespace, certName string) (*certmanagerv1.Certificate, error) {
+							assert.True(t, calledCtx.IsChildOf(ctx))
+							return th.ErrOr1Val(createdCert, tt.simulateReissueCertificateError)
+						})
 					if tt.simulateReissueCertificateError {
 						return
 					}
@@ -159,7 +167,11 @@ func TestNewClusterUserCert(t *testing.T) {
 				}
 
 				// 3.
-				c.cmClient.EXPECT().WaitForReadyCertificate(ctx, createdCert.Namespace, mock.Anything, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.WaitForCertTimeout}).Return(th.ErrOr1Val(createdCert, tt.simulateWaitForReadyCertError))
+				c.cmClient.EXPECT().WaitForReadyCertificate(mock.Anything, createdCert.Namespace, mock.Anything, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: tt.opts.WaitForCertTimeout}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, certName string, opts certmanager.WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(createdCert, tt.simulateWaitForReadyCertError)
+					})
 				if tt.simulateWaitForReadyCertError {
 					return
 				}
@@ -306,11 +318,19 @@ func TestClusterUserCertDelete(t *testing.T) {
 			tt.cuc.p = p
 
 			if tt.cuc.certificate != nil {
-				p.cmClient.EXPECT().DeleteCertificate(ctx, tt.cuc.certificate.Namespace, tt.cuc.certificate.Name).Return(th.ErrIfTrue(tt.simulateCertificateDeleteError))
+				p.cmClient.EXPECT().DeleteCertificate(mock.Anything, tt.cuc.certificate.Namespace, tt.cuc.certificate.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, certName string) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulateCertificateDeleteError)
+					})
 			}
 
 			if tt.cuc.crp != nil {
-				p.apClient.EXPECT().DeleteCertificateRequestPolicy(ctx, tt.cuc.crp.Name).Return(th.ErrIfTrue(tt.simulateCRPDeleteError))
+				p.apClient.EXPECT().DeleteCertificateRequestPolicy(mock.Anything, tt.cuc.crp.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, crpName string) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulateCRPDeleteError)
+					})
 			}
 
 			err := tt.cuc.Delete(ctx)

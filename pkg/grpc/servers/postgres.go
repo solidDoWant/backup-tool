@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/gravitational/trace/trail"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	postgres_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/postgres/v1"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
 )
 
@@ -37,14 +39,14 @@ func decodeDumpAllOptions(encodedOptions *postgres_v1.DumpAllOptions) postgres.D
 
 	timeout := encodedOptions.GetCleanupTimeout()
 	if timeout != nil {
-		opts.CleanupTimeout = timeout.AsDuration()
+		opts.CleanupTimeout = helpers.MaxWaitTime(timeout.AsDuration())
 	}
 
 	return opts
 }
 
 func (ps *PostgresServer) DumpAll(ctx context.Context, req *postgres_v1.DumpAllRequest) (*postgres_v1.DumpAllResponse, error) {
-	grpcCtx := detatchHandlerContext(ctx)
+	grpcCtx := contexts.UnwrapHandlerContext(ctx)
 	err := ps.runtime.DumpAll(grpcCtx, decodeCredentials(req.GetCredentials()), req.GetOutputFilePath(), decodeDumpAllOptions(req.GetOptions()))
 	if err != nil {
 		return nil, trail.Send(grpcCtx, err)

@@ -19,6 +19,9 @@ type SnapshotVolumeOptions struct {
 }
 
 func (c *Client) SnapshotVolume(ctx *contexts.Context, namespace, pvcName string, opts SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error) {
+	ctx.Log.With("name", pvcName).Info("Creating snapshot for volume")
+	ctx.Log.Debug("Call parameters", "opts", opts)
+
 	snapshot := &volumesnapshotv1.VolumeSnapshot{
 		Spec: volumesnapshotv1.VolumeSnapshotSpec{
 			Source: volumesnapshotv1.VolumeSnapshotSource{
@@ -49,8 +52,13 @@ type WaitForReadySnapshotOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (c *Client) WaitForReadySnapshot(ctx *contexts.Context, namespace, name string, opts WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error) {
-	processEvent := func(_ *contexts.Context, snapshot *volumesnapshotv1.VolumeSnapshot) (*volumesnapshotv1.VolumeSnapshot, bool, error) {
+func (c *Client) WaitForReadySnapshot(ctx *contexts.Context, namespace, name string, opts WaitForReadySnapshotOpts) (snapshot *volumesnapshotv1.VolumeSnapshot, err error) {
+	ctx.Log.With("name", name).Info("Waiting for snapshot to become ready")
+	defer ctx.Log.Info("Finished waiting for snapshot to become ready", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
+	processEvent := func(ctx *contexts.Context, snapshot *volumesnapshotv1.VolumeSnapshot) (*volumesnapshotv1.VolumeSnapshot, bool, error) {
+		ctx.Log.Debug("Snapshot status", "status", snapshot.Status)
+
 		if snapshot.Status == nil {
 			return nil, false, nil
 		}
@@ -68,9 +76,7 @@ func (c *Client) WaitForReadySnapshot(ctx *contexts.Context, namespace, name str
 		}
 		return nil, false, nil
 	}
-
-	snapshot, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(10*time.Minute), c.client.SnapshotV1().VolumeSnapshots(namespace), name, processEvent)
-
+	snapshot, err = helpers.WaitForResourceCondition(ctx.Child(), opts.MaxWait(10*time.Minute), c.client.SnapshotV1().VolumeSnapshots(namespace), name, processEvent)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed waiting for snapshot to become ready")
 	}
@@ -79,6 +85,8 @@ func (c *Client) WaitForReadySnapshot(ctx *contexts.Context, namespace, name str
 }
 
 func (c *Client) DeleteSnapshot(ctx *contexts.Context, namespace, snapshotName string) error {
+	ctx.Log.With("name", snapshotName).Info("Deleting snapshot")
+
 	err := c.client.SnapshotV1().VolumeSnapshots(namespace).Delete(ctx, snapshotName, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete snapshot %q", helpers.FullNameStr(namespace, snapshotName))
 }

@@ -21,20 +21,19 @@ import (
 func TestCreatePod(t *testing.T) {
 	namespace := "test-ns"
 	podName := "test-pod"
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+		},
+	}
 
 	tests := []struct {
 		desc                string
-		pod                 *corev1.Pod
 		simulateClientError bool
 	}{
 		{
 			desc: "create pod successfully",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      podName,
-					Namespace: namespace,
-				},
-			},
 		},
 		{
 			desc:                "creation errors",
@@ -53,15 +52,15 @@ func TestCreatePod(t *testing.T) {
 				})
 			}
 
-			pod, err := c.CreatePod(ctx, namespace, tt.pod)
+			createdPod, err := c.CreatePod(ctx, namespace, pod)
 			if tt.simulateClientError {
 				assert.Error(t, err)
-				assert.Nil(t, pod)
+				assert.Nil(t, createdPod)
 				return
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.pod, pod)
+			assert.Equal(t, pod, createdPod)
 		})
 	}
 }
@@ -134,8 +133,6 @@ func TestWaitForReadyPod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			t.Parallel()
-
 			kc, mockK8s := createTestClient()
 			ctx := th.NewTestContext()
 

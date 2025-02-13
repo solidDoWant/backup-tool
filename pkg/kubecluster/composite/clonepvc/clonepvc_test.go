@@ -372,29 +372,39 @@ func TestClonePVC(t *testing.T) {
 			// becomes expected, the function can be returned from
 			func() {
 				snapshot := th.ValOrDefault(tt.createdSnapshot, createdSnapshot)
-				p.esClient.EXPECT().SnapshotVolume(ctx, namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{}).
-					Return(th.ErrOr1Val(snapshot, tt.simulateSnapshotErr))
+				p.esClient.EXPECT().SnapshotVolume(mock.Anything, namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts externalsnapshotter.SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(snapshot, tt.simulateSnapshotErr)
+					})
+
 				if tt.simulateSnapshotErr {
 					return
 				}
 
-				p.esClient.EXPECT().DeleteSnapshot(mock.Anything, namespace, snapshotName).RunAndReturn(func(cleanupCtx *contexts.Context, _, _ string) error {
+				p.esClient.EXPECT().DeleteSnapshot(mock.Anything, namespace, snapshotName).RunAndReturn(func(cleanupCtx *contexts.Context, namespace, name string) error {
 					require.NotEqual(t, ctx, cleanupCtx)
 					return nil
 				})
 
-				p.esClient.EXPECT().WaitForReadySnapshot(ctx, namespace, snapshotName, mock.Anything).
-					Return(th.ErrOr1Val(snapshot, tt.simulateWaitForSnapshotErr))
+				p.esClient.EXPECT().WaitForReadySnapshot(mock.Anything, namespace, snapshotName, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts externalsnapshotter.WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(snapshot, tt.simulateWaitForSnapshotErr)
+					})
 				if tt.simulateWaitForSnapshotErr {
 					return
 				}
 
-				p.coreClient.EXPECT().GetPVC(ctx, namespace, pvcName).RunAndReturn(func(ctx *contexts.Context, namespace, pvcName string) (*corev1.PersistentVolumeClaim, error) {
-					if tt.initialPVC != nil {
-						return th.ErrOr1Val(tt.initialPVC, tt.simulateQueryExistingErr)
-					}
-					return nil, assert.AnError
-				}).Maybe() // This only needs to be called when certain options are not set
+				if tt.opts.DestStorageClassName == "" {
+					p.coreClient.EXPECT().GetPVC(mock.Anything, namespace, pvcName).RunAndReturn(func(calledCtx *contexts.Context, namespace, pvcName string) (*corev1.PersistentVolumeClaim, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						if tt.initialPVC != nil {
+							return th.ErrOr1Val(tt.initialPVC, tt.simulateQueryExistingErr)
+						}
+						return nil, assert.AnError
+					})
+				}
 				if tt.simulateQueryExistingErr {
 					return
 				}
@@ -423,8 +433,9 @@ func TestClonePVC(t *testing.T) {
 					opts.StorageClassName = *tt.initialPVC.Spec.StorageClassName
 				}
 
-				p.coreClient.EXPECT().CreatePVC(ctx, namespace, newPVCName, size, opts).
-					RunAndReturn(func(ctx *contexts.Context, namespace, newPVCName string, size resource.Quantity, opts core.CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+				p.coreClient.EXPECT().CreatePVC(mock.Anything, namespace, newPVCName, size, opts).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, newPVCName string, size resource.Quantity, opts core.CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
 						pvc := tt.clonedPVC
 						if pvc == nil {
 							pvc = tt.expectedPVC
@@ -437,15 +448,21 @@ func TestClonePVC(t *testing.T) {
 				}
 
 				if tt.simulatePodCreateErr || tt.simulatePodWaitErr || tt.simulatePodDeleteError {
-					p.coreClient.EXPECT().DeletePVC(mock.Anything, namespace, mock.Anything).Return(th.ErrIfTrue(tt.simulatePVCDeleteError))
+					p.coreClient.EXPECT().DeletePVC(mock.Anything, namespace, mock.Anything).
+						RunAndReturn(func(cleanupCtx *contexts.Context, namespace, name string) error {
+							assert.NotEqual(t, ctx, cleanupCtx)
+							return th.ErrIfTrue(tt.simulatePVCDeleteError)
+						})
 				}
 
 				if !tt.opts.ForceBind {
 					return
 				}
 
-				p.coreClient.EXPECT().CreatePod(ctx, namespace, mock.Anything).
-					RunAndReturn(func(ctx *contexts.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
+				p.coreClient.EXPECT().CreatePod(mock.Anything, namespace, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+
 						assert.Contains(t, pod.Name, "force-bind")
 						assert.Len(t, pod.Spec.Containers, 1)
 						assert.Len(t, pod.Spec.Volumes, 1)
@@ -464,10 +481,17 @@ func TestClonePVC(t *testing.T) {
 				if tt.simulatePodCreateErr {
 					return
 				}
-				p.coreClient.EXPECT().DeletePod(mock.Anything, namespace, createdPod.Name).Return(th.ErrIfTrue(tt.simulatePodDeleteError))
+				p.coreClient.EXPECT().DeletePod(mock.Anything, namespace, createdPod.Name).
+					RunAndReturn(func(cleanupCtx *contexts.Context, namespace, name string) error {
+						assert.NotEqual(t, ctx, cleanupCtx)
+						return th.ErrIfTrue(tt.simulatePodDeleteError)
+					})
 
-				p.coreClient.EXPECT().WaitForReadyPod(ctx, namespace, createdPod.Name, core.WaitForReadyPodOpts{MaxWaitTime: tt.opts.ForceBindTimeout}).
-					Return(th.ErrOr1Val(createdPod, tt.simulatePodWaitErr))
+				p.coreClient.EXPECT().WaitForReadyPod(mock.Anything, namespace, createdPod.Name, core.WaitForReadyPodOpts{MaxWaitTime: tt.opts.ForceBindTimeout}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts core.WaitForReadyPodOpts) (*corev1.Pod, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(createdPod, tt.simulatePodWaitErr)
+					})
 			}()
 
 			clonedPVC, err := p.ClonePVC(ctx, namespace, pvcName, tt.opts)

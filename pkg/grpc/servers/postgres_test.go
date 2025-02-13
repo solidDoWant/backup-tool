@@ -4,7 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	postgres_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/postgres/v1"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
@@ -92,7 +94,7 @@ func TestDecodeDumpAllOptions(t *testing.T) {
 			input: postgres_v1.DumpAllOptions_builder{
 				CleanupTimeout: durationpb.New(5 * time.Second),
 			}.Build(),
-			want: postgres.DumpAllOptions{CleanupTimeout: 5 * time.Second},
+			want: postgres.DumpAllOptions{CleanupTimeout: helpers.MaxWaitTime(5 * time.Second)},
 		},
 	}
 
@@ -149,7 +151,7 @@ func TestDumpAll(t *testing.T) {
 			ctx := th.NewTestContext()
 			decodedCredentials := decodeCredentials(tc.credentials)
 			decodedOpts := decodeDumpAllOptions(tc.opts)
-			runtime.EXPECT().DumpAll(detatchHandlerContext(ctx), decodedCredentials, tc.outputPath, decodedOpts).Return(tc.runtimeErr)
+			runtime.EXPECT().DumpAll(contexts.UnwrapHandlerContext(ctx), decodedCredentials, tc.outputPath, decodedOpts).Return(tc.runtimeErr)
 
 			// Create request
 			req := postgres_v1.DumpAllRequest_builder{

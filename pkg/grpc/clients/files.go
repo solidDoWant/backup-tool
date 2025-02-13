@@ -19,23 +19,29 @@ func NewFilesClient(grpcConnection grpc.ClientConnInterface) *FilesClient {
 }
 
 func (fc *FilesClient) CopyFiles(ctx *contexts.Context, src, dest string) error {
+	ctx.Log.With("src", src, "dest", dest).Info("Copying files")
+	defer ctx.Log.Info("Finished copying files", ctx.Stopwatch.Keyval())
+
 	request := files_v1.CopyFilesRequest_builder{
 		Source: &src,
 		Dest:   &dest,
 	}.Build()
 
 	var header metadata.MD
-	_, err := fc.client.CopyFiles(ctx, request, grpc.Header(&header))
+	_, err := fc.client.CopyFiles(ctx.Child(), request, grpc.Header(&header))
 	return trail.FromGRPC(err, header)
 }
 
 func (fc *FilesClient) SyncFiles(ctx *contexts.Context, src, dest string) error {
+	ctx.Log.With("src", src, "dest", dest).Info("Syncing files")
+	defer ctx.Log.Info("Finished syncing files", ctx.Stopwatch.Keyval())
+
 	request := files_v1.SyncFilesRequest_builder{
 		Source: &src,
 		Dest:   &dest,
 	}.Build()
 
 	var header metadata.MD
-	_, err := fc.client.SyncFiles(ctx, request, grpc.Header(&header))
+	_, err := fc.client.SyncFiles(ctx.Child(), request, grpc.Header(&header))
 	return trail.FromGRPC(err, header)
 }

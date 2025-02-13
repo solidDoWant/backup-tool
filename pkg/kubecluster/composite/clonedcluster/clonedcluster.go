@@ -91,19 +91,25 @@ func newClonedCluster(p providerInterfaceInternal) ClonedClusterInterface {
 // Clone an existing CNPG cluster, with separate certificates for authentication.
 // It is assumed that all required resources for approving certificats (such as Certificate Request Policies) are already in place.
 func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
+	ctx.Log.With("existingCluster", existingClusterName, "newCluster", newClusterName).Info("Cloning CNPG cluster")
+	defer ctx.Log.Info("Finished cloning CNPG cluster", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
 	cluster = p.newClonedCluster()
 
 	// Prepare to handle resource cleanup in the event of an error
 	errHandler := func(originalErr error, args ...interface{}) (*ClonedCluster, error) {
 		originalErr = trace.Wrap(originalErr, args...)
-		return nil, cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(10*time.Minute), cluster.Delete).
+		return nil, cleanup.To(cluster.Delete).
 			WithErrMessage("failed to cleanup cloned cluster %q in namespace %q", newClusterName, namespace).
 			WithOriginalErr(&originalErr).
+			WithParentCtx(ctx).
+			WithTimeout(opts.CleanupTimeout.MaxWait(10 * time.Minute)).
 			Run()
 	}
 
 	// Perform as many read-only operations as possible now to reduce the number of changes that need to be reverted in case of a failure
-	existingCluster, err := p.cnpgClient.GetCluster(ctx, namespace, existingClusterName)
+	ctx.Log.Info("Collecting information about the existing cluster")
+	existingCluster, err := p.cnpgClient.GetCluster(ctx.Child(), namespace, existingClusterName)
 	if err != nil {
 		return errHandler(err, "failed to get existing cluster %q", helpers.FullNameStr(namespace, existingClusterName))
 	}
@@ -115,11 +121,13 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 
 	// 1. Create a backup of the current cluster
 	backupNamePrefix := existingClusterName + "-cloned"
-	backup, err := p.cnpgClient.CreateBackup(ctx, namespace, backupNamePrefix, existingClusterName, cnpg.CreateBackupOptions{GenerateName: true})
+	ctx.Log.Step().Info("Creating a backup of the existing cluster", "backupName", backupNamePrefix)
+	backup, err := p.cnpgClient.CreateBackup(ctx.Child(), namespace, backupNamePrefix, existingClusterName, cnpg.CreateBackupOptions{GenerateName: true})
 	if err != nil {
 		return errHandler(err, "failed to create backup of existing cluster %q", helpers.FullNameStr(namespace, existingClusterName))
 	}
-	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
+	defer cleanup.To(func(ctx *contexts.Context) error {
+		// A child context is not passed here because this is mostly just a wrapper for DeleteBackup.
 		cleanupErr := p.cnpgClient.DeleteBackup(ctx, namespace, backup.Name)
 		if cleanupErr == nil {
 			return nil
@@ -128,15 +136,16 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 		// If backup deletion failed, treat the entire operation as a failure. This includes deleting the cluster, and setting the return value to nil.
 		cluster, cleanupErr = errHandler(cleanupErr, "failed to delete backup %q", helpers.FullName(backup))
 		return cleanupErr
-	}).WithErrMessage("cleanup failed").WithOriginalErr(&err).Run()
+	}).WithErrMessage("cleanup failed").WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(time.Minute)).Run()
 
-	readyBackup, err := p.cnpgClient.WaitForReadyBackup(ctx, namespace, backup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: opts.WaitForBackupTimeout})
+	readyBackup, err := p.cnpgClient.WaitForReadyBackup(ctx.Child(), namespace, backup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: opts.WaitForBackupTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for backup %q to be ready", helpers.FullName(backup))
 	}
 
 	// 2. Create the serving certificate (short lived)
 	servingCertName := helpers.CleanName(newClusterName + "-serving-cert")
+	ctx.Log.Step().Info("Creating serving certificate for the new cluster", "certificateName", servingCertName)
 	certOptions := certmanager.CreateCertificateOptions{
 		CommonName: servingCertName,
 		Subject:    opts.Certificates.ServingCert.Subject,
@@ -144,25 +153,28 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 		SecretLabels: map[string]string{
 			utils.WatchedLabelName: "true",
 		},
-		DNSNames:   getClusterDomainNames(newClusterName, namespace),
+		DNSNames:   getClusterDomainNames(ctx.Child(), newClusterName, namespace),
 		IssuerKind: opts.Certificates.ServingCert.IssuerKind,
 	}
 
-	servingCert, err := p.cmClient.CreateCertificate(ctx, namespace, servingCertName, servingCertIssuerName, certOptions)
+	servingCert, err := p.cmClient.CreateCertificate(ctx.Child(), namespace, servingCertName, servingCertIssuerName, certOptions)
 	if err != nil {
 		return errHandler(err, "failed to create cluster serving cert %q", helpers.FullNameStr(namespace, servingCertName))
 	}
 	cluster.setServingCert(servingCert)
 
-	readyServingCert, err := p.cmClient.WaitForReadyCertificate(ctx, namespace, servingCertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.Certificates.ServingCert.WaitForReadyTimeout})
+	readyServingCert, err := p.cmClient.WaitForReadyCertificate(ctx.Child(), namespace, servingCertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.Certificates.ServingCert.WaitForReadyTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for serving certificate %q to be ready", helpers.FullName(servingCert))
 	}
 	cluster.setServingCert(readyServingCert)
 
-	// 3. Create the client CA certificate (short lived) and issuer.
-	// 3.1 Client CA certificate
+	// 3. Create the client CA certificate (short lived) and issuer
 	clientCACertName := helpers.CleanName(newClusterName + "-client-ca")
+	clientCAIssuerName := helpers.CleanName(clientCACertName + "-issuer")
+	ctx.Log.Step().Info("Creating PKI for client certificates for the new cluster", "certificateName", clientCACertName, "issuerName", clientCAIssuerName)
+
+	// 3.1 Client CA certificate
 	certOptions = certmanager.CreateCertificateOptions{
 		IsCA: true,
 		// Permit nothing. The certs should only be authoritive for the common name, which stores the postgres username.
@@ -184,59 +196,62 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 		IssuerKind: opts.Certificates.ClientCACert.IssuerKind,
 	}
 
-	clientCACert, err := p.cmClient.CreateCertificate(ctx, namespace, clientCACertName, clientCACertIssuerName, certOptions)
+	clientCACert, err := p.cmClient.CreateCertificate(ctx.Child(), namespace, clientCACertName, clientCACertIssuerName, certOptions)
 	if err != nil {
 		return errHandler(err, "failed to create client CA cert %q", helpers.FullNameStr(namespace, clientCACertName))
 	}
 	cluster.setClientCACert(clientCACert)
 
-	readyClientCACert, err := p.cmClient.WaitForReadyCertificate(ctx, namespace, clientCACertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.Certificates.ClientCACert.WaitForReadyTimeout})
+	readyClientCACert, err := p.cmClient.WaitForReadyCertificate(ctx.Child(), namespace, clientCACertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.Certificates.ClientCACert.WaitForReadyTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for client CA cert %q to be ready", helpers.FullName(readyServingCert))
 	}
 	cluster.setClientCACert(readyClientCACert)
 
 	// 3.2 Client CA issuer
-	clientCAIssuerName := helpers.CleanName(clientCACertName + "-issuer")
-	clientCAIssuer, err := p.cmClient.CreateIssuer(ctx, namespace, clientCAIssuerName, readyClientCACert.Name, certmanager.CreateIssuerOptions{})
+	clientCAIssuer, err := p.cmClient.CreateIssuer(ctx.Child(), namespace, clientCAIssuerName, readyClientCACert.Name, certmanager.CreateIssuerOptions{})
 	if err != nil {
 		return errHandler(err, "failed to create client CA issuer %q", helpers.FullNameStr(namespace, clientCAIssuerName))
 	}
 	cluster.setClientCAIssuer(clientCAIssuer)
 
-	readyClientCAIssuer, err := p.cmClient.WaitForReadyIssuer(ctx, namespace, clientCAIssuerName, certmanager.WaitForReadyIssuerOpts{MaxWaitTime: opts.ClientCAIssuer.WaitForReadyTimeout})
+	readyClientCAIssuer, err := p.cmClient.WaitForReadyIssuer(ctx.Child(), namespace, clientCAIssuerName, certmanager.WaitForReadyIssuerOpts{MaxWaitTime: opts.ClientCAIssuer.WaitForReadyTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for client CA issuer %q to be ready", helpers.FullName(clientCAIssuer))
 	}
 	cluster.setClientCAIssuer(readyClientCAIssuer)
 
-	// 4. Create the postgres user certificate
+	// 4. Create the user certificates
+	ctx.Log.Step().Info("Creating user certificates for the new cluster")
+
+	// 4.1 Create the postgres user certificate
 	cucOptions := clusterusercert.NewClusterUserCertOpts{
 		Subject:            opts.Certificates.PostgresUserCert.Subject,
 		CRPOpts:            opts.Certificates.PostgresUserCert.CRPOpts,
 		WaitForCertTimeout: opts.Certificates.PostgresUserCert.WaitForReadyTimeout,
 		CleanupTimeout:     opts.CleanupTimeout,
 	}
-	postgresUserCert, err := p.cucp.NewClusterUserCert(ctx, namespace, "postgres", clientCAIssuerName, newClusterName, cucOptions)
+	postgresUserCert, err := p.cucp.NewClusterUserCert(ctx.Child(), namespace, "postgres", clientCAIssuerName, newClusterName, cucOptions)
 	if err != nil {
 		return errHandler(err, "failed to create postgres user cert resources")
 	}
 	cluster.setPostgresUserCert(postgresUserCert)
 
-	// 5. Create the streaming_replica user certificate
+	// 4.2 Create the streaming_replica user certificate
 	cucOptions = clusterusercert.NewClusterUserCertOpts{
 		Subject:            opts.Certificates.StreamingReplicaUserCert.Subject,
 		CRPOpts:            opts.Certificates.StreamingReplicaUserCert.CRPOpts,
 		WaitForCertTimeout: opts.Certificates.StreamingReplicaUserCert.WaitForReadyTimeout,
 		CleanupTimeout:     opts.CleanupTimeout,
 	}
-	replicationUserCert, err := p.cucp.NewClusterUserCert(ctx, namespace, "streaming_replica", clientCAIssuerName, newClusterName, cucOptions)
+	replicationUserCert, err := p.cucp.NewClusterUserCert(ctx.Child(), namespace, "streaming_replica", clientCAIssuerName, newClusterName, cucOptions)
 	if err != nil {
 		return errHandler(err, "failed to create streaming_replica user cert resources")
 	}
 	cluster.setStreamingReplicaUserCert(replicationUserCert)
 
-	// 6. Create a new cluster from the backup
+	// 5. Create a new cluster from the backup
+	ctx.Log.Step().Info("Creating new cluster from backup")
 	clusterOpts := cnpg.CreateClusterOptions{
 		BackupName: readyBackup.Name,
 	}
@@ -264,14 +279,14 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 		}
 	}
 
-	newCluster, err := p.cnpgClient.CreateCluster(ctx, namespace, newClusterName, clusterVolumeSize, readyServingCert.Name, readyClientCACert.Name, replicationUserCert.GetCertificate().Name, clusterOpts)
+	newCluster, err := p.cnpgClient.CreateCluster(ctx.Child(), namespace, newClusterName, clusterVolumeSize, readyServingCert.Name, readyClientCACert.Name, replicationUserCert.GetCertificate().Name, clusterOpts)
 	if err != nil {
 		return errHandler(err, "failed to create new cluster %q from backup %q with serving certificate %q and client certificate %q",
 			helpers.FullNameStr(namespace, newClusterName), helpers.FullName(readyBackup), helpers.FullName(readyServingCert), helpers.FullName(readyClientCACert))
 	}
 	cluster.setCluster(newCluster)
 
-	readyCluster, err := p.cnpgClient.WaitForReadyCluster(ctx, namespace, newClusterName, cnpg.WaitForReadyClusterOpts{MaxWaitTime: opts.WaitForClusterTimeout})
+	readyCluster, err := p.cnpgClient.WaitForReadyCluster(ctx.Child(), namespace, newClusterName, cnpg.WaitForReadyClusterOpts{MaxWaitTime: opts.WaitForClusterTimeout})
 	if err != nil {
 		return errHandler(err, "failed to wait for new cluster %q to become ready", helpers.FullNameStr(namespace, newClusterName))
 	}
@@ -280,7 +295,7 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 	return cluster, nil
 }
 
-func getClusterDomainNames(clusterName, namespace string) []string {
+func getClusterDomainNames(ctx *contexts.Context, clusterName, namespace string) []string {
 	endpointTypes := []string{"r", "ro", "rw"}
 	// Pending https://github.com/kubernetes/kubernetes/issues/44954 there is no way to get the cluster domain name (i.e. cluster.local)
 	// from the k8s API
@@ -298,6 +313,7 @@ func getClusterDomainNames(clusterName, namespace string) []string {
 		}
 	}
 
+	ctx.Log.Debug("Generated domain names", "domainNames", domainNames)
 	return domainNames
 }
 
@@ -358,46 +374,49 @@ func (cc *ClonedCluster) GetCredentials(servingCertMountDirectory, clientCertMou
 	}
 }
 
-func (cc *ClonedCluster) Delete(ctx *contexts.Context) error {
+func (cc *ClonedCluster) Delete(ctx *contexts.Context) (err error) {
+	ctx.Log.Info("Cleaning up cloned cluster resources")
+	defer ctx.Log.Info("Finished cleaning up cloned cluster resources", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
 	cleanupErrs := make([]error, 0, 6)
 
 	if cc.cluster != nil {
-		err := cc.p.cnpg().DeleteCluster(ctx, cc.cluster.Namespace, cc.cluster.Name)
+		err := cc.p.cnpg().DeleteCluster(ctx.Child(), cc.cluster.Namespace, cc.cluster.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster CNPG cluster %q", helpers.FullName(cc.cluster)))
 		}
 	}
 
 	if cc.streamingReplicaUserCertificate != nil {
-		err := cc.streamingReplicaUserCertificate.Delete(ctx)
+		err := cc.streamingReplicaUserCertificate.Delete(ctx.Child())
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster streaming_replica user cert resources"))
 		}
 	}
 
 	if cc.postgresUserCertificate != nil {
-		err := cc.postgresUserCertificate.Delete(ctx)
+		err := cc.postgresUserCertificate.Delete(ctx.Child())
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster postgres user cert resources"))
 		}
 	}
 
 	if cc.clientCAIssuer != nil {
-		err := cc.p.cm().DeleteIssuer(ctx, cc.clientCAIssuer.Namespace, cc.clientCAIssuer.Name)
+		err := cc.p.cm().DeleteIssuer(ctx.Child(), cc.clientCAIssuer.Namespace, cc.clientCAIssuer.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster client CA issuer %q", helpers.FullName(cc.clientCAIssuer)))
 		}
 	}
 
 	if cc.clientCACertificate != nil {
-		err := cc.p.cm().DeleteCertificate(ctx, cc.clientCACertificate.Namespace, cc.clientCACertificate.Name)
+		err := cc.p.cm().DeleteCertificate(ctx.Child(), cc.clientCACertificate.Namespace, cc.clientCACertificate.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster client CA cert %q", helpers.FullName(cc.clientCACertificate)))
 		}
 	}
 
 	if cc.servingCertificate != nil {
-		err := cc.p.cm().DeleteCertificate(ctx, cc.servingCertificate.Namespace, cc.servingCertificate.Name)
+		err := cc.p.cm().DeleteCertificate(ctx.Child(), cc.servingCertificate.Namespace, cc.servingCertificate.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster serving cert %q", helpers.FullName(cc.servingCertificate)))
 		}

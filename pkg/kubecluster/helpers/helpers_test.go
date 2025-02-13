@@ -234,7 +234,6 @@ func TestWaitForResourceCondition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			t.Parallel()
 			client := fake.NewClientset(tt.initialResources...)
 			ctx := th.NewTestContext()
 

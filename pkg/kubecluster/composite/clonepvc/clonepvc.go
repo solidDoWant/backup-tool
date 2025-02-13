@@ -27,16 +27,20 @@ type ClonePVCOptions struct {
 
 // Snapshots a given volume and clones it. Callers are responsible for ensuring consistency.
 func (p *Provider) ClonePVC(ctx *contexts.Context, namespace, pvcName string, opts ClonePVCOptions) (clonedPvc *corev1.PersistentVolumeClaim, err error) {
-	snapshot, err := p.esClient.SnapshotVolume(ctx, namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{})
+	ctx.Log.With("existingPVC", pvcName).Info("Cloning PVC")
+	defer ctx.Log.Info("Finished cloning PVC", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
+	ctx.Log.Step().Info("Creating snapshot of PVC")
+	snapshot, err := p.esClient.SnapshotVolume(ctx.Child(), namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{})
 	if err != nil {
 		err = trace.Wrap(err, "failed to snapshot %q", helpers.FullNameStr(namespace, pvcName))
 		return
 	}
-	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
+	defer cleanup.To(func(ctx *contexts.Context) error {
 		return p.esClient.DeleteSnapshot(ctx, namespace, snapshot.Name)
-	}).WithErrMessage("failed to delete created snapshot for PVC %q", helpers.FullNameStr(namespace, pvcName)).WithOriginalErr(&err).Run()
+	}).WithErrMessage("failed to delete created snapshot for PVC %q", helpers.FullNameStr(namespace, pvcName)).WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(time.Minute)).Run()
 
-	readySnapshot, err := p.esClient.WaitForReadySnapshot(ctx, namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: opts.WaitForSnapshotTimeout})
+	readySnapshot, err := p.esClient.WaitForReadySnapshot(ctx.Child(), namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: opts.WaitForSnapshotTimeout})
 	if err != nil {
 		err = trace.Wrap(err, "failed to wait for snapshot %q to become ready", helpers.FullName(snapshot))
 		return
@@ -46,6 +50,7 @@ func (p *Provider) ClonePVC(ctx *contexts.Context, namespace, pvcName string, op
 	if opts.DestPvcNamePrefix != "" {
 		pvcNamePrefix = opts.DestPvcNamePrefix
 	}
+	ctx.Log.With("newPVC", pvcNamePrefix).Step().Info("Creating PVC from snapshot", "snapshot", readySnapshot.Name)
 
 	var storageClassName string
 	if opts.DestStorageClassName != "" {
@@ -53,7 +58,7 @@ func (p *Provider) ClonePVC(ctx *contexts.Context, namespace, pvcName string, op
 	} else {
 		// Default to the original PVC's storage class if none is specified
 		var srcPvc *corev1.PersistentVolumeClaim
-		srcPvc, err = p.coreClient.GetPVC(ctx, namespace, pvcName)
+		srcPvc, err = p.coreClient.GetPVC(ctx.Child(), namespace, pvcName)
 		if err != nil {
 			err = trace.Wrap(err, "failed to get existing PVC %q", helpers.FullNameStr(namespace, pvcName))
 			return
@@ -73,7 +78,7 @@ func (p *Provider) ClonePVC(ctx *contexts.Context, namespace, pvcName string, op
 		return
 	}
 
-	clonedPvc, err = p.coreClient.CreatePVC(ctx, namespace, pvcNamePrefix, size, core.CreatePVCOptions{
+	clonedPvc, err = p.coreClient.CreatePVC(ctx.Child(), namespace, pvcNamePrefix, size, core.CreatePVCOptions{
 		GenerateName:     true,
 		StorageClassName: storageClassName,
 		Source: &corev1.TypedObjectReference{
@@ -86,20 +91,22 @@ func (p *Provider) ClonePVC(ctx *contexts.Context, namespace, pvcName string, op
 		err = trace.Wrap(err, "failed to create volume from created snapshot %q", helpers.FullName(readySnapshot))
 		return
 	}
-	defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
+	defer cleanup.To(func(ctx *contexts.Context) error {
 		if err == nil {
 			return nil
 		}
 		cleanupErr := p.coreClient.DeletePVC(ctx, namespace, clonedPvc.Name)
 		clonedPvc = nil
 		return cleanupErr
-	}).WithErrMessage("failed to delete created volume for PVC %q", helpers.FullNameStr(namespace, pvcName)).WithOriginalErr(&err).Run()
+	}).WithErrMessage("failed to delete created volume for PVC %q", helpers.FullNameStr(namespace, pvcName)).WithOriginalErr(&err).
+		WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(time.Minute)).Run()
 
 	if opts.ForceBind {
+		ctx.Log.Step().Info("Forcing immediate bind of PVC")
 		podVol := core.NewSingleContainerPVC(clonedPvc.Name, "/mnt")
 
 		var pod *corev1.Pod
-		pod, err = p.coreClient.CreatePod(ctx, namespace, &corev1.Pod{
+		pod, err = p.coreClient.CreatePod(ctx.Child(), namespace, &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "force-bind-" + clonedPvc.Name,
 			},
@@ -121,11 +128,12 @@ func (p *Provider) ClonePVC(ctx *contexts.Context, namespace, pvcName string, op
 			err = trace.Wrap(err, "failed to create 'force bind' pod for PVC %q", helpers.FullName(clonedPvc))
 			return
 		}
-		defer cleanup.WithTimeoutTo(opts.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
+		defer cleanup.To(func(ctx *contexts.Context) error {
 			return p.coreClient.DeletePod(ctx, namespace, pod.Name)
-		}).WithErrMessage("failed to delete 'force bind' pod for PVC %q", helpers.FullName(clonedPvc)).WithOriginalErr(&err).Run()
+		}).WithErrMessage("failed to delete 'force bind' pod for PVC %q", helpers.FullName(clonedPvc)).WithOriginalErr(&err).
+			WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(time.Minute)).Run()
 
-		_, err = p.coreClient.WaitForReadyPod(ctx, namespace, pod.Name, core.WaitForReadyPodOpts{MaxWaitTime: opts.ForceBindTimeout})
+		_, err = p.coreClient.WaitForReadyPod(ctx.Child(), namespace, pod.Name, core.WaitForReadyPodOpts{MaxWaitTime: opts.ForceBindTimeout})
 		if err != nil {
 			err = trace.Wrap(err, "failed to wait for 'force bind' pod %q to become ready", helpers.FullName(pod))
 			return

@@ -15,7 +15,10 @@ type CreateCRPForCertificateOpts struct {
 }
 
 // Create a Certificate Request Policy that matches the given certificate as closely as possible.
-func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmanagerv1.Certificate, opts CreateCRPForCertificateOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
+func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmanagerv1.Certificate, opts CreateCRPForCertificateOpts) (_crp *policyv1alpha1.CertificateRequestPolicy, err error) {
+	ctx.Log.With("certificate", cert.Name).Info("Creating CertificateRequestPolicy for Certificate")
+	defer ctx.Log.Info("Finished creating CertificateRequestPolicy for Certificate", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
 	spec := policyv1alpha1.CertificateRequestPolicySpec{
 		Selector: policyv1alpha1.CertificateRequestPolicySelector{
 			Namespace: &policyv1alpha1.CertificateRequestPolicySelectorNamespace{
@@ -198,12 +201,12 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 		spec.Allowed = allowed
 	}
 
-	crp, err := p.apClient.CreateCertificateRequestPolicy(ctx, cert.Name, spec, approverpolicy.CreateCertificateRequestPolicyOptions{GenerateName: true})
+	crp, err := p.apClient.CreateCertificateRequestPolicy(ctx.Child(), cert.Name, spec, approverpolicy.CreateCertificateRequestPolicyOptions{GenerateName: true})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create certificate request policy for certificate %q", cert.Name)
 	}
 
-	readyCRP, err := p.apClient.WaitForReadyCertificateRequestPolicy(ctx, crp.Name, approverpolicy.WaitForReadyCertificateRequestPolicyOpts{MaxWaitTime: opts.MaxWaitTime})
+	readyCRP, err := p.apClient.WaitForReadyCertificateRequestPolicy(ctx.Child(), crp.Name, approverpolicy.WaitForReadyCertificateRequestPolicyOpts{MaxWaitTime: opts.MaxWaitTime})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed waiting for certificate request policy %q to become ready", crp.Name)
 	}

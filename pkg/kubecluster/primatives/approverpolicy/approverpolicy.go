@@ -16,6 +16,9 @@ type CreateCertificateRequestPolicyOptions struct {
 }
 
 func (c *Client) CreateCertificateRequestPolicy(ctx *contexts.Context, name string, spec policyv1alpha1.CertificateRequestPolicySpec, opts CreateCertificateRequestPolicyOptions) (*policyv1alpha1.CertificateRequestPolicy, error) {
+	ctx.Log.With("name", name).Info("Creating certificate request policy")
+	ctx.Log.Debug("Call parameters", "spec", spec, "opts", opts)
+
 	policy := &policyv1alpha1.CertificateRequestPolicy{
 		Spec: spec,
 	}
@@ -34,8 +37,12 @@ type WaitForReadyCertificateRequestPolicyOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (c *Client) WaitForReadyCertificateRequestPolicy(ctx *contexts.Context, name string, opts WaitForReadyCertificateRequestPolicyOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
+func (c *Client) WaitForReadyCertificateRequestPolicy(ctx *contexts.Context, name string, opts WaitForReadyCertificateRequestPolicyOpts) (policy *policyv1alpha1.CertificateRequestPolicy, err error) {
+	ctx.Log.With("name", name).Info("Waiting for certificate request policy to become ready")
+	defer ctx.Log.Info("Finished waiting for certificate request policy to become ready", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
 	precondition := func(ctx *contexts.Context, policy *policyv1alpha1.CertificateRequestPolicy) (*policyv1alpha1.CertificateRequestPolicy, bool, error) {
+		ctx.Log.Debug("Policy conditions", "conditions", policy.Status.Conditions)
 		isReady := false
 		for _, condition := range policy.Status.Conditions {
 			if condition.Type != policyv1alpha1.CertificateRequestPolicyConditionReady {
@@ -53,7 +60,7 @@ func (c *Client) WaitForReadyCertificateRequestPolicy(ctx *contexts.Context, nam
 
 		return nil, false, nil
 	}
-	policy, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), c.client.PolicyV1alpha1().CertificateRequestPolicies(), name, precondition)
+	policy, err = helpers.WaitForResourceCondition(ctx.Child(), opts.MaxWait(time.Minute), c.client.PolicyV1alpha1().CertificateRequestPolicies(), name, precondition)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed waiting for certificate request policy %q to become ready", name)
 	}
@@ -62,6 +69,8 @@ func (c *Client) WaitForReadyCertificateRequestPolicy(ctx *contexts.Context, nam
 }
 
 func (c *Client) DeleteCertificateRequestPolicy(ctx *contexts.Context, name string) error {
-	err := c.client.PolicyV1alpha1().CertificateRequestPolicies().Delete(ctx, name, v1.DeleteOptions{})
+	ctx.Log.With("name", name).Info("Deleting certificate request policy")
+
+	err := c.client.PolicyV1alpha1().CertificateRequestPolicies().Delete(ctx.Child(), name, v1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete certificate request policy %q", name)
 }

@@ -184,8 +184,6 @@ func TestWaitForReadyBackup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			t.Parallel()
-
 			client, cnpgFakeClient, _ := createTestClient()
 			ctx := th.NewTestContext()
 
@@ -545,8 +543,6 @@ func TestWaitForReadyCluster(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			t.Parallel()
-
 			client, cnpgFakeClient, _ := createTestClient()
 			ctx := th.NewTestContext()
 

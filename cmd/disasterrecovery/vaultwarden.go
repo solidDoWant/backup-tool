@@ -1,10 +1,8 @@
 package disasterrecovery
 
 import (
-	"fmt"
-
 	"github.com/gravitational/trace"
-	"github.com/solidDoWant/backup-tool/cmd/disasterrecovery/common"
+	"github.com/solidDoWant/backup-tool/pkg/cli/features"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery"
 	"github.com/spf13/cobra"
 )
@@ -21,9 +19,9 @@ type VaultWardenBackupConfig struct {
 }
 
 type VaultWardenCommand struct {
-	kubeConfig     common.KubernetesCommand
-	timeoutContext common.ContextTimeoutCommand
-	configFile     common.ConfigFileCommand[VaultWardenBackupConfig]
+	kubeConfig     features.KubernetesCommand
+	timeoutContext features.ContextCommand
+	configFile     features.ConfigFileCommand[VaultWardenBackupConfig]
 }
 
 func NewVaultWardenCommand() *VaultWardenCommand {
@@ -54,8 +52,7 @@ func (vwc *VaultWardenCommand) Backup() error {
 	}
 
 	vw := disasterrecovery.NewVaultWarden(clusterClient)
-	backup, err := vw.Backup(ctx, config.Namespace, config.BackupName, config.DataPVCName, config.CNPGClusterName, config.ServingCertIssuerName, config.ClientCACertIssuerName, config.VaultWardenBackupOptions)
-	fmt.Printf("Backup completed in %s\n", backup.CalculateRuntime().String()) // TODO logging/output library
+	_, err = vw.Backup(ctx, config.Namespace, config.BackupName, config.DataPVCName, config.CNPGClusterName, config.ServingCertIssuerName, config.ClientCACertIssuerName, config.VaultWardenBackupOptions)
 	return trace.Wrap(err, "failed to backup Vaultwarden")
 }
 

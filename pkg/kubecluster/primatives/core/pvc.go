@@ -17,6 +17,9 @@ type CreatePVCOptions struct {
 }
 
 func (c *Client) CreatePVC(ctx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+	ctx.Log.With("name", pvcName).Info("Creating PVC")
+	ctx.Log.Debug("Call parameters", "size", size.String(), "opts", opts)
+
 	pvc := &corev1.PersistentVolumeClaim{
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -46,16 +49,22 @@ func (c *Client) CreatePVC(ctx *contexts.Context, namespace, pvcName string, siz
 }
 
 func (kc *Client) GetPVC(ctx *contexts.Context, namespace, name string) (*corev1.PersistentVolumeClaim, error) {
+	ctx.Log.With("name", name).Info("Getting PVC")
+
 	pvc, err := kc.client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, meta_v1.GetOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to query cluster for PVC %q", helpers.FullNameStr(namespace, name))
 	}
 
+	ctx.Log.Debug("Retrieved PVC", "pvc", pvc)
 	return pvc, nil
 }
 
-func (c *Client) DoesPVCExist(ctx *contexts.Context, namespace, name string) (bool, error) {
-	_, err := c.GetPVC(ctx, namespace, name)
+func (c *Client) DoesPVCExist(ctx *contexts.Context, namespace, name string) (doesExist bool, err error) {
+	ctx.Log.With("name", name).Info("Checking if PVC exists")
+	defer ctx.Log.Debug("PVC status", "exists", doesExist, contexts.ErrorKeyvals(&err))
+
+	_, err = c.GetPVC(ctx.Child(), namespace, name)
 	if err == nil {
 		return true, nil
 	}
@@ -68,7 +77,9 @@ func (c *Client) DoesPVCExist(ctx *contexts.Context, namespace, name string) (bo
 }
 
 func (c *Client) EnsurePVCExists(ctx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
-	pvc, err := c.GetPVC(ctx, namespace, pvcName)
+	ctx.Log.With("name", pvcName).Info("Ensuring PVC exists")
+
+	pvc, err := c.GetPVC(ctx.Child(), namespace, pvcName)
 	if err == nil {
 		return pvc, nil
 	}
@@ -77,7 +88,7 @@ func (c *Client) EnsurePVCExists(ctx *contexts.Context, namespace, pvcName strin
 		return nil, trace.Wrap(err, "failed to query cluster for PVC %q", helpers.FullNameStr(namespace, pvcName))
 	}
 
-	pvc, err = c.CreatePVC(ctx, namespace, pvcName, size, opts)
+	pvc, err = c.CreatePVC(ctx.Child(), namespace, pvcName, size, opts)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create PVC %q", helpers.FullNameStr(namespace, pvcName))
 	}
@@ -86,6 +97,8 @@ func (c *Client) EnsurePVCExists(ctx *contexts.Context, namespace, pvcName strin
 }
 
 func (c *Client) DeletePVC(ctx *contexts.Context, namespace, volumeName string) error {
+	ctx.Log.With("name", volumeName).Info("Deleting PVC")
+
 	err := c.client.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, volumeName, meta_v1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete volume %q in namespace %q", volumeName, namespace)
 }

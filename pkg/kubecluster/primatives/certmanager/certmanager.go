@@ -33,6 +33,9 @@ type CreateCertificateOptions struct {
 }
 
 func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+	ctx.Log.With("name", name).Info("Creating certificate")
+	ctx.Log.Debug("Call parameters", "issuerName", issuerName, "opts", opts)
+
 	certificate := &certmanagerv1.Certificate{
 		Spec: certmanagerv1.CertificateSpec{
 			IsCA:                  opts.IsCA,
@@ -85,7 +88,7 @@ func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name, iss
 		certificate.Spec.PrivateKey.Algorithm = opts.KeyAlgorithm
 	}
 
-	certificate, err := cmc.client.CertmanagerV1().Certificates(namespace).Create(ctx, certificate, metav1.CreateOptions{})
+	certificate, err := cmc.client.CertmanagerV1().Certificates(namespace).Create(ctx.Child(), certificate, metav1.CreateOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create certificate %q", helpers.FullNameStr(namespace, name))
 	}
@@ -97,8 +100,12 @@ type WaitForReadyCertificateOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (cmc *Client) WaitForReadyCertificate(ctx *contexts.Context, namespace, name string, opts WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error) {
+func (cmc *Client) WaitForReadyCertificate(ctx *contexts.Context, namespace, name string, opts WaitForReadyCertificateOpts) (certificate *certmanagerv1.Certificate, err error) {
+	ctx.Log.With("name", name).Info("Waiting for certificate to become ready")
+	defer ctx.Log.Info("Finished waiting for certificate to become ready", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
 	precondition := func(ctx *contexts.Context, certificate *certmanagerv1.Certificate) (*certmanagerv1.Certificate, bool, error) {
+		ctx.Log.Debug("Certificate conditions", "conditions", certificate.Status.Conditions)
 		isReady := false
 		for _, condition := range certificate.Status.Conditions {
 			if condition.Type != certmanagerv1.CertificateConditionReady {
@@ -115,7 +122,7 @@ func (cmc *Client) WaitForReadyCertificate(ctx *contexts.Context, namespace, nam
 
 		return nil, false, nil
 	}
-	certificate, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), cmc.client.CertmanagerV1().Certificates(namespace), name, precondition)
+	certificate, err = helpers.WaitForResourceCondition(ctx.Child(), opts.MaxWait(time.Minute), cmc.client.CertmanagerV1().Certificates(namespace), name, precondition)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed waiting for certificate %q to become ready", helpers.FullNameStr(namespace, name))
 	}
@@ -124,27 +131,32 @@ func (cmc *Client) WaitForReadyCertificate(ctx *contexts.Context, namespace, nam
 }
 
 // Trigger an immediate re-issuance of a certificate
-func (cmc *Client) ReissueCertificate(ctx *contexts.Context, namespace, name string) (*certmanagerv1.Certificate, error) {
-	var updatedCert *certmanagerv1.Certificate
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+func (cmc *Client) ReissueCertificate(ctx *contexts.Context, namespace, name string) (certificate *certmanagerv1.Certificate, err error) {
+	ctx.Log.With("name", name).Info("Reissuing certificate")
+	defer ctx.Log.Info("Finished reissuing certificate", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
+	retryCtx := ctx.Child() // Do this once instead of on every retry
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		cert, err := cmc.client.CertmanagerV1().Certificates(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return trace.Wrap(err, "failed to get certificate %q", helpers.FullNameStr(namespace, name))
 		}
 
 		cmutil.SetCertificateCondition(cert, cert.Generation, certmanagerv1.CertificateConditionIssuing, cmmeta.ConditionTrue, "ManuallyTriggered", fmt.Sprintf("Certificate re-issuance triggered by %s", constants.ToolName))
-		updatedCert, err = cmc.client.CertmanagerV1().Certificates(cert.Namespace).UpdateStatus(ctx, cert, metav1.UpdateOptions{})
+		certificate, err = cmc.client.CertmanagerV1().Certificates(cert.Namespace).UpdateStatus(retryCtx, cert, metav1.UpdateOptions{})
 		return err
 	})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to update status of Certificate %q", helpers.FullNameStr(namespace, name))
 	}
 
-	return updatedCert, nil
+	return certificate, nil
 }
 
 func (cmc *Client) DeleteCertificate(ctx *contexts.Context, namespace, name string) error {
-	err := cmc.client.CertmanagerV1().Certificates(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	ctx.Log.With("name", name).Info("Deleting certificate")
+
+	err := cmc.client.CertmanagerV1().Certificates(namespace).Delete(ctx.Child(), name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete certificate %q", helpers.FullNameStr(namespace, name))
 }
 
@@ -153,6 +165,9 @@ type CreateIssuerOptions struct {
 }
 
 func (cmc *Client) CreateIssuer(ctx *contexts.Context, namespace, name, caCertSecretName string, opts CreateIssuerOptions) (*certmanagerv1.Issuer, error) {
+	ctx.Log.With("name", name).Info("Creating issuer")
+	ctx.Log.Debug("Call parameters", "caCertSecretName", caCertSecretName, "opts", opts)
+
 	issuer := &certmanagerv1.Issuer{
 		Spec: certmanagerv1.IssuerSpec{
 			IssuerConfig: certmanagerv1.IssuerConfig{
@@ -165,7 +180,7 @@ func (cmc *Client) CreateIssuer(ctx *contexts.Context, namespace, name, caCertSe
 
 	opts.SetName(&issuer.ObjectMeta, name)
 
-	issuer, err := cmc.client.CertmanagerV1().Issuers(namespace).Create(ctx, issuer, metav1.CreateOptions{})
+	issuer, err := cmc.client.CertmanagerV1().Issuers(namespace).Create(ctx.Child(), issuer, metav1.CreateOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create issuer %q", helpers.FullNameStr(namespace, name))
 	}
@@ -177,8 +192,13 @@ type WaitForReadyIssuerOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (cmc *Client) WaitForReadyIssuer(ctx *contexts.Context, namespace, name string, opts WaitForReadyIssuerOpts) (*certmanagerv1.Issuer, error) {
+func (cmc *Client) WaitForReadyIssuer(ctx *contexts.Context, namespace, name string, opts WaitForReadyIssuerOpts) (issuer *certmanagerv1.Issuer, err error) {
+	ctx.Log.With("name", name).Info("Waiting for issuer to become ready")
+	defer ctx.Log.Info("Finished waiting for issuer to become ready", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
 	precondition := func(ctx *contexts.Context, issuer *certmanagerv1.Issuer) (*certmanagerv1.Issuer, bool, error) {
+		ctx.Log.Debug("Issuer conditions", "conditions", issuer.Status.Conditions)
+
 		isReady := false
 		for _, condition := range issuer.Status.Conditions {
 			if condition.Type != certmanagerv1.IssuerConditionReady {
@@ -195,7 +215,7 @@ func (cmc *Client) WaitForReadyIssuer(ctx *contexts.Context, namespace, name str
 
 		return nil, false, nil
 	}
-	issuer, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), cmc.client.CertmanagerV1().Issuers(namespace), name, precondition)
+	issuer, err = helpers.WaitForResourceCondition(ctx.Child(), opts.MaxWait(time.Minute), cmc.client.CertmanagerV1().Issuers(namespace), name, precondition)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed waiting for issuer %q to become ready", helpers.FullNameStr(namespace, name))
 	}
@@ -204,6 +224,8 @@ func (cmc *Client) WaitForReadyIssuer(ctx *contexts.Context, namespace, name str
 }
 
 func (cmc *Client) DeleteIssuer(ctx *contexts.Context, namespace, name string) error {
-	err := cmc.client.CertmanagerV1().Issuers(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	ctx.Log.With("name", name).Info("Deleting issuer")
+
+	err := cmc.client.CertmanagerV1().Issuers(namespace).Delete(ctx.Child(), name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete issuer %q", helpers.FullNameStr(namespace, name))
 }

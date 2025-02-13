@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	postgres_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/postgres/v1"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
@@ -135,7 +137,7 @@ func TestEncodeDumpAllOptions(t *testing.T) {
 		},
 		{
 			name: "non-zero cleanup timeout",
-			opts: postgres.DumpAllOptions{CleanupTimeout: 5 * time.Second},
+			opts: postgres.DumpAllOptions{CleanupTimeout: helpers.MaxWaitTime(5 * time.Second)},
 			want: postgres_v1.DumpAllOptions_builder{
 				CleanupTimeout: durationpb.New(5 * time.Second),
 			}.Build(),
@@ -168,7 +170,7 @@ func TestDumpAll(t *testing.T) {
 			},
 			outputPath: "/tmp/dump.sql",
 			opts: postgres.DumpAllOptions{
-				CleanupTimeout: 10 * time.Second,
+				CleanupTimeout: helpers.MaxWaitTime(10 * time.Second),
 			},
 			mockResponse: &postgres_v1.DumpAllResponse{},
 		},
@@ -207,7 +209,12 @@ func TestDumpAll(t *testing.T) {
 				OutputFilePath: &tt.outputPath,
 				Options:        encodedOpts,
 			}.Build()
-			mockClient.On("DumpAll", ctx, expectedRequest, mock.Anything).Return(tt.mockResponse, tt.mockError)
+			mockClient.On("DumpAll", mock.Anything, expectedRequest, mock.Anything).
+				Run(func(args mock.Arguments) {
+					calledCtx := args.Get(0).(*contexts.Context)
+					calledCtx.IsChildOf(ctx)
+				}).
+				Return(tt.mockResponse, tt.mockError)
 
 			pc := &PostgresClient{client: mockClient}
 

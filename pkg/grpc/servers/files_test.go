@@ -44,7 +44,7 @@ func transferTest(t *testing.T, onExpectCall func(expecter *files.MockRuntime_Ex
 			ctx := th.NewTestContext()
 			src := "src"
 			dest := "dest"
-			onExpectCall(runtime.EXPECT(), detatchHandlerContext(ctx), src, dest).Return(tt.returnValue)
+			onExpectCall(runtime.EXPECT(), contexts.UnwrapHandlerContext(ctx), src, dest).Return(tt.returnValue)
 
 			resp, err := call(server, ctx, src, dest)
 			if tt.shouldError {

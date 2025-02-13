@@ -84,9 +84,12 @@ type WaitEventProcessor[T runtime.Object, V interface{}] func(*contexts.Context,
 
 // Wait for a check to pass on a given resource, optionally returning a value when the condition passes.
 // Will not return until the condition is met, or an error occurs.
-func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interface{}](ctx *contexts.Context, timeout time.Duration, client ListerWatcher[TList], name string, processEvent WaitEventProcessor[T, V]) (V, error) {
-	// Setup a timeout context
-	timeoutCtx, cancel := contexts.WithTimeout(ctx, timeout)
+func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interface{}](ctx *contexts.Context, timeout time.Duration, client ListerWatcher[TList], name string, processEvent WaitEventProcessor[T, V]) (result V, err error) {
+	ctx.Log.With("name", name, "timeout", timeout).Debug("Waiting for resource condition")
+	defer ctx.Log.Debug("Finished waiting for resource condition", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err), "result", result)
+
+	// Setup a timeout context for processing events
+	eventCtx, cancel := ctx.Child().WithTimeout(timeout)
 	defer cancel()
 
 	// Setup the k8s API calls
@@ -97,19 +100,21 @@ func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interfac
 
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
 		setCommonOpts(&options)
-		return client.List(timeoutCtx, options)
+		return client.List(eventCtx, options)
 	}
 	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
 		options.Watch = true
 		setCommonOpts(&options)
-		return client.Watch(timeoutCtx, options)
+		return client.Watch(eventCtx, options)
 	}
 
 	var objType T // Due to golang limitations and legacy cruft, this is needed pass around type to some functions
-	var result V  // Holds the result from processEvent calls
 
 	// This checks the result of the initial `List` API call to see if a watcher actually needs to be setup.
-	initialCheck := func(store cache.Store) (bool, error) {
+	initialCheck := func(store cache.Store) (matched bool, err error) {
+		eventCtx.Log.Debug("Checking initial resource condition")
+		defer eventCtx.Log.Debug("Initial condition check results", "matched", matched, contexts.ErrorKeyvals(&err))
+
 		items := store.List()
 		if len(items) > 1 {
 			return false, trace.Errorf("expected at most one item, matched %d", len(items))
@@ -124,28 +129,29 @@ func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interfac
 		if !ok {
 			return false, trace.Errorf("failed to cast item to %T", objType)
 		}
+		eventCtx.Log.With("item", item)
 
-		var matched bool
-		var err error
-		result, matched, err = processEvent(timeoutCtx, castedItem)
+		result, matched, err = processEvent(eventCtx.Child(), castedItem)
 		return matched, trace.Wrap(err, "failed while processing initial precondition event")
 	}
 
 	// Handles casting the event object to `T`, and the boilerplate logic for calling/returning values from `processEvent`.
-	typedProcessEvent := func(event watch.Event) (bool, error) {
+	typedProcessEvent := func(event watch.Event) (matched bool, err error) {
+		eventCtx.Log.Debug("Processing event")
+		defer eventCtx.Log.Debug("Processed event", "matched", matched, contexts.ErrorKeyvals(&err))
+
 		castedItem, ok := event.Object.(T)
 		if !ok {
 			return false, trace.Errorf("failed to cast item to %T", objType)
 		}
+		eventCtx.Log.With("item", castedItem)
 
-		var matched bool
-		var err error
-		result, matched, err = processEvent(timeoutCtx, castedItem)
+		result, matched, err = processEvent(eventCtx.Child(), castedItem)
 		return matched, trace.Wrap(err, "failed while processing initial precondition event")
 	}
 
-	_, err := toolswatch.UntilWithSync(
-		timeoutCtx,
+	_, err = toolswatch.UntilWithSync(
+		eventCtx,
 		&cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc},
 		objType,
 		initialCheck,

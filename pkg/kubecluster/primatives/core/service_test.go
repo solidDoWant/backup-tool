@@ -63,28 +63,27 @@ func TestContainerPortToServicePort(t *testing.T) {
 func TestCreateService(t *testing.T) {
 	namespace := "test-ns"
 	serviceName := "test-service"
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Port:       80,
+					TargetPort: intstr.FromInt(8080),
+				},
+			},
+		},
+	}
 
 	tests := []struct {
 		desc                string
-		service             *corev1.Service
 		simulateClientError bool
 	}{
 		{
 			desc: "create service successfully",
-			service: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      serviceName,
-					Namespace: namespace,
-				},
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{
-						{
-							Port:       80,
-							TargetPort: intstr.FromInt(8080),
-						},
-					},
-				},
-			},
 		},
 		{
 			desc:                "creation errors",
@@ -103,15 +102,15 @@ func TestCreateService(t *testing.T) {
 				})
 			}
 
-			service, err := c.CreateService(ctx, namespace, tt.service)
+			createdService, err := c.CreateService(ctx, namespace, service)
 			if tt.simulateClientError {
 				assert.Error(t, err)
-				assert.Nil(t, service)
+				assert.Nil(t, createdService)
 				return
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.service, service)
+			assert.Equal(t, service, createdService)
 		})
 	}
 }
@@ -228,8 +227,6 @@ func TestWaitForReadyService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			t.Parallel()
-
 			c, mockK8s := createTestClient()
 			ctx := th.NewTestContext()
 

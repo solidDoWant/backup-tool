@@ -12,6 +12,7 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 )
 
 // Depending on a CLI tool is unfortunate but there are no viable golang replacements for this.
@@ -40,12 +41,15 @@ func (wcc *writerCloserCallback) Close() error {
 }
 
 type DumpAllOptions struct {
-	CleanupTimeout time.Duration
+	CleanupTimeout helpers.MaxWaitTime
 }
 
 func (lr *LocalRuntime) DumpAll(ctx *contexts.Context, credentials Credentials, outputFilePath string, opts DumpAllOptions) (err error) {
+	ctx.Log.With("serverAddress", GetServerAddress(credentials), "username", credentials.GetUsername()).Info("Dumping all databases", "outputFilePath", outputFilePath)
+	defer ctx.Log.Info("Database dump complete", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
 	// This will cause the process to be terminated if the function returns before the process is done.
-	commandCtx, ctxCancel := context.WithCancel(ctx)
+	commandCtx, ctxCancel := context.WithCancel(ctx.Child())
 	defer ctxCancel()
 
 	cmd := lr.wrapCommand(exec.CommandContext(commandCtx, commandName, "--clean", "--if-exists", "--exclude-database=postgres"))
@@ -68,14 +72,16 @@ func (lr *LocalRuntime) DumpAll(ctx *contexts.Context, credentials Credentials, 
 		return trace.Wrap(err, "failed to open SQL dump output file %q for writing", outputFilePath)
 	}
 	outputFileWriter := bufio.NewWriter(outputFile) // This is used to avoid writing to the file one (potentially small) line at a time.
-	defer cleanup.WithTimeoutTo(opts.CleanupTimeout, func(ctx *contexts.Context) error {
+	defer cleanup.To(func(ctx *contexts.Context) error {
 		flushErr := outputFileWriter.Flush()
 		closeErr := outputFile.Close()
 		return trace.NewAggregate(
 			trace.Wrap(flushErr, "failed to flush all output data to output file at %q", outputFilePath),
 			trace.Wrap(closeErr, "failed to close output file at %q", outputFilePath),
 		)
-	}).WithOriginalErr(&err).Run()
+	}).WithOriginalErr(&err).
+		WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(30 * time.Second)).
+		Run()
 
 	err = cmd.Start()
 	if err != nil {
@@ -89,10 +95,26 @@ func (lr *LocalRuntime) DumpAll(ctx *contexts.Context, credentials Credentials, 
 	}
 	foundIgnoreLineCount := 0 // Used to stop checking every line a little early
 
+	// Track the number of lines processed for logging purposes.
+	linesProcessed := 0
+	modulus := 1
+
 	// This is a pretty naive implementation and probably isn't very efficient. I'll optimize if runtime
 	// starts to become a problem.
 	sqlReader := bufio.NewReader(stdout)
 	for {
+		linesProcessed++
+		if linesProcessed%modulus == 0 {
+			ctx.Log.Debug("Processed lines", "lineCount", linesProcessed)
+
+			// Every 10 messages, increase the modulus by a factor of 10. This helps keep the log output
+			// under control, while still providing some feedback.
+			newModulus := modulus * 10
+			if linesProcessed%newModulus == 0 {
+				modulus = newModulus
+			}
+		}
+
 		hitEOF := false
 		sqlLine, err := sqlReader.ReadString('\n')
 		if err == io.EOF {
@@ -128,6 +150,7 @@ func (lr *LocalRuntime) DumpAll(ctx *contexts.Context, credentials Credentials, 
 				}
 
 				if strings.HasPrefix(sqlLine, ignoreLinePrefix) {
+					ctx.Log.Debug("Ignoring line", "line", sqlLine)
 					ignoreLineTracker[ignoreLinePrefix] = true
 					foundIgnoreLineCount++
 

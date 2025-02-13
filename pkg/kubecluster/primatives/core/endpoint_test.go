@@ -133,8 +133,6 @@ func TestWaitForReadyEndpoint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			t.Parallel()
-
 			c, mockK8s := createTestClient()
 			ctx := th.NewTestContext()
 

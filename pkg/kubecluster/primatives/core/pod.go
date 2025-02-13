@@ -12,6 +12,17 @@ import (
 )
 
 func (c *Client) CreatePod(ctx *contexts.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
+	if pod.Name != "" {
+		ctx.Log.With("name", pod.Name)
+	} else if pod.GenerateName != "" {
+		ctx.Log.With("name", pod.GenerateName)
+	} else {
+		ctx.Log.With("name", "").Warn("Creating pod without a name")
+	}
+
+	ctx.Log.Info("Creating pod")
+	ctx.Log.Debug("Call parameters", "pod", pod)
+
 	pod, err := c.client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create pod %q", helpers.FullNameStr(namespace, pod.Name))
@@ -24,8 +35,11 @@ type WaitForReadyPodOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (c *Client) WaitForReadyPod(ctx *contexts.Context, namespace, name string, opts WaitForReadyPodOpts) (*corev1.Pod, error) {
-	processEvent := func(_ *contexts.Context, pod *corev1.Pod) (*corev1.Pod, bool, error) {
+func (c *Client) WaitForReadyPod(ctx *contexts.Context, namespace, name string, opts WaitForReadyPodOpts) (pod *corev1.Pod, err error) {
+	ctx.Log.With("name", name).Info("Waiting for pod to become ready")
+	defer ctx.Log.Info("Finished waiting for pod to become ready", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
+	processEvent := func(ctx *contexts.Context, pod *corev1.Pod) (*corev1.Pod, bool, error) {
 		for _, condition := range pod.Status.Conditions {
 			if condition.Type == corev1.PodReady {
 				if condition.Status == corev1.ConditionTrue {
@@ -36,7 +50,7 @@ func (c *Client) WaitForReadyPod(ctx *contexts.Context, namespace, name string, 
 		}
 		return nil, false, nil
 	}
-	pod, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), c.client.CoreV1().Pods(namespace), name, processEvent)
+	pod, err = helpers.WaitForResourceCondition(ctx.Child(), opts.MaxWait(time.Minute), c.client.CoreV1().Pods(namespace), name, processEvent)
 
 	if err != nil {
 		return nil, trace.Wrap(err, "failed waiting for pod to become ready")
@@ -46,6 +60,8 @@ func (c *Client) WaitForReadyPod(ctx *contexts.Context, namespace, name string, 
 }
 
 func (c *Client) DeletePod(ctx *contexts.Context, namespace, name string) error {
+	ctx.Log.With("name", name).Info("Deleting pod")
+
 	err := c.client.CoreV1().Pods(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete pod %q", helpers.FullNameStr(namespace, name))
 }

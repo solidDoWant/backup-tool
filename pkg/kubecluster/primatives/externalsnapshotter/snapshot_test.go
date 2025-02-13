@@ -139,8 +139,6 @@ func TestWaitForReadySnapshot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			t.Parallel()
-
 			c, mockES := createTestClient()
 			ctx := th.NewTestContext()
 

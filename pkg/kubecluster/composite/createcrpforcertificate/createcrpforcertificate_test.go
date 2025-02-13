@@ -213,8 +213,9 @@ func TestCreateCRPForCertificate(t *testing.T) {
 
 			func() {
 				var crp *policyv1alpha1.CertificateRequestPolicy
-				c.apClient.EXPECT().CreateCertificateRequestPolicy(ctx, tt.cert.Name, mock.Anything, approverpolicy.CreateCertificateRequestPolicyOptions{GenerateName: true}).
-					RunAndReturn(func(ctx *contexts.Context, name string, spec policyv1alpha1.CertificateRequestPolicySpec, opts approverpolicy.CreateCertificateRequestPolicyOptions) (*policyv1alpha1.CertificateRequestPolicy, error) {
+				c.apClient.EXPECT().CreateCertificateRequestPolicy(mock.Anything, tt.cert.Name, mock.Anything, approverpolicy.CreateCertificateRequestPolicyOptions{GenerateName: true}).
+					RunAndReturn(func(childCtx *contexts.Context, name string, spec policyv1alpha1.CertificateRequestPolicySpec, opts approverpolicy.CreateCertificateRequestPolicyOptions) (*policyv1alpha1.CertificateRequestPolicy, error) {
+						assert.True(t, childCtx.IsChildOf(ctx))
 						crp = &policyv1alpha1.CertificateRequestPolicy{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: name,
@@ -228,8 +229,9 @@ func TestCreateCRPForCertificate(t *testing.T) {
 					return
 				}
 
-				c.apClient.EXPECT().WaitForReadyCertificateRequestPolicy(ctx, tt.cert.Name, approverpolicy.WaitForReadyCertificateRequestPolicyOpts{MaxWaitTime: tt.opts.MaxWaitTime}).
-					RunAndReturn(func(ctx *contexts.Context, name string, wfrcrpo approverpolicy.WaitForReadyCertificateRequestPolicyOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
+				c.apClient.EXPECT().WaitForReadyCertificateRequestPolicy(mock.Anything, tt.cert.Name, approverpolicy.WaitForReadyCertificateRequestPolicyOpts{MaxWaitTime: tt.opts.MaxWaitTime}).
+					RunAndReturn(func(calledCtx *contexts.Context, name string, wfrcrpo approverpolicy.WaitForReadyCertificateRequestPolicyOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
 						return th.ErrOr1Val(crp, tt.simulateWaitForReadyCertificateRequestPolicyError)
 					})
 			}()

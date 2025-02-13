@@ -3,13 +3,12 @@ package backuptoolinstance
 import (
 	"fmt"
 	"net"
-	"reflect"
 	"testing"
 
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
-	"github.com/solidDoWant/backup-tool/pkg/grpc/servers"
+	"github.com/solidDoWant/backup-tool/pkg/grpc"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
@@ -28,14 +27,14 @@ func TestNewBackupToolInstance(t *testing.T) {
 	casted := btInstance.(*BackupToolInstance)
 
 	assert.Equal(t, c, casted.p)
-	assert.Equal(t, reflect.ValueOf(net.LookupIP), reflect.ValueOf(casted.lookupIP))
 
 	// Test the default testConnection function
-	listener, err := net.Listen("tcp", net.JoinHostPort("localhost", fmt.Sprintf("%d", servers.GRPCPort)))
+	listener, err := net.Listen("tcp", net.JoinHostPort("localhost", fmt.Sprintf("%d", grpc.GRPCPort)))
 	require.NoError(t, err)
 	defer listener.Close()
 
-	assert.True(t, casted.testConnection("localhost"))
+	ctx := th.NewTestContext()
+	assert.True(t, casted.testConnection(ctx, "localhost"))
 }
 
 func TestCreateBackupToolInstanceOptions(t *testing.T) {
@@ -123,8 +122,6 @@ func TestCreateBackupToolInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			p := newMockProvider(t)
 			ctx := th.NewTestContext()
 
@@ -145,38 +142,41 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				}
 
 				var createdPod *corev1.Pod
-				p.coreClient.EXPECT().CreatePod(ctx, namespace, mock.Anything).RunAndReturn(func(_ *contexts.Context, _ string, pod *corev1.Pod) (*corev1.Pod, error) {
-					createdPod = pod
+				p.coreClient.EXPECT().CreatePod(mock.Anything, namespace, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, _ string, pod *corev1.Pod) (*corev1.Pod, error) {
+						createdPod = pod
 
-					require.Len(t, pod.Spec.Containers, 1)
-					require.Equal(t, len(tt.opts.Volumes), len(pod.Spec.Volumes))
-					require.Contains(t, pod.ObjectMeta.Labels, "app.kubernetes.io/name")
-					require.Contains(t, pod.ObjectMeta.Labels, "app.kubernetes.io/instance")
+						assert.True(t, calledCtx.IsChildOf(ctx))
 
-					container := pod.Spec.Containers[0]
-					require.Equal(t, constants.ToolName, container.Name)
-					require.Equal(t, constants.FullImageName, container.Image)
-					require.Equal(t, []string{constants.ToolName}, container.Command)
-					require.Equal(t, len(tt.opts.Volumes), len(container.VolumeMounts))
-					require.Len(t, container.Ports, 1)
+						require.Len(t, pod.Spec.Containers, 1)
+						require.Equal(t, len(tt.opts.Volumes), len(pod.Spec.Volumes))
+						require.Contains(t, pod.ObjectMeta.Labels, "app.kubernetes.io/name")
+						require.Contains(t, pod.ObjectMeta.Labels, "app.kubernetes.io/instance")
 
-					port := container.Ports[0]
-					require.Equal(t, "grpc", port.Name)
-					require.Equal(t, int32(servers.GRPCPort), port.ContainerPort)
-					require.Equal(t, corev1.ProtocolTCP, port.Protocol)
+						container := pod.Spec.Containers[0]
+						require.Equal(t, constants.ToolName, container.Name)
+						require.Equal(t, constants.FullImageName, container.Image)
+						require.Equal(t, []string{constants.ToolName}, container.Command)
+						require.Equal(t, len(tt.opts.Volumes), len(container.VolumeMounts))
+						require.Len(t, container.Ports, 1)
 
-					require.NotNil(t, pod.Spec.SecurityContext)
-					require.NotNil(t, pod.Spec.SecurityContext.RunAsUser)
-					require.Equal(t, int64(0), *pod.Spec.SecurityContext.RunAsUser)
-					require.NotNil(t, pod.Spec.SecurityContext.RunAsGroup)
-					require.Equal(t, int64(0), *pod.Spec.SecurityContext.RunAsGroup)
+						port := container.Ports[0]
+						require.Equal(t, "grpc", port.Name)
+						require.Equal(t, int32(grpc.GRPCPort), port.ContainerPort)
+						require.Equal(t, corev1.ProtocolTCP, port.Protocol)
 
-					require.NotNil(t, container.SecurityContext)
-					require.NotNil(t, container.SecurityContext.RunAsGroup)
-					require.Equal(t, *pod.Spec.SecurityContext.RunAsGroup, *container.SecurityContext.RunAsGroup)
+						require.NotNil(t, pod.Spec.SecurityContext)
+						require.NotNil(t, pod.Spec.SecurityContext.RunAsUser)
+						require.Equal(t, int64(0), *pod.Spec.SecurityContext.RunAsUser)
+						require.NotNil(t, pod.Spec.SecurityContext.RunAsGroup)
+						require.Equal(t, int64(0), *pod.Spec.SecurityContext.RunAsGroup)
 
-					return th.ErrOr1Val(pod, tt.simulateCreatePodError)
-				})
+						require.NotNil(t, container.SecurityContext)
+						require.NotNil(t, container.SecurityContext.RunAsGroup)
+						require.Equal(t, *pod.Spec.SecurityContext.RunAsGroup, *container.SecurityContext.RunAsGroup)
+
+						return th.ErrOr1Val(pod, tt.simulateCreatePodError)
+					})
 				if tt.simulateCreatePodError {
 					return
 				}
@@ -184,8 +184,9 @@ func TestCreateBackupToolInstance(t *testing.T) {
 					require.Equal(t, createdPod, pod)
 				})
 
-				p.coreClient.EXPECT().WaitForReadyPod(ctx, namespace, mock.Anything, core.WaitForReadyPodOpts{MaxWaitTime: tt.opts.PodWaitTimeout}).
-					RunAndReturn(func(ctx *contexts.Context, namespace, name string, wfrpo core.WaitForReadyPodOpts) (*corev1.Pod, error) {
+				p.coreClient.EXPECT().WaitForReadyPod(mock.Anything, namespace, mock.Anything, core.WaitForReadyPodOpts{MaxWaitTime: tt.opts.PodWaitTimeout}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, wfrpo core.WaitForReadyPodOpts) (*corev1.Pod, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
 						return th.ErrOr1Val(createdPod, tt.simulateWaitForPodError)
 					})
 				if tt.simulateWaitForPodError {
@@ -193,14 +194,15 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				}
 
 				var createdService *corev1.Service
-				p.coreClient.EXPECT().CreateService(ctx, namespace, mock.Anything).RunAndReturn(func(_ *contexts.Context, _ string, service *corev1.Service) (*corev1.Service, error) {
+				p.coreClient.EXPECT().CreateService(mock.Anything, namespace, mock.Anything).RunAndReturn(func(calledCtx *contexts.Context, _ string, service *corev1.Service) (*corev1.Service, error) {
 					createdService = service
+					assert.True(t, calledCtx.IsChildOf(ctx))
 					require.Equal(t, createdPod.ObjectMeta.Labels, service.Spec.Selector)
 
 					require.Len(t, service.Spec.Ports, 1)
 					port := service.Spec.Ports[0]
 					require.Equal(t, "grpc", port.Name)
-					require.Equal(t, int32(servers.GRPCPort), port.Port)
+					require.Equal(t, int32(grpc.GRPCPort), port.Port)
 					require.Equal(t, intstr.FromString("grpc"), port.TargetPort)
 					require.Equal(t, corev1.ProtocolTCP, port.Protocol)
 
@@ -213,8 +215,11 @@ func TestCreateBackupToolInstance(t *testing.T) {
 					require.Equal(t, createdService, service)
 				})
 
-				p.coreClient.EXPECT().WaitForReadyService(ctx, namespace, mock.Anything, core.WaitForReadyServiceOpts{MaxWaitTime: tt.opts.ServiceWaitTimeout}).
-					Return(th.ErrOr1Val(&corev1.Service{}, tt.simulateWaitForServiceError))
+				p.coreClient.EXPECT().WaitForReadyService(mock.Anything, namespace, mock.Anything, core.WaitForReadyServiceOpts{MaxWaitTime: tt.opts.ServiceWaitTimeout}).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts core.WaitForReadyServiceOpts) (*corev1.Service, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(createdService, tt.simulateWaitForServiceError)
+					})
 			}()
 
 			btInstance, err := p.CreateBackupToolInstance(ctx, namespace, "unique-instance-name", tt.opts)
@@ -428,11 +433,19 @@ func TestBackupToolInstanceDelete(t *testing.T) {
 			tt.btInstance.p = p
 
 			if tt.btInstance.pod != nil {
-				p.coreClient.EXPECT().DeletePod(ctx, tt.btInstance.pod.Namespace, tt.btInstance.pod.Name).Return(th.ErrIfTrue(tt.simulatePodDeleteError))
+				p.coreClient.EXPECT().DeletePod(mock.Anything, tt.btInstance.pod.Namespace, tt.btInstance.pod.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulatePodDeleteError)
+					})
 			}
 
 			if tt.btInstance.service != nil {
-				p.coreClient.EXPECT().DeleteService(ctx, tt.btInstance.service.Namespace, tt.btInstance.service.Name).Return(th.ErrIfTrue(tt.simulateServiceDeleteError))
+				p.coreClient.EXPECT().DeleteService(mock.Anything, tt.btInstance.service.Namespace, tt.btInstance.service.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulateServiceDeleteError)
+					})
 			}
 
 			err := tt.btInstance.Delete(ctx)
@@ -446,9 +459,9 @@ func TestBackupToolInstanceDelete(t *testing.T) {
 				if oErrs, ok := tErr.OrigError().(trace.Aggregate); ok {
 					assert.Equal(t, tt.expectedErrorsInMessage, len(oErrs.Errors()))
 				}
-			} else {
-				require.Fail(t, "error is not a trace.Error")
+				return
 			}
+			require.Fail(t, "error is not a trace.Error")
 		})
 	}
 }
@@ -576,11 +589,11 @@ func TestBackupToolInstanceFindReachableServiceAddress(t *testing.T) {
 
 			btInstance := &BackupToolInstance{
 				service: tt.service,
-				testConnection: func(address string) bool {
+				testConnection: func(_ *contexts.Context, address string) bool {
 					testedConnections = append(testedConnections, address)
 					return tt.testConnFunc(address)
 				},
-				lookupIP: func(host string) ([]net.IP, error) {
+				lookupIP: func(_ *contexts.Context, host string) ([]net.IP, error) {
 					queries = append(queries, host)
 					return []net.IP{
 						net.ParseIP(fmt.Sprintf("127.0.0.%d", len(queries))),
@@ -588,7 +601,8 @@ func TestBackupToolInstanceFindReachableServiceAddress(t *testing.T) {
 				},
 			}
 
-			got, err := btInstance.findReachableServiceAddress(tt.searchDomains)
+			ctx := th.NewTestContext()
+			got, err := btInstance.findReachableServiceAddress(ctx, tt.searchDomains)
 
 			if len(tt.expectedQueries) > 0 {
 				assert.ElementsMatch(t, tt.expectedQueries, queries)

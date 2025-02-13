@@ -3,6 +3,7 @@ package clients
 import (
 	"maps"
 	"slices"
+	"time"
 
 	"github.com/gravitational/trace"
 	"github.com/gravitational/trace/trail"
@@ -65,13 +66,16 @@ func encodeDumpAllOptions(opts postgres.DumpAllOptions) *postgres_v1.DumpAllOpti
 	encodedOpts := &postgres_v1.DumpAllOptions{}
 
 	if opts.CleanupTimeout != 0 {
-		encodedOpts.SetCleanupTimeout(durationpb.New(opts.CleanupTimeout))
+		encodedOpts.SetCleanupTimeout(durationpb.New(time.Duration(opts.CleanupTimeout)))
 	}
 
 	return encodedOpts
 }
 
 func (pc *PostgresClient) DumpAll(ctx *contexts.Context, credentials postgres.Credentials, outputFilePath string, opts postgres.DumpAllOptions) error {
+	ctx.Log.With("outputFilePath", outputFilePath, "address", postgres.GetServerAddress(credentials), "username", credentials.GetUsername()).Info("Dumping all databases")
+	defer ctx.Log.Info("Finished dumping databases", ctx.Stopwatch.Keyval())
+
 	encodedCredentials, err := encodeCredentials(credentials)
 	if err != nil {
 		return trace.Wrap(err, "failed to encode credentials")
@@ -84,6 +88,6 @@ func (pc *PostgresClient) DumpAll(ctx *contexts.Context, credentials postgres.Cr
 	}.Build()
 
 	var header metadata.MD
-	_, err = pc.client.DumpAll(ctx, request, grpc.Header(&header))
+	_, err = pc.client.DumpAll(ctx.Child(), request, grpc.Header(&header))
 	return trail.FromGRPC(err, header)
 }

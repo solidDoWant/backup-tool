@@ -95,8 +95,6 @@ func TestDumpAll(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Create a context for signaling when the process should pretend to be complete
 			ctx := th.NewTestContext()
 			processCtx, cancel := context.WithCancel(ctx)

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gravitational/trace/trail"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/files"
 	files_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/files/v1"
 )
@@ -21,7 +22,7 @@ func NewFilesServer() *FilesServer {
 }
 
 func (fs *FilesServer) CopyFiles(ctx context.Context, req *files_v1.CopyFilesRequest) (*files_v1.CopyFilesResponse, error) {
-	grpcCtx := detatchHandlerContext(ctx)
+	grpcCtx := contexts.UnwrapHandlerContext(ctx)
 	err := fs.runtime.CopyFiles(grpcCtx, req.GetSource(), req.GetDest())
 	if err != nil {
 		return nil, trail.Send(grpcCtx, err)
@@ -31,7 +32,7 @@ func (fs *FilesServer) CopyFiles(ctx context.Context, req *files_v1.CopyFilesReq
 }
 
 func (fs *FilesServer) SyncFiles(ctx context.Context, req *files_v1.SyncFilesRequest) (*files_v1.SyncFilesResponse, error) {
-	grpcCtx := detatchHandlerContext(ctx)
+	grpcCtx := contexts.UnwrapHandlerContext(ctx)
 	err := fs.runtime.SyncFiles(grpcCtx, req.GetSource(), req.GetDest())
 	if err != nil {
 		return nil, trail.Send(grpcCtx, err)

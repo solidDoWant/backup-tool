@@ -63,18 +63,29 @@ func NewVaultWarden(client kubecluster.ClientInterface) *VaultWarden {
 // 8. Exit the tool instance, delete all created resources except for DR volume snapshot
 func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, dataPVC, cnpgClusterName, servingCertIssuerName, clientCertIssuerName string, backupOptions VaultWardenBackupOptions) (backup *Backup, err error) {
 	backup = NewBackupNow(backupName)
-	defer backup.Stop()
+	ctx.Log.With("backupName", backup.GetFullName(), "namespace", namespace).Info("Starting backup process")
+	defer func() {
+		backup.Stop()
+		keyvals := []interface{}{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
+		if err != nil {
+			ctx.Log.Warn("Backup process failed", keyvals...)
+		} else {
+			ctx.Log.Info("Backup process completed", keyvals...)
+		}
+	}()
 
 	// 1. Snapshot/clone PVC containing data directory
-	clonedPVC, err := vw.kubernetesClient.ClonePVC(ctx, namespace, dataPVC, clonepvc.ClonePVCOptions{DestPvcNamePrefix: backup.GetFullName(), CleanupTimeout: backupOptions.CleanupTimeout, ForceBind: true})
+	ctx.Log.Step().Info("Cloning data PVC")
+	clonedPVC, err := vw.kubernetesClient.ClonePVC(ctx.Child(), namespace, dataPVC, clonepvc.ClonePVCOptions{DestPvcNamePrefix: backup.GetFullName(), CleanupTimeout: backupOptions.CleanupTimeout, ForceBind: true})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to clone data PVC")
 	}
-	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
+	defer cleanup.To(func(ctx *contexts.Context) error {
 		return vw.kubernetesClient.Core().DeletePVC(ctx, namespace, clonedPVC.Name)
-	}).WithErrMessage("failed to cleanup PVC %q", helpers.FullName(clonedPVC)).WithOriginalErr(&err).Run()
+	}).WithErrMessage("failed to cleanup PVC %q", helpers.FullName(clonedPVC)).WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(backupOptions.CleanupTimeout.MaxWait(time.Minute)).Run()
 
 	// 2. Create the DR PVC if not exists
+	ctx.Log.Step().Info("Ensuring DR PVC exists")
 	drVolumeSize := backupOptions.VolumeSize
 	if drVolumeSize.IsZero() {
 		snapshotSize, ok := clonedPVC.Spec.Resources.Requests[corev1.ResourceStorage]
@@ -86,12 +97,13 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 		drVolumeSize.Mul(2)
 	}
 
-	drPVC, err := vw.kubernetesClient.Core().EnsurePVCExists(ctx, namespace, backup.Name, drVolumeSize, core.CreatePVCOptions{StorageClassName: backupOptions.VolumeStorageClass})
+	drPVC, err := vw.kubernetesClient.Core().EnsurePVCExists(ctx.Child(), namespace, backup.Name, drVolumeSize, core.CreatePVCOptions{StorageClassName: backupOptions.VolumeStorageClass})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to ensure backup volume exists")
 	}
 
-	// 3. Clone the CNPG cluster
+	// 3. Clone the CNPG cluster with PITR set to the PVC snapshot time
+	ctx.Log.Step().Info("Cloning CNPG cluster")
 	clonedClusterName := helpers.CleanName(fmt.Sprintf("%s-%s", cnpgClusterName, backup.GetFullName()))
 
 	if backupOptions.CloneClusterOptions.CleanupTimeout == 0 {
@@ -102,15 +114,16 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 		backupOptions.CloneClusterOptions.RecoveryTargetTime = clonedPVC.CreationTimestamp.Format(time.RFC3339)
 	}
 
-	clonedCluster, err := vw.kubernetesClient.CloneCluster(ctx, namespace, cnpgClusterName,
+	clonedCluster, err := vw.kubernetesClient.CloneCluster(ctx.Child(), namespace, cnpgClusterName,
 		clonedClusterName, servingCertIssuerName, clientCertIssuerName,
 		backupOptions.CloneClusterOptions)
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to clone cluster %q", cnpgClusterName)
 	}
-	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(10*time.Minute), clonedCluster.Delete).WithErrMessage("failed to cleanup cloned cluster %q resources", clonedClusterName).WithOriginalErr(&err).Run()
+	defer cleanup.To(clonedCluster.Delete).WithErrMessage("failed to cleanup cloned cluster %q resources", clonedClusterName).WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(backupOptions.CleanupTimeout.MaxWait(10 * time.Minute)).Run()
 
 	// 4. Spawn a new tool instance with the cloned PVC attached, and DR mount and secrets attached
+	ctx.Log.Step().Info("Creating backup tool instance")
 	drVolumeMountPath := filepath.Join(baseMountPath, "dr")
 	clonedVolumeMountPath := filepath.Join(baseMountPath, "data")
 	secretsVolumeMountPath := filepath.Join(baseMountPath, "secrets")
@@ -127,42 +140,45 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 		CleanupTimeout: backupOptions.CleanupTimeout,
 	}
 	mergo.MergeWithOverwrite(&btOpts, backupOptions.RemoteBackupToolOptions)
-	btInstance, err := vw.kubernetesClient.CreateBackupToolInstance(ctx, namespace, backup.GetFullName(), btOpts)
+	btInstance, err := vw.kubernetesClient.CreateBackupToolInstance(ctx.Child(), namespace, backup.GetFullName(), btOpts)
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to create %s instance", constants.ToolName)
 	}
-	defer cleanup.WithTimeoutTo(backupOptions.CleanupTimeout.MaxWait(time.Minute), func(ctx *contexts.Context) error {
+	defer cleanup.To(func(ctx *contexts.Context) error {
 		return btInstance.Delete(ctx)
 	}).WithErrMessage("failed to cleanup backup tool instance %q resources", backup.GetFullName()).
-		WithOriginalErr(&err).Run()
+		WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(backupOptions.CleanupTimeout.MaxWait(time.Minute)).Run()
 
 	// 5. Sync the data directory to the DR volume
-	backupToolClient, err := btInstance.GetGRPCClient(ctx, backupOptions.ClusterServiceSearchDomains...)
+	ctx.Log.Step().Info("Syncing data directory to DR volume")
+	backupToolClient, err := btInstance.GetGRPCClient(ctx.Child(), backupOptions.ClusterServiceSearchDomains...)
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to create client for backup tool GRPC server")
 	}
 
 	drDataVolPath := filepath.Join(drVolumeMountPath, "data-vol")
-	err = backupToolClient.Files().SyncFiles(ctx, clonedVolumeMountPath, drDataVolPath)
+	err = backupToolClient.Files().SyncFiles(ctx.Child(), clonedVolumeMountPath, drDataVolPath)
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to sync data directory files at %q to the disaster recovery volume at %q", clonedVolumeMountPath, drDataVolPath)
 	}
 
-	// 6. Perform a CNPG logical backup with PITR set to the PVC snapshot time
+	// 6. Perform a CNPG logical backup
+	ctx.Log.Step().Info("Performing Postgres logical backup")
 	podSQLFilePath := filepath.Join(drVolumeMountPath, "dump.sql")
 	clusterCredentials := clonedCluster.GetCredentials(servingCertVolumeMountPath, clientCertVolumeMountPath)
-	err = backupToolClient.Postgres().DumpAll(ctx, clusterCredentials, podSQLFilePath, postgres.DumpAllOptions{CleanupTimeout: backupOptions.CleanupTimeout.MaxWait(10 * time.Second)})
+	err = backupToolClient.Postgres().DumpAll(ctx.Child(), clusterCredentials, podSQLFilePath, postgres.DumpAllOptions{CleanupTimeout: backupOptions.CleanupTimeout})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to dump logical backup for postgres server at %q", postgres.GetServerAddress(clusterCredentials))
 	}
 
 	// 7. Snapshot the backup PVC
-	snapshot, err := vw.kubernetesClient.ES().SnapshotVolume(ctx, namespace, drPVC.Name, externalsnapshotter.SnapshotVolumeOptions{Name: helpers.CleanName(backup.GetFullName()), SnapshotClass: backupOptions.BackupSnapshot.SnapshotClass})
+	ctx.Log.Step().Info("Snapshotting the DR volume")
+	snapshot, err := vw.kubernetesClient.ES().SnapshotVolume(ctx.Child(), namespace, drPVC.Name, externalsnapshotter.SnapshotVolumeOptions{Name: helpers.CleanName(backup.GetFullName()), SnapshotClass: backupOptions.BackupSnapshot.SnapshotClass})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to snapshot backup volume %q", helpers.FullName(drPVC))
 	}
 
-	_, err = vw.kubernetesClient.ES().WaitForReadySnapshot(ctx, namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: backupOptions.BackupSnapshot.ReadyTimeout})
+	_, err = vw.kubernetesClient.ES().WaitForReadySnapshot(ctx.Child(), namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: backupOptions.BackupSnapshot.ReadyTimeout})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to wait for backup snapshot %q to become ready", helpers.FullName(snapshot))
 	}

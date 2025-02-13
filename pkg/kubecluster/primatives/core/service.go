@@ -31,6 +31,9 @@ func ContainerPortToServicePort(containerPort corev1.ContainerPort) corev1.Servi
 // TODO resolve service dialer func?
 
 func (c *Client) CreateService(ctx *contexts.Context, namespce string, service *corev1.Service) (*corev1.Service, error) {
+	ctx.Log.With("name", service.Name).Info("Creating service")
+	ctx.Log.Debug("Call parameters", "service", service)
+
 	service, err := c.client.CoreV1().Services(namespce).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create service %q", helpers.FullNameStr(namespce, service.Name))
@@ -43,7 +46,10 @@ type WaitForReadyServiceOpts struct {
 	helpers.MaxWaitTime
 }
 
-func (c *Client) WaitForReadyService(ctx *contexts.Context, namespace, name string, opts WaitForReadyServiceOpts) (*corev1.Service, error) {
+func (c *Client) WaitForReadyService(ctx *contexts.Context, namespace, name string, opts WaitForReadyServiceOpts) (service *corev1.Service, err error) {
+	ctx.Log.With("name", name).Info("Waiting for service to become ready")
+	defer ctx.Log.Info("Finished waiting for service to become ready", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
 	processEvent := func(_ *contexts.Context, service *corev1.Service) (*corev1.Service, bool, error) {
 		switch service.Spec.Type {
 		case corev1.ServiceTypeExternalName:
@@ -68,13 +74,12 @@ func (c *Client) WaitForReadyService(ctx *contexts.Context, namespace, name stri
 
 		return service, true, nil
 	}
-	service, err := helpers.WaitForResourceCondition(ctx, opts.MaxWait(time.Minute), c.client.CoreV1().Services(namespace), name, processEvent)
-
+	service, err = helpers.WaitForResourceCondition(ctx.Child(), opts.MaxWait(time.Minute), c.client.CoreV1().Services(namespace), name, processEvent)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed waiting for service to become ready")
 	}
 
-	_, err = c.WaitForReadyEndpoint(ctx, namespace, name, WaitForReadyEndpointOpts(opts))
+	_, err = c.WaitForReadyEndpoint(ctx.Child(), namespace, name, WaitForReadyEndpointOpts(opts))
 	if err != nil {
 		return nil, trace.Wrap(err, "failed waiting for at least one service endpoint to become ready")
 	}
@@ -83,6 +88,8 @@ func (c *Client) WaitForReadyService(ctx *contexts.Context, namespace, name stri
 }
 
 func (c *Client) DeleteService(ctx *contexts.Context, namespace, name string) error {
+	ctx.Log.With("name", name).Info("Deleting service")
+
 	err := c.client.CoreV1().Services(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete service %q", helpers.FullNameStr(namespace, name))
 }
