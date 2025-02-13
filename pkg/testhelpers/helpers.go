@@ -3,10 +3,12 @@ package testhelpers
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"slices"
 	"testing"
 
+	"github.com/charmbracelet/log"
 	"github.com/fatih/structtag"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/stretchr/testify/assert"
@@ -97,5 +99,14 @@ func OptStructTest[T interface{}](t runnableTB) {
 }
 
 func NewTestContext() *contexts.Context {
-	return contexts.NewContext(context.Background())
+	return contexts.NewContext(context.Background()).
+		WithLogger(contexts.NewLoggerContext(log.NewWithOptions(
+			os.Stdout,
+			log.Options{
+				Level:           log.DebugLevel,
+				ReportTimestamp: true,
+				Formatter:       log.TextFormatter,
+				ReportCaller:    true,
+			},
+		)))
 }
