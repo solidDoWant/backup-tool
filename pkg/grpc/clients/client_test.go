@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -83,14 +84,77 @@ func TestNewClient(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Nil(t, client)
-			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, client)
-				assert.NotNil(t, client.Files())
-				assert.NotNil(t, client.Postgres())
+				return
 			}
-
-			// TODO verify that the client actually attempts to connect to the server
+			require.NoError(t, err)
+			assert.NotNil(t, client)
+			assert.NotNil(t, client.Files())
+			assert.NotNil(t, client.Postgres())
+			assert.NotNil(t, client.Health())
 		})
 	}
+}
+
+func TestUnaryLoggingInterceptor(t *testing.T) {
+	ctx := th.NewTestContext()
+	method := "method"
+	req := "request"
+	reply := "reply"
+	cc := &grpc.ClientConn{}
+	opts := []grpc.CallOption{
+		grpc.HeaderCallOption{},
+	}
+	errResponse := assert.AnError
+
+	invokerCalled := false
+	invoker := func(calledCtx context.Context, calledMethod string, calledReq, calledReply any, calledCC *grpc.ClientConn, calledOpts ...grpc.CallOption) error {
+		invokerCalled = true
+
+		assert.Equal(t, ctx, calledCtx)
+		assert.Equal(t, method, calledMethod)
+		assert.Equal(t, req, calledReq)
+		assert.Equal(t, reply, calledReply)
+		assert.Equal(t, cc, calledCC)
+		assert.Equal(t, opts, calledOpts)
+
+		return errResponse
+	}
+
+	err := unaryLoggingInterceptor(ctx, method, req, reply, cc, invoker, opts...)
+	assert.True(t, invokerCalled)
+	assert.Equal(t, errResponse, err)
+}
+
+func TestStreamLoggingInterceptor(t *testing.T) {
+	ctx := th.NewTestContext()
+	desc := &grpc.StreamDesc{}
+	cc := &grpc.ClientConn{}
+	method := "method"
+	opts := []grpc.CallOption{
+		grpc.HeaderCallOption{},
+	}
+	errResponse := assert.AnError
+
+	streamerCalled := false
+	streamer := func(calledCtx context.Context, calledDesc *grpc.StreamDesc, calledCC *grpc.ClientConn, calledMethod string, calledOpts ...grpc.CallOption) (stream grpc.ClientStream, err error) {
+		streamerCalled = true
+
+		assert.Equal(t, ctx, calledCtx)
+		assert.Equal(t, desc, calledDesc)
+		assert.Equal(t, cc, calledCC)
+		assert.Equal(t, method, calledMethod)
+		assert.Equal(t, opts, calledOpts)
+
+		return nil, errResponse
+	}
+
+	stream, err := streamLoggingInterceptor(ctx, desc, cc, method, streamer, opts...)
+	assert.True(t, streamerCalled)
+	assert.Nil(t, stream)
+	assert.Equal(t, errResponse, err)
+}
+
+func TestGrpcKeyvals(t *testing.T) {
+	calledMethod := "called/method"
+	assert.Equal(t, []interface{}{"method", calledMethod}, grpcKeyvals(calledMethod))
 }

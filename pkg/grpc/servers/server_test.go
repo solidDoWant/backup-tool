@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -126,9 +127,10 @@ func TestStartServer(t *testing.T) {
 			}
 
 			// Start server in goroutine since it blocks
+			ctx := th.NewTestContext()
 			errChan := make(chan error)
 			go func() {
-				errChan <- StartServer()
+				errChan <- StartServer(ctx)
 			}()
 
 			// Wait briefly to let server start
