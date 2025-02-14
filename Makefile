@@ -101,6 +101,7 @@ check-licenses:
 
 VERSION = 0.0.1-dev
 CONTAINER_REGISTRY = ghcr.io/soliddowant
+HELM_REGISTRY = ghcr.io/soliddowant
 
 BINARY_DIR = $(BUILD_DIR)/binaries
 BINARY_PLATFORMS = linux/amd64 linux/arm64
@@ -178,9 +179,13 @@ container-manifest: $(CONTAINER_PLATFORMS:%=$(BINARY_DIR)/%/$(BINARY_NAME)) lice
 HELM_CHART_DIR := $(PROJECT_DIR)/deploy/charts/dr-job
 HELM_CHART_FILES := $(shell find $(HELM_CHART_DIR) -type f)
 HELM_PACKAGE = $(BUILD_DIR)/helm/dr-job-$(VERSION).tgz
+HELM_PUSH ?= false
+
+$(HELM_PACKAGE): PUSH_CHECK = $(if $(findstring t,$(HELM_PUSH)),true)
 $(HELM_PACKAGE): $(HELM_CHART_FILES)
 	@mkdir -p "$(@D)"
 	@helm package "$(HELM_CHART_DIR)" --dependency-update --version "$(VERSION)" --app-version "$(VERSION)" --destination "$(@D)"
+	@$(PUSH_CHECK) && helm push "$(HELM_PACKAGE)" oci://$(HELM_REGISTRY)
 
 PHONY += helm
 LOCAL_BUILDERS += helm
