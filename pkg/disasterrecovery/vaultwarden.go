@@ -61,8 +61,8 @@ func NewVaultWarden(client kubecluster.ClientInterface) *VaultWarden {
 // 6. Copy the logical backup to the DR mount
 // 7. Take a snapshot of the DR volume
 // 8. Exit the tool instance, delete all created resources except for DR volume snapshot
-func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, dataPVC, cnpgClusterName, servingCertIssuerName, clientCertIssuerName string, backupOptions VaultWardenBackupOptions) (backup *Backup, err error) {
-	backup = NewBackupNow(backupName)
+func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, dataPVC, cnpgClusterName, servingCertIssuerName, clientCertIssuerName string, backupOptions VaultWardenBackupOptions) (backup *DREvent, err error) {
+	backup = NewDREventNow(backupName)
 	ctx.Log.With("backupName", backup.GetFullName(), "namespace", namespace).Info("Starting backup process")
 	defer func() {
 		backup.Stop()
