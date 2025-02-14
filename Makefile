@@ -125,6 +125,14 @@ PHONY += binary-all
 ALL_BUILDERS += binary-all
 binary-all: $(BINARY_PLATFORMS:%=$(BINARY_DIR)/%/$(BINARY_NAME))
 
+LICENSE_DIR = $(BUILD_DIR)/licenses
+
+PHONY += build-licenses
+ALL_BUILDERS += build-licenses
+build-licenses:
+	@rm -rf "$(LICENSE_DIR)"
+	@go run github.com/google/go-licenses@latest save ./... --save_path="$(LICENSE_DIR)" --ignore "$(MODULE_NAME)"
+
 DEBIAN_IMAGE_VERSION = 12.9-slim
 POSTGRES_MAJOR_VERSION = 17
 
