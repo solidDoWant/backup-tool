@@ -260,6 +260,143 @@ func TestWaitForReadyCertificate(t *testing.T) {
 	}
 }
 
+func TestReissueCertificate(t *testing.T) {
+	namespace := "test-ns"
+	certName := "test-cert"
+
+	existingCert := &certmanagerv1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  namespace,
+			Name:       certName,
+			Generation: 1,
+		},
+	}
+
+	tests := []struct {
+		desc                  string
+		setupCert             *certmanagerv1.Certificate
+		simulateGetFailure    bool
+		simulateUpdateFailure bool
+		wantErr               bool
+	}{
+		{
+			desc:      "successfully reissue certificate",
+			setupCert: existingCert,
+		},
+		{
+			desc:               "get certificate fails",
+			setupCert:          existingCert,
+			simulateGetFailure: true,
+			wantErr:            true,
+		},
+		{
+			desc:                  "update status fails",
+			setupCert:             existingCert,
+			simulateUpdateFailure: true,
+			wantErr:               true,
+		},
+		{
+			desc:    "certificate does not exist",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			client, fakeClientset := createTestClient()
+			ctx := th.NewTestContext()
+
+			if tt.setupCert != nil {
+				_, err := client.client.CertmanagerV1().Certificates(namespace).Create(ctx, tt.setupCert, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
+
+			if tt.simulateGetFailure {
+				fakeClientset.PrependReactor("get", "certificates", func(action kubetesting.Action) (bool, runtime.Object, error) {
+					return true, nil, assert.AnError
+				})
+			}
+
+			if tt.simulateUpdateFailure {
+				fakeClientset.PrependReactor("update", "certificates", func(action kubetesting.Action) (bool, runtime.Object, error) {
+					return true, nil, assert.AnError
+				})
+			}
+
+			cert, err := client.ReissueCertificate(ctx, namespace, certName)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, cert)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, cert)
+
+			for _, condition := range cert.Status.Conditions {
+				if condition.Type == certmanagerv1.CertificateConditionIssuing {
+					assert.Equal(t, cmmeta.ConditionTrue, condition.Status)
+					assert.Equal(t, "ManuallyTriggered", condition.Reason)
+					return
+				}
+			}
+
+			t.Error("Issuing condition not found")
+		})
+	}
+}
+
+func TestGetCertificate(t *testing.T) {
+	namespace := "test-ns"
+	certName := "test-cert"
+
+	tests := []struct {
+		desc            string
+		shouldSetupCert bool
+		wantErr         bool
+	}{
+		{
+			desc:            "get existing certificate",
+			shouldSetupCert: true,
+		},
+		{
+			desc:    "get non-existent certificate",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			client, _ := createTestClient()
+			ctx := th.NewTestContext()
+
+			var existingCert *certmanagerv1.Certificate
+			if tt.shouldSetupCert {
+				existingCert = &certmanagerv1.Certificate{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      certName,
+						Namespace: namespace,
+					},
+				}
+				_, err := client.client.CertmanagerV1().Certificates(namespace).Create(ctx, existingCert, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
+
+			cert, err := client.GetCertificate(ctx, namespace, certName)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, cert)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, cert)
+			assert.Equal(t, existingCert, cert)
+		})
+	}
+}
+
 func TestDeleteCertificate(t *testing.T) {
 	namespace := "test-ns"
 	certName := "test-cert"
@@ -498,89 +635,52 @@ func TestWaitForReadyIssuer(t *testing.T) {
 	}
 }
 
-func TestReissueCertificate(t *testing.T) {
+func TestGetIssuer(t *testing.T) {
 	namespace := "test-ns"
-	certName := "test-cert"
-
-	existingCert := &certmanagerv1.Certificate{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:  namespace,
-			Name:       certName,
-			Generation: 1,
-		},
-	}
+	issuerName := "test-issuer"
 
 	tests := []struct {
-		desc                  string
-		setupCert             *certmanagerv1.Certificate
-		simulateGetFailure    bool
-		simulateUpdateFailure bool
-		wantErr               bool
+		desc            string
+		shouldSetupCert bool
+		wantErr         bool
 	}{
 		{
-			desc:      "successfully reissue certificate",
-			setupCert: existingCert,
+			desc:            "get existing issuer",
+			shouldSetupCert: true,
 		},
 		{
-			desc:               "get certificate fails",
-			setupCert:          existingCert,
-			simulateGetFailure: true,
-			wantErr:            true,
-		},
-		{
-			desc:                  "update status fails",
-			setupCert:             existingCert,
-			simulateUpdateFailure: true,
-			wantErr:               true,
-		},
-		{
-			desc:    "certificate does not exist",
+			desc:    "get non-existent issuer",
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			client, fakeClientset := createTestClient()
+			client, _ := createTestClient()
 			ctx := th.NewTestContext()
 
-			if tt.setupCert != nil {
-				_, err := client.client.CertmanagerV1().Certificates(namespace).Create(ctx, tt.setupCert, metav1.CreateOptions{})
+			var existingIssuer *certmanagerv1.Issuer
+			if tt.shouldSetupCert {
+				existingIssuer = &certmanagerv1.Issuer{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      issuerName,
+						Namespace: namespace,
+					},
+				}
+				_, err := client.client.CertmanagerV1().Issuers(namespace).Create(ctx, existingIssuer, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
-			if tt.simulateGetFailure {
-				fakeClientset.PrependReactor("get", "certificates", func(action kubetesting.Action) (bool, runtime.Object, error) {
-					return true, nil, assert.AnError
-				})
-			}
-
-			if tt.simulateUpdateFailure {
-				fakeClientset.PrependReactor("update", "certificates", func(action kubetesting.Action) (bool, runtime.Object, error) {
-					return true, nil, assert.AnError
-				})
-			}
-
-			cert, err := client.ReissueCertificate(ctx, namespace, certName)
-
+			issuer, err := client.GetIssuer(ctx, namespace, issuerName)
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.Nil(t, cert)
+				assert.Nil(t, issuer)
 				return
 			}
 
 			assert.NoError(t, err)
-			assert.NotNil(t, cert)
-
-			for _, condition := range cert.Status.Conditions {
-				if condition.Type == certmanagerv1.CertificateConditionIssuing {
-					assert.Equal(t, cmmeta.ConditionTrue, condition.Status)
-					assert.Equal(t, "ManuallyTriggered", condition.Reason)
-					return
-				}
-			}
-
-			t.Error("Issuing condition not found")
+			assert.NotNil(t, issuer)
+			assert.Equal(t, existingIssuer, issuer)
 		})
 	}
 }

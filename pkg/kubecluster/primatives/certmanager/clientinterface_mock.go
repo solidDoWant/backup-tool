@@ -242,6 +242,126 @@ func (_c *MockClientInterface_DeleteIssuer_Call) RunAndReturn(run func(*contexts
 	return _c
 }
 
+// GetCertificate provides a mock function with given fields: ctx, namespace, name
+func (_m *MockClientInterface) GetCertificate(ctx *contexts.Context, namespace string, name string) (*v1.Certificate, error) {
+	ret := _m.Called(ctx, namespace, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCertificate")
+	}
+
+	var r0 *v1.Certificate
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) (*v1.Certificate, error)); ok {
+		return rf(ctx, namespace, name)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) *v1.Certificate); ok {
+		r0 = rf(ctx, namespace, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Certificate)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string) error); ok {
+		r1 = rf(ctx, namespace, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_GetCertificate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCertificate'
+type MockClientInterface_GetCertificate_Call struct {
+	*mock.Call
+}
+
+// GetCertificate is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - name string
+func (_e *MockClientInterface_Expecter) GetCertificate(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_GetCertificate_Call {
+	return &MockClientInterface_GetCertificate_Call{Call: _e.mock.On("GetCertificate", ctx, namespace, name)}
+}
+
+func (_c *MockClientInterface_GetCertificate_Call) Run(run func(ctx *contexts.Context, namespace string, name string)) *MockClientInterface_GetCertificate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_GetCertificate_Call) Return(_a0 *v1.Certificate, _a1 error) *MockClientInterface_GetCertificate_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_GetCertificate_Call) RunAndReturn(run func(*contexts.Context, string, string) (*v1.Certificate, error)) *MockClientInterface_GetCertificate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetIssuer provides a mock function with given fields: ctx, namespace, name
+func (_m *MockClientInterface) GetIssuer(ctx *contexts.Context, namespace string, name string) (*v1.Issuer, error) {
+	ret := _m.Called(ctx, namespace, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetIssuer")
+	}
+
+	var r0 *v1.Issuer
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) (*v1.Issuer, error)); ok {
+		return rf(ctx, namespace, name)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) *v1.Issuer); ok {
+		r0 = rf(ctx, namespace, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Issuer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string) error); ok {
+		r1 = rf(ctx, namespace, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_GetIssuer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetIssuer'
+type MockClientInterface_GetIssuer_Call struct {
+	*mock.Call
+}
+
+// GetIssuer is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - name string
+func (_e *MockClientInterface_Expecter) GetIssuer(ctx interface{}, namespace interface{}, name interface{}) *MockClientInterface_GetIssuer_Call {
+	return &MockClientInterface_GetIssuer_Call{Call: _e.mock.On("GetIssuer", ctx, namespace, name)}
+}
+
+func (_c *MockClientInterface_GetIssuer_Call) Run(run func(ctx *contexts.Context, namespace string, name string)) *MockClientInterface_GetIssuer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_GetIssuer_Call) Return(_a0 *v1.Issuer, _a1 error) *MockClientInterface_GetIssuer_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_GetIssuer_Call) RunAndReturn(run func(*contexts.Context, string, string) (*v1.Issuer, error)) *MockClientInterface_GetIssuer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ReissueCertificate provides a mock function with given fields: ctx, namespace, name
 func (_m *MockClientInterface) ReissueCertificate(ctx *contexts.Context, namespace string, name string) (*v1.Certificate, error) {
 	ret := _m.Called(ctx, namespace, name)

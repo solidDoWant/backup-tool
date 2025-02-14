@@ -153,6 +153,18 @@ func (cmc *Client) ReissueCertificate(ctx *contexts.Context, namespace, name str
 	return certificate, nil
 }
 
+func (cmc *Client) GetCertificate(ctx *contexts.Context, namespace, name string) (*certmanagerv1.Certificate, error) {
+	ctx.Log.With("name", name).Info("Getting certificate")
+
+	certificate, err := cmc.client.CertmanagerV1().Certificates(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to get certificate %q", helpers.FullNameStr(namespace, name))
+	}
+
+	ctx.Log.Debug("Retrieved certificate", "certificate", certificate)
+	return certificate, nil
+}
+
 func (cmc *Client) DeleteCertificate(ctx *contexts.Context, namespace, name string) error {
 	ctx.Log.With("name", name).Info("Deleting certificate")
 
@@ -220,6 +232,18 @@ func (cmc *Client) WaitForReadyIssuer(ctx *contexts.Context, namespace, name str
 		return nil, trace.Wrap(err, "failed waiting for issuer %q to become ready", helpers.FullNameStr(namespace, name))
 	}
 
+	return issuer, nil
+}
+
+func (cmc *Client) GetIssuer(ctx *contexts.Context, namespace, name string) (*certmanagerv1.Issuer, error) {
+	ctx.Log.With("name", name).Info("Getting issuer")
+
+	issuer, err := cmc.client.CertmanagerV1().Issuers(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to get issuer %q", helpers.FullNameStr(namespace, name))
+	}
+
+	ctx.Log.Debug("Retrieved issuer", "issuer", issuer)
 	return issuer, nil
 }
 
