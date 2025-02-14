@@ -164,7 +164,7 @@ CONTAINER_PLATFORMS := $(BINARY_PLATFORMS)
 
 PHONY += container-image
 LOCAL_BUILDERS += container-image
-container-image: binary
+container-image: binary licenses
 	@docker buildx build --platform linux/$(LOCALARCH) -t $(CONTAINER_IMAGE_TAG) --load $(CONTAINER_BUILD_ARGS) .
 
 CONTAINER_MANIFEST_PUSH ?= false
@@ -172,7 +172,7 @@ CONTAINER_MANIFEST_PUSH ?= false
 PHONY += container-manifest
 ALL_BUILDERS += container-manifest
 container-manifest: PUSH_ARG = $(if $(findstring t,$(CONTAINER_MANIFEST_PUSH)),--push)
-container-manifest: $(CONTAINER_PLATFORMS:%=$(BINARY_DIR)/%/$(BINARY_NAME))
+container-manifest: $(CONTAINER_PLATFORMS:%=$(BINARY_DIR)/%/$(BINARY_NAME)) licenses
 	@docker buildx build $(CONTAINER_PLATFORMS:%=--platform %) $(PUSH_ARG) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) .
 
 HELM_CHART_DIR := $(PROJECT_DIR)/deploy/charts/dr-job

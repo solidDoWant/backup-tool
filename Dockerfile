@@ -15,7 +15,9 @@ RUN apt update && \
 ARG TARGETOS
 ARG TARGETARCH
 ARG SOURCE_BINARY_PATH="build/binaries/${TARGETOS}/${TARGETARCH}/backup-tool"
+ARG SOURCE_LICENSE_PATH="build/licenses/"
 COPY "${SOURCE_BINARY_PATH}" /bin/backup-tool
+COPY "${SOURCE_LICENSE_PATH}" /usr/share/doc/backup-tool
 
 # Configure runtime settings
 USER 1000:1000
