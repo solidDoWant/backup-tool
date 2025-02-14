@@ -167,3 +167,49 @@ func TestCmdWrapperWait(t *testing.T) {
 		})
 	}
 }
+
+func TestCmdWrapperCombinedOutput(t *testing.T) {
+	tests := []struct {
+		desc                   string
+		combinedOutputCallback func(*cmdWrapper) ([]byte, error)
+		expectedOutput         []byte
+		errFunc                require.ErrorAssertionFunc
+	}{
+		{
+			desc: "callback is nil",
+		},
+		{
+			desc: "callback is not nil",
+			combinedOutputCallback: func(cw *cmdWrapper) ([]byte, error) {
+				return []byte("test output"), nil
+			},
+			expectedOutput: []byte("test output"),
+		},
+		{
+			desc: "callback returns error",
+			combinedOutputCallback: func(cw *cmdWrapper) ([]byte, error) {
+				return nil, exec.ErrNotFound
+			},
+			errFunc: require.Error,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			if tt.errFunc == nil {
+				tt.errFunc = require.NoError
+			}
+
+			cmd := instantReturnCommand()
+			wrapper := NewCmdWrapper(cmd)
+			wrapper.combinedOutputCallback = tt.combinedOutputCallback
+
+			output, err := wrapper.CombinedOutput()
+
+			tt.errFunc(t, err)
+			if tt.expectedOutput != nil {
+				require.Equal(t, tt.expectedOutput, output)
+			}
+		})
+	}
+}

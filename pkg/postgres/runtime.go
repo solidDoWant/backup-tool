@@ -11,6 +11,7 @@ import (
 // Represents a place (i.e. local or remote) where commands can run.
 type Runtime interface {
 	DumpAll(*contexts.Context, Credentials, string, DumpAllOptions) error
+	Restore(*contexts.Context, Credentials, string, RestoreOptions) error
 }
 
 type LocalRuntime struct {

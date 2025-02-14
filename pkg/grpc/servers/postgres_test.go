@@ -174,3 +174,73 @@ func TestDumpAll(t *testing.T) {
 		})
 	}
 }
+
+func TestDecodeRestoreOptions(t *testing.T) {
+	assert.Equal(t, postgres.RestoreOptions{}, decodeRestoreOptions(&postgres_v1.RestoreOptions{}))
+}
+
+func TestRestore(t *testing.T) {
+	testCases := []struct {
+		desc        string
+		credentials *postgres_v1.EnvironmentCredentials
+		inputPath   string
+		opts        *postgres_v1.RestoreOptions
+		runtimeErr  error
+		shouldError bool
+	}{
+		{
+			desc: "successful restore",
+			credentials: postgres_v1.EnvironmentCredentials_builder{
+				Credentials: []*postgres_v1.EnvironmentCredentials_EnvironmentVariable{
+					postgres_v1.EnvironmentCredentials_EnvironmentVariable_builder{
+						Name:  postgres_v1.VarName_PGHOST.Enum(),
+						Value: ptr.To("localhost"),
+					}.Build(),
+				},
+			}.Build(),
+			inputPath: "/tmp/restore.sql",
+		},
+		{
+			desc: "runtime error",
+			credentials: postgres_v1.EnvironmentCredentials_builder{
+				Credentials: []*postgres_v1.EnvironmentCredentials_EnvironmentVariable{},
+			}.Build(),
+			inputPath:   "/tmp/restore.sql",
+			runtimeErr:  assert.AnError,
+			shouldError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			// Setup mock
+			runtime := postgres.NewMockRuntime(t)
+			server := NewPostgresServer()
+			server.runtime = runtime
+
+			ctx := th.NewTestContext()
+			decodedCredentials := decodeCredentials(tc.credentials)
+			decodedOpts := decodeRestoreOptions(tc.opts)
+			runtime.EXPECT().Restore(contexts.UnwrapHandlerContext(ctx), decodedCredentials, tc.inputPath, decodedOpts).Return(tc.runtimeErr)
+
+			// Create request
+			req := postgres_v1.RestoreRequest_builder{
+				Credentials:   tc.credentials,
+				InputFilePath: &tc.inputPath,
+				Options:       tc.opts,
+			}.Build()
+
+			// Execute test
+			result, err := server.Restore(ctx, req)
+
+			// Assert results
+			if tc.shouldError {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+			}
+		})
+	}
+}

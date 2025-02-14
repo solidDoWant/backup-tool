@@ -38,6 +38,23 @@ func (c *MockPostgresClient) OnDumpAll(ctx interface{}, in interface{}, opts ...
 	return c.On("DumpAll", append([]interface{}{ctx, in}, opts...)...)
 }
 
+func (c *MockPostgresClient) Restore(ctx context.Context, in *RestoreRequest, opts ...grpc.CallOption) (*RestoreResponse, error) {
+	opts0 := []interface{}{ctx, in}
+	for _, opts1 := range opts {
+		opts0 = append(opts0, opts1)
+	}
+	args := c.Called(opts0...)
+	var ret0 *RestoreResponse
+	if args.Get(0) != nil {
+		ret0 = args.Get(0).(*RestoreResponse)
+	}
+	return ret0, args.Error(1)
+}
+
+func (c *MockPostgresClient) OnRestore(ctx interface{}, in interface{}, opts ...interface{}) *mock.Call {
+	return c.On("Restore", append([]interface{}{ctx, in}, opts...)...)
+}
+
 type MockPostgresServer struct {
 	mock.Mock
 }
@@ -57,4 +74,17 @@ func (s *MockPostgresServer) DumpAll(ctx context.Context, in *DumpAllRequest) (*
 
 func (s *MockPostgresServer) OnDumpAll(ctx interface{}, in interface{}) *mock.Call {
 	return s.On("DumpAll", ctx, in)
+}
+
+func (s *MockPostgresServer) Restore(ctx context.Context, in *RestoreRequest) (*RestoreResponse, error) {
+	args := s.Called(ctx, in)
+	var ret0 *RestoreResponse
+	if args.Get(0) != nil {
+		ret0 = args.Get(0).(*RestoreResponse)
+	}
+	return ret0, args.Error(1)
+}
+
+func (s *MockPostgresServer) OnRestore(ctx interface{}, in interface{}) *mock.Call {
+	return s.On("Restore", ctx, in)
 }

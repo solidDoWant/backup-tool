@@ -54,3 +54,17 @@ func (ps *PostgresServer) DumpAll(ctx context.Context, req *postgres_v1.DumpAllR
 
 	return &postgres_v1.DumpAllResponse{}, nil
 }
+
+func decodeRestoreOptions(_ *postgres_v1.RestoreOptions) postgres.RestoreOptions {
+	return postgres.RestoreOptions{}
+}
+
+func (ps *PostgresServer) Restore(ctx context.Context, req *postgres_v1.RestoreRequest) (*postgres_v1.RestoreResponse, error) {
+	grpcCtx := contexts.UnwrapHandlerContext(ctx)
+	err := ps.runtime.Restore(grpcCtx, decodeCredentials(req.GetCredentials()), req.GetInputFilePath(), decodeRestoreOptions(req.GetOptions()))
+	if err != nil {
+		return nil, trail.Send(grpcCtx, err)
+	}
+
+	return &postgres_v1.RestoreResponse{}, nil
+}

@@ -91,3 +91,27 @@ func (pc *PostgresClient) DumpAll(ctx *contexts.Context, credentials postgres.Cr
 	_, err = pc.client.DumpAll(ctx.Child(), request, grpc.Header(&header))
 	return trail.FromGRPC(err, header)
 }
+
+func encodeRestoreOptions(_ postgres.RestoreOptions) *postgres_v1.RestoreOptions {
+	return &postgres_v1.RestoreOptions{}
+}
+
+func (pc *PostgresClient) Restore(ctx *contexts.Context, credentials postgres.Credentials, inputFilePath string, opts postgres.RestoreOptions) error {
+	ctx.Log.With("inputFilePath", inputFilePath, "address", postgres.GetServerAddress(credentials), "username", credentials.GetUsername()).Info("Restoring all databases")
+	defer ctx.Log.Info("Finished restoring databases", ctx.Stopwatch.Keyval())
+
+	encodedCredentials, err := encodeCredentials(credentials)
+	if err != nil {
+		return trace.Wrap(err, "failed to encode credentials")
+	}
+
+	request := postgres_v1.RestoreRequest_builder{
+		Credentials:   encodedCredentials,
+		InputFilePath: &inputFilePath,
+		Options:       encodeRestoreOptions(opts),
+	}.Build()
+
+	var header metadata.MD
+	_, err = pc.client.Restore(ctx.Child(), request, grpc.Header(&header))
+	return trail.FromGRPC(err, header)
+}

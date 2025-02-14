@@ -11,9 +11,10 @@ import (
 // TODO move this to another package when/if other packages need to run commands.
 type cmdWrapper struct {
 	*exec.Cmd
-	stdoutPipeCallback func(*cmdWrapper) (io.ReadCloser, error)
-	startCallback      func(*cmdWrapper) error
-	waitCallback       func(*cmdWrapper) error
+	stdoutPipeCallback     func(*cmdWrapper) (io.ReadCloser, error)
+	startCallback          func(*cmdWrapper) error
+	waitCallback           func(*cmdWrapper) error
+	combinedOutputCallback func(*cmdWrapper) ([]byte, error)
 }
 
 func NewCmdWrapper(cmd *exec.Cmd) *cmdWrapper {
@@ -39,4 +40,11 @@ func (cw *cmdWrapper) Wait() error {
 		return cw.waitCallback(cw)
 	}
 	return cw.Cmd.Wait()
+}
+
+func (cw *cmdWrapper) CombinedOutput() ([]byte, error) {
+	if cw.combinedOutputCallback != nil {
+		return cw.combinedOutputCallback(cw)
+	}
+	return cw.Cmd.CombinedOutput()
 }

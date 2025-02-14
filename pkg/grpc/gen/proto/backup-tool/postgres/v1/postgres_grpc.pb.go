@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	Postgres_DumpAll_FullMethodName = "/Postgres/DumpAll"
+	Postgres_Restore_FullMethodName = "/Postgres/Restore"
 )
 
 // PostgresClient is the client API for Postgres service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PostgresClient interface {
 	DumpAll(ctx context.Context, in *DumpAllRequest, opts ...grpc.CallOption) (*DumpAllResponse, error)
+	Restore(ctx context.Context, in *RestoreRequest, opts ...grpc.CallOption) (*RestoreResponse, error)
 }
 
 type postgresClient struct {
@@ -47,11 +49,22 @@ func (c *postgresClient) DumpAll(ctx context.Context, in *DumpAllRequest, opts .
 	return out, nil
 }
 
+func (c *postgresClient) Restore(ctx context.Context, in *RestoreRequest, opts ...grpc.CallOption) (*RestoreResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RestoreResponse)
+	err := c.cc.Invoke(ctx, Postgres_Restore_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PostgresServer is the server API for Postgres service.
 // All implementations must embed UnimplementedPostgresServer
 // for forward compatibility.
 type PostgresServer interface {
 	DumpAll(context.Context, *DumpAllRequest) (*DumpAllResponse, error)
+	Restore(context.Context, *RestoreRequest) (*RestoreResponse, error)
 	mustEmbedUnimplementedPostgresServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedPostgresServer struct{}
 
 func (UnimplementedPostgresServer) DumpAll(context.Context, *DumpAllRequest) (*DumpAllResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DumpAll not implemented")
+}
+func (UnimplementedPostgresServer) Restore(context.Context, *RestoreRequest) (*RestoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Restore not implemented")
 }
 func (UnimplementedPostgresServer) mustEmbedUnimplementedPostgresServer() {}
 func (UnimplementedPostgresServer) testEmbeddedByValue()                  {}
@@ -104,6 +120,24 @@ func _Postgres_DumpAll_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Postgres_Restore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PostgresServer).Restore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Postgres_Restore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PostgresServer).Restore(ctx, req.(*RestoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Postgres_ServiceDesc is the grpc.ServiceDesc for Postgres service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var Postgres_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DumpAll",
 			Handler:    _Postgres_DumpAll_Handler,
+		},
+		{
+			MethodName: "Restore",
+			Handler:    _Postgres_Restore_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

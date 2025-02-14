@@ -16,7 +16,7 @@ import (
 )
 
 // Depending on a CLI tool is unfortunate but there are no viable golang replacements for this.
-const commandName = "pg_dumpall"
+const dumpCommandName = "pg_dumpall"
 
 // Tracks the _prefixes_ of lines that should be commented out in the produced file.
 // This is used to drop problematic queries for DB resources that should be entirely managed by CNPG, such as the postgres role.
@@ -52,7 +52,7 @@ func (lr *LocalRuntime) DumpAll(ctx *contexts.Context, credentials Credentials, 
 	commandCtx, ctxCancel := context.WithCancel(ctx.Child())
 	defer ctxCancel()
 
-	cmd := lr.wrapCommand(exec.CommandContext(commandCtx, commandName, "--clean", "--if-exists", "--exclude-database=postgres"))
+	cmd := lr.wrapCommand(exec.CommandContext(commandCtx, dumpCommandName, "--clean", "--if-exists", "--exclude-database=postgres"))
 	cmd.Env = credentials.GetVariables().SetDatabaseName("postgres").ToEnvSlice()
 
 	// Capture stderr and also write it to the standard error output stream.
@@ -64,7 +64,7 @@ func (lr *LocalRuntime) DumpAll(ctx *contexts.Context, credentials Credentials, 
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return trace.Wrap(err, "failed to get stdout pipe for %q process", commandName)
+		return trace.Wrap(err, "failed to get stdout pipe for %q process", dumpCommandName)
 	}
 
 	outputFile, err := os.OpenFile(outputFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
@@ -85,7 +85,7 @@ func (lr *LocalRuntime) DumpAll(ctx *contexts.Context, credentials Credentials, 
 
 	err = cmd.Start()
 	if err != nil {
-		return trace.Wrap(err, "failed to start %q process", commandName)
+		return trace.Wrap(err, "failed to start %q process", dumpCommandName)
 	}
 
 	// The map value indicates if the item has been found yet.
@@ -173,6 +173,6 @@ func (lr *LocalRuntime) DumpAll(ctx *contexts.Context, credentials Credentials, 
 	// TODO document this or parse and wrap the error
 	// Common errors:
 	// * authentication method requirement "none" failed: server requested SASL authentication: this usually means that the server isn't expecting client cert auth
-	cmdErr := trace.Wrap(cmd.Wait(), "process %q failed with stderr: %s", commandName, stderrCapture.String())
+	cmdErr := trace.Wrap(cmd.Wait(), "process %q failed with stderr: %s", dumpCommandName, stderrCapture.String())
 	return trace.NewAggregate(cmdErr, err)
 }

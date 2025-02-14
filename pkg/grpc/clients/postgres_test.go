@@ -234,3 +234,85 @@ func TestDumpAll(t *testing.T) {
 		})
 	}
 }
+
+func TestEncodeRestoreOptions(t *testing.T) {
+	assert.Equal(t, &postgres_v1.RestoreOptions{}, encodeRestoreOptions(postgres.RestoreOptions{}))
+}
+
+func TestRestore(t *testing.T) {
+	tests := []struct {
+		name          string
+		credentials   map[postgres.CredentialVariable]string
+		inputPath     string
+		mockResponse  *postgres_v1.RestoreResponse
+		mockError     error
+		expectedError bool
+	}{
+		{
+			name: "successful restore",
+			credentials: map[postgres.CredentialVariable]string{
+				postgres.HostVarName: "localhost",
+				postgres.PortVarName: "5432",
+			},
+			inputPath:    "/tmp/restore.sql",
+			mockResponse: &postgres_v1.RestoreResponse{},
+		},
+		{
+			name: "credentials encoding error",
+			credentials: map[postgres.CredentialVariable]string{
+				"INVALID_VAR": "value",
+			},
+			inputPath:     "/tmp/restore.sql",
+			expectedError: true,
+		},
+		{
+			name: "grpc error",
+			credentials: map[postgres.CredentialVariable]string{
+				postgres.HostVarName: "localhost",
+			},
+			inputPath:     "/tmp/restore.sql",
+			mockError:     fmt.Errorf("grpc error"),
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := postgres_v1.NewMockPostgresClient()
+
+			ctx := th.NewTestContext()
+			credentials := postgres.Credentials(postgres.EnvironmentCredentials(tt.credentials))
+
+			// Setup the mock function call
+			// The returned error is ignored to ensure that the function under test errors if the credentials are invalid
+			encodedCredentials, credErr := encodeCredentials(credentials)
+			expectedRequest := postgres_v1.RestoreRequest_builder{
+				Credentials:   encodedCredentials,
+				InputFilePath: &tt.inputPath,
+				Options:       encodeRestoreOptions(postgres.RestoreOptions{}),
+			}.Build()
+			mockClient.On("Restore", mock.Anything, expectedRequest, mock.Anything).
+				Run(func(args mock.Arguments) {
+					calledCtx := args.Get(0).(*contexts.Context)
+					calledCtx.IsChildOf(ctx)
+				}).
+				Return(tt.mockResponse, tt.mockError)
+
+			pc := &PostgresClient{client: mockClient}
+
+			// Test
+			err := pc.Restore(ctx, credentials, tt.inputPath, postgres.RestoreOptions{})
+
+			// Validate
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			if credErr == nil {
+				mockClient.AssertExpectations(t)
+			}
+		})
+	}
+}
