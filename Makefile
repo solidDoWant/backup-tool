@@ -101,7 +101,7 @@ check-licenses:
 
 VERSION = 0.0.1-dev
 CONTAINER_REGISTRY = ghcr.io/soliddowant
-HELM_REGISTRY = ghcr.io/soliddowant
+HELM_REGISTRY = ghcr.io/soliddowant/charts
 PUSH_ALL ?= false
 
 BINARY_DIR = $(BUILD_DIR)/binaries
@@ -160,6 +160,8 @@ DEBIAN_IMAGE_VERSION = 12.9-slim
 POSTGRES_MAJOR_VERSION = 17
 
 CONTAINER_IMAGE_TAG = $(CONTAINER_REGISTRY)/$(BINARY_NAME):$(VERSION)
+CONTAINER_BUILD_LABEL_VARS = org.opencontainers.image.source=https://github.com/solidDoWant/backup-tool org.opencontainers.image.licenses=AGPL-3.0
+CONTAINER_BUILD_LABELS := $(foreach var,$(CONTAINER_BUILD_LABEL_VARS),--label $(var))
 CONTAINER_BUILD_ARG_VARS = DEBIAN_IMAGE_VERSION POSTGRES_MAJOR_VERSION
 CONTAINER_BUILD_ARGS := $(foreach var,$(CONTAINER_BUILD_ARG_VARS),--build-arg $(var)=$($(var)))
 CONTAINER_PLATFORMS := $(BINARY_PLATFORMS)
@@ -167,7 +169,7 @@ CONTAINER_PLATFORMS := $(BINARY_PLATFORMS)
 PHONY += container-image
 LOCAL_BUILDERS += container-image
 container-image: binary licenses
-	@docker buildx build --platform linux/$(LOCALARCH) -t $(CONTAINER_IMAGE_TAG) --load $(CONTAINER_BUILD_ARGS) .
+	@docker buildx build --platform linux/$(LOCALARCH) -t $(CONTAINER_IMAGE_TAG) --load $(CONTAINER_BUILD_ARGS) $(CONTAINER_BUILD_LABELS) .
 
 CONTAINER_MANIFEST_PUSH ?= $(PUSH_ALL)
 
@@ -175,7 +177,7 @@ PHONY += container-manifest
 ALL_BUILDERS += container-manifest
 container-manifest: PUSH_ARG = $(if $(findstring t,$(CONTAINER_MANIFEST_PUSH)),--push)
 container-manifest: $(CONTAINER_PLATFORMS:%=$(BINARY_DIR)/%/$(BINARY_NAME)) licenses
-	@docker buildx build $(CONTAINER_PLATFORMS:%=--platform %) $(PUSH_ARG) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) .
+	@docker buildx build $(CONTAINER_PLATFORMS:%=--platform %) $(PUSH_ARG) -t $(CONTAINER_IMAGE_TAG) $(CONTAINER_BUILD_ARGS) $(CONTAINER_BUILD_LABELS) .
 
 HELM_CHART_DIR := $(PROJECT_DIR)/deploy/charts/dr-job
 HELM_CHART_FILES := $(shell find $(HELM_CHART_DIR) -type f)
