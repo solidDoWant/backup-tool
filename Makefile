@@ -102,6 +102,7 @@ check-licenses:
 VERSION = 0.0.1-dev
 CONTAINER_REGISTRY = ghcr.io/soliddowant
 HELM_REGISTRY = ghcr.io/soliddowant
+PUSH_ALL ?= false
 
 BINARY_DIR = $(BUILD_DIR)/binaries
 BINARY_PLATFORMS = linux/amd64 linux/arm64
@@ -168,7 +169,7 @@ LOCAL_BUILDERS += container-image
 container-image: binary licenses
 	@docker buildx build --platform linux/$(LOCALARCH) -t $(CONTAINER_IMAGE_TAG) --load $(CONTAINER_BUILD_ARGS) .
 
-CONTAINER_MANIFEST_PUSH ?= false
+CONTAINER_MANIFEST_PUSH ?= $(PUSH_ALL)
 
 PHONY += container-manifest
 ALL_BUILDERS += container-manifest
@@ -179,7 +180,7 @@ container-manifest: $(CONTAINER_PLATFORMS:%=$(BINARY_DIR)/%/$(BINARY_NAME)) lice
 HELM_CHART_DIR := $(PROJECT_DIR)/deploy/charts/dr-job
 HELM_CHART_FILES := $(shell find $(HELM_CHART_DIR) -type f)
 HELM_PACKAGE = $(BUILD_DIR)/helm/dr-job-$(VERSION).tgz
-HELM_PUSH ?= false
+HELM_PUSH ?= $(PUSH_ALL)
 
 $(HELM_PACKAGE): PUSH_CHECK = $(if $(findstring t,$(HELM_PUSH)),true)
 $(HELM_PACKAGE): $(HELM_CHART_FILES)
@@ -228,6 +229,19 @@ build: $(LOCAL_BUILDERS)
 
 PHONY += build-all
 build-all: $(ALL_BUILDERS)
+
+RELEASE_DIR = $(BUILD_DIR)/releases/$(VERSION)
+
+PHONY += release
+release: TAG = v$(VERSION)
+release: CP_CMDS = $(foreach PLATFORM,$(BINARY_PLATFORMS),cp $(TARBALL_DIR)/$(PLATFORM)/$(BINARY_NAME).tar.gz $(RELEASE_DIR)/$(BINARY_NAME)-$(VERSION)-$(subst /,-,$(PLATFORM)).tar.gz &&) true
+release: SAFETY_PREFIX = $(if $(findstring t,$(PUSH_ALL)),,echo)
+release: build-all
+	@mkdir -p $(RELEASE_DIR)
+	@$(CP_CMDS)
+	@$(SAFETY_PREFIX) git tag -a $(TAG) -m "Release $(TAG)"
+	@$(SAFETY_PREFIX) git push origin --tags
+	@$(SAFETY_PREFIX) gh release create $(TAG) --generate-notes --latest --verify-tag "$(RELEASE_DIR)"/*
 
 PHONY += generate-dr-schemas
 GENERATORS += generate-dr-schemas
