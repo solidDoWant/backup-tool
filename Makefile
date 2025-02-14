@@ -182,11 +182,11 @@ HELM_CHART_FILES := $(shell find $(HELM_CHART_DIR) -type f)
 HELM_PACKAGE = $(BUILD_DIR)/helm/dr-job-$(VERSION).tgz
 HELM_PUSH ?= $(PUSH_ALL)
 
-$(HELM_PACKAGE): PUSH_CHECK = $(if $(findstring t,$(HELM_PUSH)),true)
+$(HELM_PACKAGE): PUSH_CHECK = $(if $(findstring t,$(HELM_PUSH)),true,false)
 $(HELM_PACKAGE): $(HELM_CHART_FILES)
 	@mkdir -p "$(@D)"
 	@helm package "$(HELM_CHART_DIR)" --dependency-update --version "$(VERSION)" --app-version "$(VERSION)" --destination "$(@D)"
-	@$(PUSH_CHECK) && helm push "$(HELM_PACKAGE)" oci://$(HELM_REGISTRY)
+	@$(PUSH_CHECK) && helm push "$(HELM_PACKAGE)" oci://$(HELM_REGISTRY) || true
 
 PHONY += helm
 LOCAL_BUILDERS += helm
