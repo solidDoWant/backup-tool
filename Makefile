@@ -240,7 +240,8 @@ release: build-all
 	@mkdir -p $(RELEASE_DIR)
 	@$(CP_CMDS)
 	@$(SAFETY_PREFIX) git tag -a $(TAG) -m "Release $(TAG)"
-	@$(SAFETY_PREFIX) git push origin --all
+	@$(SAFETY_PREFIX) git push origin
+	@$(SAFETY_PREFIX) git push origin --tags
 	@$(SAFETY_PREFIX) gh release create $(TAG) --generate-notes --latest --verify-tag "$(RELEASE_DIR)"/*
 
 PHONY += generate-dr-schemas
