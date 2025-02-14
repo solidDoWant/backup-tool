@@ -158,6 +158,46 @@ func TestCreateCertificate(t *testing.T) {
 	}
 }
 
+func TestIsCertificateReady(t *testing.T) {
+	tests := []struct {
+		desc     string
+		cert     *certmanagerv1.Certificate
+		expected bool
+	}{
+		{
+			desc:     "certificate is ready",
+			cert:     &certmanagerv1.Certificate{Status: certmanagerv1.CertificateStatus{Conditions: []certmanagerv1.CertificateCondition{{Type: certmanagerv1.CertificateConditionReady, Status: cmmeta.ConditionTrue}}}},
+			expected: true,
+		},
+		{
+			desc:     "certificate is not ready",
+			cert:     &certmanagerv1.Certificate{Status: certmanagerv1.CertificateStatus{Conditions: []certmanagerv1.CertificateCondition{{Type: certmanagerv1.CertificateConditionReady, Status: cmmeta.ConditionFalse}}}},
+			expected: false,
+		},
+		{
+			desc:     "certificate has no status",
+			cert:     &certmanagerv1.Certificate{},
+			expected: false,
+		},
+		{
+			desc:     "certificate has no ready condition",
+			cert:     &certmanagerv1.Certificate{Status: certmanagerv1.CertificateStatus{Conditions: []certmanagerv1.CertificateCondition{{Type: "NotReady", Status: cmmeta.ConditionTrue}}}},
+			expected: false,
+		},
+		{
+			desc:     "certificate has multiple conditions",
+			cert:     &certmanagerv1.Certificate{Status: certmanagerv1.CertificateStatus{Conditions: []certmanagerv1.CertificateCondition{{Type: certmanagerv1.CertificateConditionIssuing, Status: cmmeta.ConditionFalse}, {Type: certmanagerv1.CertificateConditionReady, Status: cmmeta.ConditionTrue}}}},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsCertificateReady(tt.cert))
+		})
+	}
+}
+
 func TestWaitForReadyCertificate(t *testing.T) {
 	certName := "test-cert"
 	certNamespace := "test-ns"
@@ -526,6 +566,46 @@ func TestCreateIssuer(t *testing.T) {
 			retrievedIssuer, err := client.client.CertmanagerV1().Issuers(namespace).Get(ctx, issuer.Name, metav1.GetOptions{})
 			assert.NoError(t, err)
 			assert.Equal(t, expectedIssuer, retrievedIssuer)
+		})
+	}
+}
+
+func TestIsIssuerReady(t *testing.T) {
+	tests := []struct {
+		desc     string
+		issuer   *certmanagerv1.Issuer
+		expected bool
+	}{
+		{
+			desc:     "issuer is ready",
+			issuer:   &certmanagerv1.Issuer{Status: certmanagerv1.IssuerStatus{Conditions: []certmanagerv1.IssuerCondition{{Type: certmanagerv1.IssuerConditionReady, Status: cmmeta.ConditionTrue}}}},
+			expected: true,
+		},
+		{
+			desc:     "issuer is not ready",
+			issuer:   &certmanagerv1.Issuer{Status: certmanagerv1.IssuerStatus{Conditions: []certmanagerv1.IssuerCondition{{Type: certmanagerv1.IssuerConditionReady, Status: cmmeta.ConditionFalse}}}},
+			expected: false,
+		},
+		{
+			desc:     "issuer has no status",
+			issuer:   &certmanagerv1.Issuer{},
+			expected: false,
+		},
+		{
+			desc:     "issuer has no ready condition",
+			issuer:   &certmanagerv1.Issuer{Status: certmanagerv1.IssuerStatus{Conditions: []certmanagerv1.IssuerCondition{{Type: "NotReady", Status: cmmeta.ConditionTrue}}}},
+			expected: false,
+		},
+		{
+			desc:     "issuer has multiple conditions",
+			issuer:   &certmanagerv1.Issuer{Status: certmanagerv1.IssuerStatus{Conditions: []certmanagerv1.IssuerCondition{{Type: "DummyCondition", Status: cmmeta.ConditionFalse}, {Type: certmanagerv1.IssuerConditionReady, Status: cmmeta.ConditionTrue}}}},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsIssuerReady(tt.issuer))
 		})
 	}
 }

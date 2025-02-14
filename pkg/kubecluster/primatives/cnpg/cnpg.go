@@ -184,6 +184,18 @@ func (cnpgc *Client) CreateCluster(ctx *contexts.Context, namespace, clusterName
 	return cluster, nil
 }
 
+func IsClusterReady(cluster *apiv1.Cluster) bool {
+	for _, condition := range cluster.Status.Conditions {
+		if condition.Type != string(apiv1.ConditionClusterReady) {
+			continue
+		}
+
+		return condition.Status == metav1.ConditionStatus(apiv1.ConditionTrue)
+	}
+
+	return false
+}
+
 type WaitForReadyClusterOpts struct {
 	helpers.MaxWaitTime
 }
@@ -194,18 +206,7 @@ func (cnpgc *Client) WaitForReadyCluster(ctx *contexts.Context, namespace, name 
 
 	precondition := func(ctx *contexts.Context, cluster *apiv1.Cluster) (*apiv1.Cluster, bool, error) {
 		ctx.Log.Debug("Cluster conditions", "conditions", cluster.Status.Conditions)
-
-		isReady := false
-		for _, condition := range cluster.Status.Conditions {
-			if condition.Type != string(apiv1.ConditionClusterReady) {
-				continue
-			}
-
-			isReady = condition.Status == metav1.ConditionStatus(apiv1.ConditionTrue)
-			break
-		}
-
-		if isReady {
+		if IsClusterReady(cluster) {
 			return cluster, true, nil
 		}
 		return nil, false, nil

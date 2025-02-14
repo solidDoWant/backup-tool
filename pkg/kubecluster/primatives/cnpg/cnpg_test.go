@@ -475,6 +475,37 @@ func TestCreateCluster(t *testing.T) {
 	}
 }
 
+func TestIsClusterReady(t *testing.T) {
+	tests := []struct {
+		desc     string
+		cluster  *apiv1.Cluster
+		expected bool
+	}{
+		{
+			desc: "cluster is ready",
+			cluster: &apiv1.Cluster{
+				Status: apiv1.ClusterStatus{
+					Conditions: []metav1.Condition{
+						{Type: string(apiv1.ConditionClusterReady), Status: metav1.ConditionTrue},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			desc:     "cluster is not ready",
+			cluster:  &apiv1.Cluster{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsClusterReady(tt.cluster))
+		})
+	}
+}
+
 func TestWaitForReadyCluster(t *testing.T) {
 	clusterName := "test-cluster"
 	clusterNamespace := "test-ns"

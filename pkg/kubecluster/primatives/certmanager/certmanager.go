@@ -96,6 +96,18 @@ func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name, iss
 	return certificate, nil
 }
 
+func IsCertificateReady(certificate *certmanagerv1.Certificate) bool {
+	for _, condition := range certificate.Status.Conditions {
+		if condition.Type != certmanagerv1.CertificateConditionReady {
+			continue
+		}
+
+		return condition.Status == cmmeta.ConditionTrue
+	}
+
+	return false
+}
+
 type WaitForReadyCertificateOpts struct {
 	helpers.MaxWaitTime
 }
@@ -106,20 +118,9 @@ func (cmc *Client) WaitForReadyCertificate(ctx *contexts.Context, namespace, nam
 
 	precondition := func(ctx *contexts.Context, certificate *certmanagerv1.Certificate) (*certmanagerv1.Certificate, bool, error) {
 		ctx.Log.Debug("Certificate conditions", "conditions", certificate.Status.Conditions)
-		isReady := false
-		for _, condition := range certificate.Status.Conditions {
-			if condition.Type != certmanagerv1.CertificateConditionReady {
-				continue
-			}
-
-			isReady = condition.Status == cmmeta.ConditionTrue
-			break
-		}
-
-		if isReady {
+		if IsCertificateReady(certificate) {
 			return certificate, true, nil
 		}
-
 		return nil, false, nil
 	}
 	certificate, err = helpers.WaitForResourceCondition(ctx.Child(), opts.MaxWait(time.Minute), cmc.client.CertmanagerV1().Certificates(namespace), name, precondition)
@@ -200,6 +201,18 @@ func (cmc *Client) CreateIssuer(ctx *contexts.Context, namespace, name, caCertSe
 	return issuer, nil
 }
 
+func IsIssuerReady(issuer *certmanagerv1.Issuer) bool {
+	for _, condition := range issuer.Status.Conditions {
+		if condition.Type != certmanagerv1.IssuerConditionReady {
+			continue
+		}
+
+		return condition.Status == cmmeta.ConditionTrue
+	}
+
+	return false
+}
+
 type WaitForReadyIssuerOpts struct {
 	helpers.MaxWaitTime
 }
@@ -210,21 +223,9 @@ func (cmc *Client) WaitForReadyIssuer(ctx *contexts.Context, namespace, name str
 
 	precondition := func(ctx *contexts.Context, issuer *certmanagerv1.Issuer) (*certmanagerv1.Issuer, bool, error) {
 		ctx.Log.Debug("Issuer conditions", "conditions", issuer.Status.Conditions)
-
-		isReady := false
-		for _, condition := range issuer.Status.Conditions {
-			if condition.Type != certmanagerv1.IssuerConditionReady {
-				continue
-			}
-
-			isReady = condition.Status == cmmeta.ConditionTrue
-			break
-		}
-
-		if isReady {
+		if IsIssuerReady(issuer) {
 			return issuer, true, nil
 		}
-
 		return nil, false, nil
 	}
 	issuer, err = helpers.WaitForResourceCondition(ctx.Child(), opts.MaxWait(time.Minute), cmc.client.CertmanagerV1().Issuers(namespace), name, precondition)
