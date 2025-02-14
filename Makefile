@@ -96,7 +96,7 @@ test:
 	@go test -timeout 30s -failfast -v ./...
 
 PHONY += dep-licenses
-dep-licenses:
+check-licenses:
 	@go run github.com/google/go-licenses@latest report ./...
 
 VERSION = 0.0.1-dev
@@ -126,12 +126,33 @@ ALL_BUILDERS += binary-all
 binary-all: $(BINARY_PLATFORMS:%=$(BINARY_DIR)/%/$(BINARY_NAME))
 
 LICENSE_DIR = $(BUILD_DIR)/licenses
+GO_DEPENDENCIES_LICENSE_DIR = $(LICENSE_DIR)/go-dependencies
+BUILT_LICENSES := $(LICENSE_DIR)/LICENSE $(GO_DEPENDENCIES_LICENSE_DIR)
 
-PHONY += build-licenses
-ALL_BUILDERS += build-licenses
-build-licenses:
-	@rm -rf "$(LICENSE_DIR)"
-	@go run github.com/google/go-licenses@latest save ./... --save_path="$(LICENSE_DIR)" --ignore "$(MODULE_NAME)"
+$(BUILT_LICENSES): go.mod LICENSE
+	@mkdir -p "$(LICENSE_DIR)"
+	@cp LICENSE "$(LICENSE_DIR)"
+	@rm -rf "$(GO_DEPENDENCIES_LICENSE_DIR)"
+	@go run github.com/google/go-licenses@latest save ./... --save_path="$(GO_DEPENDENCIES_LICENSE_DIR)" --ignore "$(MODULE_NAME)"
+
+PHONY += licenses
+ALL_BUILDERS += licenses
+licenses: $(BUILT_LICENSES)
+
+TARBALL_DIR = $(BUILD_DIR)/tarballs
+LOCAL_TARBALL_PATH := $(TARBALL_DIR)/$(LOCALOS)/$(LOCALARCH)/$(BINARY_NAME).tar.gz
+
+$(TARBALL_DIR)/%/$(BINARY_NAME).tar.gz: $(BINARY_DIR)/%/$(BINARY_NAME) licenses
+	@mkdir -p "$(@D)"
+	@tar -czf "$@" -C "$(BINARY_DIR)/$*" "$(BINARY_NAME)" -C "$(dir $(LICENSE_DIR))" "$(notdir $(LICENSE_DIR))"
+
+PHONY += tarball
+LOCAL_BUILDERS += tarball
+tarball: $(LOCAL_TARBALL_PATH)
+
+PHONY += tarball-all
+ALL_BUILDERS += tarball-all
+tarball-all: $(BINARY_PLATFORMS:%=$(TARBALL_DIR)/%/$(BINARY_NAME).tar.gz)
 
 DEBIAN_IMAGE_VERSION = 12.9-slim
 POSTGRES_MAJOR_VERSION = 17
