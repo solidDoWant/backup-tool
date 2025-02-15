@@ -1,0 +1,13 @@
+---
+# This will run as a cronjob so that the e2e test can trigger it at will
+jobConfig:
+  configFile:
+    backupName: e2e
+    dataPVCName: restore-backend-restore-data-vol
+    cnpgClusterName: vaultwarden-restore
+    servingCertName: postgres-restore-serving-cert
+    clientCertIssuerName: postgres-restore-auth-ca-issuer
+    certificates:
+      postgresUserCert:
+        certificateRequestPolicy:
+          enabled: true

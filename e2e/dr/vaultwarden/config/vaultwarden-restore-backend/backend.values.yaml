@@ -1,9 +1,9 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
 controllers:
-  postgres-wal-bucket:
+  postgres-restore-wal-bucket:
     type: job
-    nameOverride: postgres-wal-bucket
+    nameOverride: postgres-restore-wal-bucket
     containers:
       create-bucket:
         image:
@@ -18,7 +18,8 @@ controllers:
           - --host-bucket=seaweedfs-s3:8333
           - --no-ssl
           - mb
-          - s3://vaultwarden-wal/
+          # This is a different bucket from the original instance
+          - s3://vaultwarden-restore-wal/
         env:
           AWS_ACCESS_KEY_ID:
             valueFrom:
@@ -30,16 +31,23 @@ controllers:
               secretKeyRef:
                 name: seaweedfs-s3-secret
                 key: admin_secret_access_key
+persistence:
+  restore-data-vol:
+    nameOverride: restore-data-vol
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    storageClass: openebs-zfs
 rawResources:
-  postgres-serving-cert:
+  postgres-restore-serving-cert:
     apiVersion: cert-manager.io/v1
     kind: Certificate
-    forceRename: postgres-serving-cert
+    forceRename: postgres-restore-serving-cert
     spec:
       spec:
-        commonName: VaultWarden Postgres serving
+        commonName: VaultWarden Postgres restore serving
         dnsNames:
-          - vaultwarden-rw
+          - vaultwarden-restore-rw
         usages:
           - server auth
         secretTemplate:
@@ -49,11 +57,11 @@ rawResources:
           name: self-signed
           kind: Issuer
           group: cert-manager.io
-        secretName: postgres-serving-cert
-  postgres-streaming-replica-cert:
+        secretName: postgres-restore-serving-cert
+  postgres-restore-streaming-replica-cert:
     apiVersion: cert-manager.io/v1
     kind: Certificate
-    forceRename: postgres-streaming-replica-cert
+    forceRename: postgres-restore-streaming-replica-cert
     spec:
       spec:
         commonName: streaming_replica
@@ -63,31 +71,14 @@ rawResources:
           labels:
             cnpg.io/reload: "true"
         issuerRef:
-          name: postgres-auth-ca-issuer
+          name: postgres-restore-auth-ca-issuer
           kind: Issuer
           group: cert-manager.io
-        secretName: postgres-streaming-replica-cert
-  postgres-vaultwarden-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
-    forceRename: postgres-vaultwarden-cert
-    spec:
-      spec:
-        commonName: vaultwarden
-        usages:
-          - client auth
-        secretTemplate:
-          labels:
-            cnpg.io/reload: "true"
-        issuerRef:
-          name: postgres-auth-ca-issuer
-          kind: Issuer
-          group: cert-manager.io
-        secretName: postgres-vaultwarden-cert
-  postgres-vaultwarden-cluster:
+        secretName: postgres-restore-streaming-replica-cert
+  postgres-restore-vaultwarden-cluster:
     apiVersion: postgresql.cnpg.io/v1
     kind: Cluster
-    forceRename: vaultwarden
+    forceRename: vaultwarden-restore
     spec:
       spec:
         instances: 2 # One replica, one primary
@@ -99,7 +90,7 @@ rawResources:
               - ALTER USER vaultwarden WITH PASSWORD NULL;
         postgresql:
           pg_hba:
-            - hostssl vaultwarden all all cert
+            - hostssl all all all cert # Allow the restore job to connect to all databases via TLS
         storage:
           size: 5Gi
           storageClass: openebs-zfs
@@ -113,7 +104,7 @@ rawResources:
               waitForArchive: true
             snapshotOwnerReference: backup
           barmanObjectStore:
-            destinationPath: s3://vaultwarden-wal/
+            destinationPath: s3://vaultwarden-restore-wal/
             endpointURL: http://seaweedfs-s3:8333
             s3Credentials:
               accessKeyId:
@@ -123,7 +114,7 @@ rawResources:
                 name: seaweedfs-s3-secret
                 key: admin_secret_access_key
         certificates:
-          serverTLSSecret: postgres-serving-cert
-          serverCASecret: postgres-serving-cert
-          clientCASecret: postgres-client-ca-cert
-          replicationTLSSecret: postgres-streaming-replica-cert
+          serverTLSSecret: postgres-restore-serving-cert
+          serverCASecret: postgres-restore-serving-cert
+          clientCASecret: postgres-restore-client-ca-cert
+          replicationTLSSecret: postgres-restore-streaming-replica-cert

@@ -55,6 +55,7 @@ func TestMain(m *testing.M) {
 	buildChartSetup, buildChartFinish := BuildChart()
 	deployDependentServicesSetup, deployDependentServicesFinish := DeployDependentServices(clusterName)
 	vaultWardenSetup, vaultWardenFinish := DeployVaultWarden()
+	vaultWardenRestoreSetup, vaultWardenRestoreFinish := DeployVaultWardenRestore()
 
 	// Use pre-defined environment funcs to create a kind cluster prior to test run
 	testenv.Setup(
@@ -64,10 +65,12 @@ func TestMain(m *testing.M) {
 		buildChartSetup,
 		deployDependentServicesSetup,
 		vaultWardenSetup,
+		vaultWardenRestoreSetup,
 	)
 
 	// Use pre-defined environment funcs to teardown kind cluster after tests
 	testenv.Finish(
+		vaultWardenRestoreFinish,
 		vaultWardenFinish,
 		deployDependentServicesFinish,
 		buildChartFinish,
@@ -355,6 +358,32 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 	return setup, finish
 }
 
+func waitForCNPGClusterToBeReady(ctx context.Context, cfg *envconf.Config, clusterName string) error {
+	// Wait for the CNPG cluster to become ready
+	cnpgClient, err := versioned.NewForConfig(cfg.Client().RESTConfig())
+	if err != nil {
+		return trace.Wrap(err, "failed to create CNPG client")
+	}
+
+	err = wait.For(func(ctx context.Context) (done bool, err error) {
+		cnpgCluster, err := cnpgClient.PostgresqlV1().Clusters("default").Get(ctx, clusterName, metav1.GetOptions{})
+		if err != nil {
+			return false, trace.Wrap(err, "failed to get CNPG cluster")
+		}
+
+		for _, condition := range cnpgCluster.Status.Conditions {
+			if condition.Type != string(apiv1.ConditionClusterReady) {
+				continue
+			}
+
+			return condition.Status == metav1.ConditionTrue, nil
+		}
+
+		return false, nil
+	}, wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute))
+	return trace.Wrap(err, "failed to wait for vaultwarden CNPG cluster to be ready")
+}
+
 func DeployVaultWarden() (types.EnvFunc, types.EnvFunc) {
 	helmSetup, helmFinish := Helmfile("./config/vaultwarden-instance/helmfile.yaml")
 
@@ -363,28 +392,7 @@ func DeployVaultWarden() (types.EnvFunc, types.EnvFunc) {
 			return ctx, trace.Wrap(err, "failed to deploy dependent services")
 		}
 
-		// Wait for the CNPG cluster to become ready
-		cnpgClient, err := versioned.NewForConfig(cfg.Client().RESTConfig())
-		if err != nil {
-			return ctx, trace.Wrap(err, "failed to create CNPG client")
-		}
-
-		if err := wait.For(func(ctx context.Context) (done bool, err error) {
-			cnpgCluster, err := cnpgClient.PostgresqlV1().Clusters("default").Get(ctx, "vaultwarden", metav1.GetOptions{})
-			if err != nil {
-				return false, trace.Wrap(err, "failed to get vaultwarden CNPG cluster")
-			}
-
-			for _, condition := range cnpgCluster.Status.Conditions {
-				if condition.Type != string(apiv1.ConditionClusterReady) {
-					continue
-				}
-
-				return condition.Status == metav1.ConditionTrue, nil
-			}
-
-			return false, nil
-		}, wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute)); err != nil {
+		if err := waitForCNPGClusterToBeReady(ctx, cfg, "vaultwarden"); err != nil {
 			return ctx, trace.Wrap(err, "failed to wait for vaultwarden CNPG cluster to be ready")
 		}
 
@@ -424,6 +432,25 @@ func DeployVaultWarden() (types.EnvFunc, types.EnvFunc) {
 
 		return ctx, trace.NewAggregate(errors...)
 	}
+
+	return setup, finish
+}
+
+func DeployVaultWardenRestore() (types.EnvFunc, types.EnvFunc) {
+	helmSetup, helmFinish := Helmfile("./config/vaultwarden-restore-backend/helmfile.yaml")
+
+	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		if ctx, err := helmSetup(ctx, cfg); err != nil {
+			return ctx, trace.Wrap(err, "failed to deploy dependent services")
+		}
+		if err := waitForCNPGClusterToBeReady(ctx, cfg, "vaultwarden-restore"); err != nil {
+			return ctx, trace.Wrap(err, "failed to wait for vaultwarden CNPG cluster to be ready")
+		}
+
+		return ctx, nil
+	}
+
+	finish := helmFinish
 
 	return setup, finish
 }

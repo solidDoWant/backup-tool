@@ -1,0 +1,71 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+controllers:
+  vaultwarden:
+    containers:
+      app:
+        image:
+          repository: vaultwarden/server
+          tag: 1.33.0
+        env:
+          ADMIN_TOKEN: admintoken
+          DATA_FOLDER: data
+          DATABASE_URL: "\
+            postgresql://vaultwarden@vaultwarden-restore-rw:5432/vaultwarden?\
+            sslrootcert=/serving-cert/ca.crt&\
+            sslcert=/user-cert/tls.crt&\
+            sslkey=/user-cert/tls.key&\
+            sslmode=verify-full"
+        ports:
+          - containerPort: 80
+            name: http
+service:
+  app:
+    controller: vaultwarden
+    ports:
+      http:
+        port: 80
+persistence:
+  data:
+    type: persistentVolumeClaim
+    existingClaim: restore-backend-restore-data-vol
+    globalMounts:
+      - path: /data
+  serving-cert:
+    type: secret
+    name: postgres-restore-serving-cert
+    defaultMode: 0444
+    items:
+      - key: ca.crt
+        path: ca.crt
+    globalMounts:
+      - path: /serving-cert
+  user-cert:
+    type: secret
+    name: postgres-restore-vaultwarden-cert
+    defaultMode: 0440
+    items:
+      - key: tls.crt
+        path: tls.crt
+      - key: tls.key
+        path: tls.key
+    globalMounts:
+      - path: /user-cert
+rawResources:
+  postgres-restore-vaultwarden-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: postgres-restore-vaultwarden-cert
+    spec:
+      spec:
+        commonName: vaultwarden
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: postgres-restore-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: postgres-restore-vaultwarden-cert
