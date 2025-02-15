@@ -1,12 +1,26 @@
-# outpkg: "{{ .PackageName }}"
 filename: "{{ .InterfaceName | lower }}_mock.go"
 dir: "{{ .InterfaceDir }}"
 inpackage: true
 packages:
-  github.com/solidDoWant/backup-tool/pkg/files: &baseline_config
-    config: &config
+  github.com/solidDoWant/backup-tool/cmd/disasterrecovery: &baseline_config
+    config:
       issue-845-fix: true
       resolve-type-alias: false
+    interfaces:
+      DREventCommand:
+      DREventGenerateSchemaCommand:
+      DRCommand:
+      DRBackupCommand:
+      DRRestoreCommand:
+  github.com/solidDoWant/backup-tool/pkg/cli/features:
+    <<: *baseline_config
+    interfaces:
+      ConfigFileCommandInterface:
+      ContextCommandInterface:
+      KubeClusterCommandInterface:
+      KubernetesCommandInterface:
+  github.com/solidDoWant/backup-tool/pkg/files:
+    <<: *baseline_config
     interfaces:
       Runtime:
   github.com/solidDoWant/backup-tool/pkg/grpc/clients:
