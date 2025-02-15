@@ -19,10 +19,9 @@ See [the design decision doc](docs/design%20decisions.md) for additional details
 ## Supported applications:
 * Vaultwarden
     * Backup to an in-cluster PVC, which is then snapshotted
+    * Restore from an in-cluster PVC
     * Only Postgres backend supported (SQLite not supported)
-    * Restoration support pending
 
 ## Upcoming support:
-* Vaultwarden restoration
 * ZFS snapshot to tape drive/library
 * Automatic cleanup
