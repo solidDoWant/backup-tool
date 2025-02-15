@@ -1,16 +1,18 @@
 ---
 # backup-tool specific values. These populate several "resource" values.
 jobConfig:
-  schedule: "@daily"
   drType: vaultwarden
   drAction: backup
   configFile: {}
+  type: cronjob
+  cronjob:
+    schedule: "@daily"
 resources:
   controllers:
     backup-tool:
-      type: cronjob
+      type: "{{ .Values.jobConfig.type }}"
       cronjob:
-        schedule: "{{ .Values.jobConfig.schedule }}"
+        schedule: "{{ .Values.jobConfig.cronjob.schedule }}"
         parallelism: 1
         backoffLimit: 1
         ttlSecondsAfterFinished: 86400
@@ -34,6 +36,7 @@ resources:
             - dr
             - "{{ .Values.jobConfig.drType }}"
             - "{{ .Values.jobConfig.drAction }}"
+            - run
             - --config-file
             - /etc/backup-tool/config.yaml
           securityContext:

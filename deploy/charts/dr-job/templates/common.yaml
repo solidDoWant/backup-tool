@@ -1,6 +1,7 @@
 ---
 {{/* Template config values that the library doesn't */}}
 {{- $controller := index .Values "resources" "controllers" "backup-tool" -}}
+{{- $_ := set $controller "type" (tpl (index $controller "type") .) -}}
 {{- $cronjob := $controller.cronjob -}}
 {{- $_ := set $cronjob "schedule" (tpl $cronjob.schedule .) -}}
 
