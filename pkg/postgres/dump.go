@@ -24,6 +24,7 @@ const dumpCommandName = "pg_dumpall"
 var ignoreLines = []string{
 	"DROP ROLE IF EXISTS postgres",
 	"DROP ROLE IF EXISTS streaming_replica",
+	"CREATE ROLE postgres",
 	"ALTER ROLE postgres",
 	"COMMENT ON ROLE postgres",
 	"CREATE ROLE streaming_replica",
