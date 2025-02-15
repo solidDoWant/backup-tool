@@ -9,6 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestKubernetesCommand(t *testing.T) {
+	assert.Implements(t, (*KubernetesCommandInterface)(nil), &KubernetesCommand{})
+}
+
+func TestNewKubernetesCommand(t *testing.T) {
+	assert.NotNil(t, NewKubernetesCommand())
+}
+
 func TestKubernetesCommandConfigureFlags(t *testing.T) {
 	kc := &KubernetesCommand{}
 

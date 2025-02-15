@@ -45,6 +45,10 @@ func TestLogFormatVar(t *testing.T) {
 	assert.Error(t, lfv.Set("invalid"))
 }
 
+func TestContextCommand(t *testing.T) {
+	assert.Implements(t, (*ContextCommandInterface)(nil), &ContextCommand{})
+}
+
 func TestNewContextCommand(t *testing.T) {
 	tests := []struct {
 		desc          string
@@ -61,7 +65,7 @@ func TestNewContextCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			cc := NewContentCommand(tt.enableTimeout)
+			cc := NewContextCommand(tt.enableTimeout)
 
 			require.NotNil(t, cc)
 			assert.Equal(t, tt.enableTimeout, cc.EnableTimeout)
@@ -88,7 +92,7 @@ func TestContextCommandConfigureFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			cc := NewContentCommand(tt.enableTimeout)
+			cc := NewContextCommand(tt.enableTimeout)
 
 			cmd := &cobra.Command{}
 			cc.ConfigureFlags(cmd)
@@ -181,7 +185,7 @@ func TestContextCommandGetLogOptions(t *testing.T) {
 }
 
 func TestContextCommandGetCommandContext(t *testing.T) {
-	ctc := NewContentCommand(false)
+	ctc := NewContextCommand(false)
 	ctx, cancel := ctc.GetCommandContext()
 	require.NotNil(t, cancel)
 	defer cancel()

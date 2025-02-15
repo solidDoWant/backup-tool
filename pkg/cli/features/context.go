@@ -73,6 +73,11 @@ func (lfv *logFormatVar) String() string {
 	}
 }
 
+type ContextCommandInterface interface {
+	ConfigureFlags(cmd *cobra.Command)
+	GetCommandContext() (*contexts.Context, context.CancelFunc)
+}
+
 // Gives the command the ability to create a context for its execution.
 type ContextCommand struct {
 	logLevelVar
@@ -82,7 +87,7 @@ type ContextCommand struct {
 	EnableTimeout bool
 }
 
-func NewContentCommand(enableTimeout bool) *ContextCommand {
+func NewContextCommand(enableTimeout bool) *ContextCommand {
 	return &ContextCommand{
 		Timeout: 0,
 		logLevelVar: logLevelVar{

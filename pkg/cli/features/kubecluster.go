@@ -10,13 +10,22 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 )
 
+type KubeClusterCommandInterface interface {
+	KubernetesCommandInterface
+	NewKubeClusterClient() (kubecluster.ClientInterface, error)
+}
+
 // Gives a command the ability to interact with Kubernetes clusters (all supported APIs).
 type KubeClusterCommand struct {
 	KubernetesCommand
 }
 
-func (kc *KubernetesCommand) NewKubeClusterClient() (kubecluster.ClientInterface, error) {
-	config, err := kc.GetClusterConfig()
+func NewKubeClusterCommand() *KubeClusterCommand {
+	return &KubeClusterCommand{}
+}
+
+func (kcc *KubernetesCommand) NewKubeClusterClient() (kubecluster.ClientInterface, error) {
+	config, err := kcc.GetClusterConfig()
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to get kubernetes config")
 	}

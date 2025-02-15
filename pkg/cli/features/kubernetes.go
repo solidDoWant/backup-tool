@@ -11,10 +11,19 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+type KubernetesCommandInterface interface {
+	ConfigureFlags(cmd *cobra.Command)
+	GetClusterConfig() (*rest.Config, error)
+}
+
 // Gives a command the ability to interact with Kubernetes API.
 type KubernetesCommand struct {
 	ConfigOverrides    clientcmd.ConfigOverrides
 	ExplicitConfigPath string
+}
+
+func NewKubernetesCommand() *KubernetesCommand {
+	return &KubernetesCommand{}
 }
 
 func (kc *KubernetesCommand) ConfigureFlags(cmd *cobra.Command) {

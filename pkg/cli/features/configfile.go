@@ -15,11 +15,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type ConfigFileCommandInterface[T interface{}] interface {
+	ConfigureFlags(cmd *cobra.Command)
+	ReadConfigFile(ctx context.Context) (T, error)
+	GenerateConfigSchema() ([]byte, error)
+}
+
 // Gets a config file path from the command line and reads the config file into a struct of type T.
 // The flag is required.
 // The struct is then validated using the "jsonschema" and "validate" tags.
 type ConfigFileCommand[T interface{}] struct {
 	ConfigFilePath string
+}
+
+func NewConfigFileCommand[T interface{}]() *ConfigFileCommand[T] {
+	return &ConfigFileCommand[T]{}
 }
 
 func (cfc *ConfigFileCommand[T]) ConfigureFlags(cmd *cobra.Command) {

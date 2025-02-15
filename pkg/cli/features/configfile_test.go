@@ -8,7 +8,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCOnfigFileCommandConfigureFlags(t *testing.T) {
+func TestConfigFileCommand(t *testing.T) {
+	cfc := &ConfigFileCommand[interface{}]{} // Type does not matter here
+	assert.Implements(t, (*ConfigFileCommandInterface[interface{}])(nil), cfc)
+}
+
+func TestNewConfigFileCommand(t *testing.T) {
+	cfc := NewConfigFileCommand[interface{}]()
+	require.NotNil(t, cfc)
+}
+
+func TestConfigFileCommandConfigureFlags(t *testing.T) {
 	cfc := &ConfigFileCommand[string]{} // Type does not matter here
 
 	cmd := &cobra.Command{}
