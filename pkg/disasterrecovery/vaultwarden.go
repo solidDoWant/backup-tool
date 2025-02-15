@@ -324,9 +324,9 @@ func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, da
 
 	// 5. Perform a CNPG logical recovery
 	ctx.Log.Step().Info("Performing Postgres logical recovery")
-	podSQLFilePath := filepath.Join(dataVolumeMountPath, sqlFileName)
+	podSQLFilePath := filepath.Join(drVolumeMountPath, sqlFileName)
 	clusterCredentials := &postgres.EnvironmentCredentials{
-		postgres.HostVarName:        fmt.Sprintf("%s.%s.svc", cluster.Status.WriteService, namespace),
+		postgres.HostVarName:        cluster.Status.WriteService,
 		postgres.UserVarName:        "postgres",
 		postgres.RequireAuthVarName: "none",        // Require TLS auth. Don't allow the server to ask the client for a password/similar.
 		postgres.SSLModeVarName:     "verify-full", // Check the server hostname against the cert, and validate the cert chain
