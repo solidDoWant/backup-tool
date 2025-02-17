@@ -40,6 +40,7 @@ rawResources:
         commonName: VaultWarden Postgres serving
         dnsNames:
           - vaultwarden-rw
+          - vaultwarden-rw.default.svc
         usages:
           - server auth
         secretTemplate:

@@ -48,6 +48,7 @@ rawResources:
         commonName: VaultWarden Postgres restore serving
         dnsNames:
           - vaultwarden-restore-rw
+          - vaultwarden-restore-rw.default.svc
         usages:
           - server auth
         secretTemplate:
