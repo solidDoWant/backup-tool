@@ -91,6 +91,10 @@ func newClonedCluster(p providerInterfaceInternal) ClonedClusterInterface {
 // Clone an existing CNPG cluster, with separate certificates for authentication.
 // It is assumed that all required resources for approving certificats (such as Certificate Request Policies) are already in place.
 func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
+	if len(newClusterName) > 50 { // Max length that CNPG allows for cluster names
+		return nil, trace.Errorf("newClusterName must be 50 characters or less")
+	}
+
 	ctx.Log.With("existingCluster", existingClusterName, "newCluster", newClusterName).Info("Cloning CNPG cluster")
 	defer ctx.Log.Info("Finished cloning CNPG cluster", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
 

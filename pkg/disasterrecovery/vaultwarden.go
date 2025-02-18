@@ -112,7 +112,12 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 
 	// 3. Clone the CNPG cluster with PITR set to the PVC snapshot time
 	ctx.Log.Step().Info("Cloning CNPG cluster")
+	// Try and come up with the most useful name for the cloned cluster fitting CNPG requirements
+	// More info is better, but it needs to at least convey the backup name and still be readable
 	clonedClusterName := helpers.CleanName(fmt.Sprintf("%s-%s", cnpgClusterName, backup.GetFullName()))
+	if len(clonedClusterName) > 50 {
+		clonedClusterName = helpers.CleanName(helpers.TruncateString(backup.GetFullName(), 50, ""))
+	}
 
 	if backupOptions.CloneClusterOptions.CleanupTimeout == 0 {
 		backupOptions.CloneClusterOptions.CleanupTimeout = backupOptions.CleanupTimeout

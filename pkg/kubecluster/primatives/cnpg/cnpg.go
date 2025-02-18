@@ -178,7 +178,7 @@ func (cnpgc *Client) CreateCluster(ctx *contexts.Context, namespace, clusterName
 
 	cluster, err = cnpgc.cnpgClient.PostgresqlV1().Clusters(namespace).Create(ctx.Child(), cluster, metav1.CreateOptions{})
 	if err != nil {
-		return nil, trace.Wrap(err, "failed to create cluster %q")
+		return nil, trace.Wrap(err, "failed to create cluster %q", clusterName)
 	}
 
 	return cluster, nil

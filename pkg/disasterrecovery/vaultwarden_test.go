@@ -236,8 +236,8 @@ func TestVaultWardenBackup(t *testing.T) {
 				mockClient.EXPECT().CloneCluster(mock.Anything, namespace, clusterName, mock.Anything, servingIssuerName, clientIssuerName, mock.Anything).
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						require.True(t, strings.Contains(newClusterName, existingClusterName))
-						require.True(t, strings.Contains(newClusterName, helpers.CleanName(fullBackupName)))
+						assert.True(t, strings.Contains(newClusterName, helpers.CleanName(fullBackupName)))
+						assert.LessOrEqual(t, len(newClusterName), 50)
 
 						return th.ErrOr1Val(clonedCluster, tt.simulateCloneClusterErr)
 					})

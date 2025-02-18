@@ -162,6 +162,7 @@ func TestCloneClusterOptions(t *testing.T) {
 func TestCloneCluster(t *testing.T) {
 	tests := []struct {
 		desc                                          string
+		newClusterName                                string
 		opts                                          CloneClusterOptions
 		simulateErrorOnClusterCleanup                 bool
 		simulateGetExistingClusterError               bool
@@ -178,6 +179,7 @@ func TestCloneCluster(t *testing.T) {
 		simulateStreamingReplicaUserCertCreationError bool
 		simulateClusterCreationError                  bool
 		simulateWaitForClusterError                   bool
+		expectValidationError                         bool
 	}{
 		{
 			desc: "basic clone",
@@ -299,6 +301,11 @@ func TestCloneCluster(t *testing.T) {
 			desc:                        "simulate error waiting for cluster",
 			simulateWaitForClusterError: true,
 		},
+		{
+			desc:                  "cluster name too long",
+			newClusterName:        "51 character long cluster name filler filler filler",
+			expectValidationError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -308,6 +315,9 @@ func TestCloneCluster(t *testing.T) {
 			namespace := "test-ns"
 			existingClusterName := "existing-cluster"
 			newClusterName := "new-cluster"
+			if tt.newClusterName != "" {
+				newClusterName = tt.newClusterName
+			}
 			servingIssuerName := "test-serving-issuer"
 			clientIssuerName := "test-client-ca-cert-issuer"
 
@@ -401,6 +411,7 @@ func TestCloneCluster(t *testing.T) {
 				tt.simulateStreamingReplicaUserCertCreationError,
 				tt.simulateClusterCreationError,
 				tt.simulateWaitForClusterError,
+				tt.expectValidationError,
 			)
 
 			// Setup mocks
@@ -409,6 +420,11 @@ func TestCloneCluster(t *testing.T) {
 			// This makes the logic for setting up mocks/expected calls easier, because once an error
 			// becomes expected, the function can be returned from
 			func() {
+				if tt.expectValidationError {
+					// Function should short-circuit immediately and call nothing
+					return
+				}
+
 				// 0. Setup
 				if errorExpected {
 					p.clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
