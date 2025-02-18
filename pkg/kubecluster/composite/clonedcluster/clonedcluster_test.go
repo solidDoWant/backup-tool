@@ -1,7 +1,6 @@
 package clonedcluster
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -448,19 +447,26 @@ func TestCloneCluster(t *testing.T) {
 				}
 
 				// 2.
-				p.cmClient.EXPECT().CreateCertificate(mock.Anything, namespace, helpers.CleanName(createdServingCert.Name), servingIssuerName, certmanager.CreateCertificateOptions{
-					CommonName: createdServingCert.Name,
-					DNSNames:   getClusterDomainNames(ctx, newClusterName, namespace),
-					SecretLabels: map[string]string{
-						"cnpg.io/reload": "true",
-					},
-					Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageServerAuth},
-					IssuerKind: tt.opts.Certificates.ServingCert.IssuerKind,
-					Subject:    tt.opts.Certificates.ServingCert.Subject,
-				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, name, issuerName string, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
-					assert.True(t, calledCtx.IsChildOf(ctx))
-					return th.ErrOr1Val(createdServingCert, tt.simulateServingCertCreationError)
-				})
+				p.cmClient.EXPECT().CreateCertificate(mock.Anything, namespace, helpers.CleanName(createdServingCert.Name), servingIssuerName, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name, issuerName string, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+
+						expectedOpts := certmanager.CreateCertificateOptions{
+							CommonName: opts.CommonName, // This is tested separately
+							DNSNames:   getClusterDomainNames(ctx, newClusterName, namespace),
+							SecretLabels: map[string]string{
+								"cnpg.io/reload": "true",
+							},
+							Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageServerAuth},
+							IssuerKind: tt.opts.Certificates.ServingCert.IssuerKind,
+							Subject:    tt.opts.Certificates.ServingCert.Subject,
+						}
+						assert.Equal(t, expectedOpts, opts)
+
+						assert.LessOrEqual(t, len(opts.CommonName), 64)
+
+						return th.ErrOr1Val(createdServingCert, tt.simulateServingCertCreationError)
+					})
 				if tt.simulateServingCertCreationError {
 					return
 				}
@@ -479,28 +485,34 @@ func TestCloneCluster(t *testing.T) {
 				// 3.
 				// 3.1
 				clientCACertName := helpers.CleanName(createdClientCACert.Name)
-				p.cmClient.EXPECT().CreateCertificate(mock.Anything, namespace, clientCACertName, clientIssuerName, certmanager.CreateCertificateOptions{
-					IsCA: true,
-					CAConstraints: &certmanagerv1.NameConstraints{
-						Critical: true,
-						Excluded: &certmanagerv1.NameConstraintItem{
-							DNSDomains:     []string{},
-							IPRanges:       []string{},
-							EmailAddresses: []string{},
-							URIDomains:     []string{},
-						},
-					},
-					CommonName: fmt.Sprintf("%s CNPG CA", newClusterName),
-					Subject:    tt.opts.Certificates.ClientCACert.Subject,
-					Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageCertSign},
-					SecretLabels: map[string]string{
-						utils.WatchedLabelName: "true",
-					},
-					IssuerKind: tt.opts.Certificates.ClientCACert.IssuerKind,
-				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, name, issuerName string, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
-					assert.True(t, calledCtx.IsChildOf(ctx))
-					return th.ErrOr1Val(createdClientCACert, tt.simulateClientCACertCreationError)
-				})
+				p.cmClient.EXPECT().CreateCertificate(mock.Anything, namespace, clientCACertName, clientIssuerName, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name, issuerName string, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+
+						expectedOpts := certmanager.CreateCertificateOptions{
+							IsCA: true,
+							CAConstraints: &certmanagerv1.NameConstraints{
+								Critical: true,
+								Excluded: &certmanagerv1.NameConstraintItem{
+									DNSDomains:     []string{},
+									IPRanges:       []string{},
+									EmailAddresses: []string{},
+									URIDomains:     []string{},
+								},
+							},
+							CommonName: opts.CommonName, // This is tested separately
+							Subject:    tt.opts.Certificates.ClientCACert.Subject,
+							Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageCertSign},
+							SecretLabels: map[string]string{
+								utils.WatchedLabelName: "true",
+							},
+							IssuerKind: tt.opts.Certificates.ClientCACert.IssuerKind,
+						}
+						assert.Equal(t, expectedOpts, opts)
+						assert.LessOrEqual(t, len(opts.CommonName), 64)
+
+						return th.ErrOr1Val(createdClientCACert, tt.simulateClientCACertCreationError)
+					})
 				if tt.simulateClientCACertCreationError {
 					return
 				}

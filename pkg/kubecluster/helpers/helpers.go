@@ -57,6 +57,25 @@ func (gn GenerateName) SetName(metadata *metav1.ObjectMeta, name string) {
 	}
 }
 
+func TruncateStringEllipsis(s string, length int) string {
+	return TruncateString(s, length, "...")
+}
+
+func TruncateString(s string, maxLength int, truncatedSuffix string) string {
+	runes := []rune(s)
+	if len(runes) <= maxLength {
+		return s
+	}
+
+	suffixLength := len(truncatedSuffix)
+	if maxLength < suffixLength {
+		runes := []rune(truncatedSuffix)
+		return string(runes[0:maxLength])
+	}
+
+	return string(runes[0:maxLength-suffixLength]) + truncatedSuffix
+}
+
 type MaxWaitTime time.Duration
 
 // Very short wait time, mostly used for testing

@@ -99,6 +99,60 @@ func TestGenerateNameSetName(t *testing.T) {
 	}
 }
 
+func TestTruncateStringFuncs(t *testing.T) {
+	tests := []struct {
+		desc      string
+		input     string
+		maxLength int
+		want      string
+	}{
+		{
+			desc:      "should return input when length is less than max length",
+			input:     "test val",
+			maxLength: 9,
+			want:      "test val",
+		},
+		{
+			desc:      "should return input when length is equal to max length",
+			input:     "test val",
+			maxLength: 8,
+			want:      "test val",
+		},
+		{
+			desc:      "should truncate string when length is greater than max length",
+			input:     "test val",
+			maxLength: 6,
+			want:      "tes...",
+		},
+		{
+			desc:      "should truncate string when length is greater than max length and suffix length isequal to max length",
+			input:     "test",
+			maxLength: 3,
+			want:      "...",
+		},
+		{
+			desc:      "should truncate suffix when length is greater than max length and suffix length is less than the max length",
+			input:     "test",
+			maxLength: 2,
+			want:      "..",
+		},
+		{
+			desc:      "should return empty string when input is empty",
+			input:     "",
+			maxLength: 5,
+			want:      "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			truncatedString := TruncateString(tt.input, tt.maxLength, "...")
+			assert.Equal(t, tt.want, truncatedString)
+			assert.Equal(t, truncatedString, TruncateStringEllipsis(tt.input, tt.maxLength))
+		})
+	}
+}
+
 func TestMaxWaitShortWaitTIme(t *testing.T) {
 	require.LessOrEqual(t, ShortWaitTime, time.Second)
 }

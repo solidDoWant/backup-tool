@@ -144,7 +144,8 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 	}
 
 	// 2. Create the serving certificate (short lived)
-	servingCertName := helpers.CleanName(newClusterName + "-serving-cert")
+	servingCertNameSuffix := "-serving-cert"
+	servingCertName := helpers.CleanName(helpers.TruncateStringEllipsis(newClusterName, 64-len(servingCertNameSuffix)) + servingCertNameSuffix)
 	ctx.Log.Step().Info("Creating serving certificate for the new cluster", "certificateName", servingCertName)
 	certOptions := certmanager.CreateCertificateOptions{
 		CommonName: servingCertName,
@@ -175,6 +176,7 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 	ctx.Log.Step().Info("Creating PKI for client certificates for the new cluster", "certificateName", clientCACertName, "issuerName", clientCAIssuerName)
 
 	// 3.1 Client CA certificate
+	clientCACNSuffix := " CNPC CA"
 	certOptions = certmanager.CreateCertificateOptions{
 		IsCA: true,
 		// Permit nothing. The certs should only be authoritive for the common name, which stores the postgres username.
@@ -187,7 +189,7 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 				URIDomains:     []string{},
 			},
 		},
-		CommonName: fmt.Sprintf("%s CNPG CA", newClusterName), // TODO trim to 64 characters
+		CommonName: helpers.TruncateStringEllipsis(newClusterName, 64-len(clientCACNSuffix)) + clientCACNSuffix,
 		Subject:    opts.Certificates.ClientCACert.Subject,
 		Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageCertSign},
 		SecretLabels: map[string]string{
