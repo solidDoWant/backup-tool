@@ -199,6 +199,7 @@ func (cfc *ConfigFileCommand[T]) GenerateConfigSchema() ([]byte, error) {
 	configInstance := new(T)
 	schemaReflector := &jsonschema.Reflector{
 		RequiredFromJSONSchemaTags: true,
+		FieldNameTag:               "yaml",
 	}
 	schema, err := schemaReflector.Reflect(configInstance).MarshalJSON()
 	return schema, trace.Wrap(err, "failed to marshal schema for %T", configInstance)
