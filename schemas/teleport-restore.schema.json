@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/solidDoWant/backup-tool/cmd/disasterrecovery/teleport-restore-config",
+  "$ref": "#/$defs/TeleportRestoreConfig",
+  "$defs": {
+    "TeleportRestoreConfig": {
+      "properties": {},
+      "additionalProperties": false,
+      "type": "object"
+    }
+  }
+}

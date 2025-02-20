@@ -216,7 +216,8 @@ clean-e2e:
 	@docker volume prune -f
 
 DR_SCHEMAS_PRETTY = true
-DR_SCHEMAS = vaultwarden
+DR_SCHEMAS = vaultwarden teleport
+DR_COMMANDS = backup restore
 DR_SCHEMAS_DIR = $(PROJECT_DIR)/schemas
 
 $(DR_SCHEMAS_DIR):
@@ -224,7 +225,7 @@ $(DR_SCHEMAS_DIR):
 
 $(DR_SCHEMAS_DIR)/%.schema.json: MAYBE_PRETTIFY = $(if $(findstring t,$(DR_SCHEMAS_PRETTY)),| jq)
 $(DR_SCHEMAS_DIR)/%.schema.json: binary $(DR_SCHEMAS_DIR)
-	@$(LOCAL_BINARY_PATH) dr $* gen-config-schema $(MAYBE_PRETTIFY) > "$@"
+	@$(LOCAL_BINARY_PATH) dr $(subst -, ,$*) gen-config-schema $(MAYBE_PRETTIFY) > "$@"
 
 PHONY += build
 build: $(LOCAL_BUILDERS)
@@ -248,7 +249,7 @@ release: build-all
 
 PHONY += generate-dr-schemas
 GENERATORS += generate-dr-schemas
-generate-dr-schemas: $(DR_SCHEMAS:%=$(DR_SCHEMAS_DIR)/%.schema.json)
+generate-dr-schemas: $(foreach schema,$(DR_SCHEMAS),$(foreach command,$(DR_COMMANDS),$(DR_SCHEMAS_DIR)/$(schema)-$(command).schema.json))
 
 PHONY += clean-all
 generate-all: $(GENERATORS)
