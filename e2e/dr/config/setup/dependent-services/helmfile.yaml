@@ -71,7 +71,7 @@ releases:
       - cert-manager
     values:
       - ./cert-manager-approver-policy.values.yaml
-  - name: resources
+  - name: dependent-resources
     chart: bjw-s-charts/app-template
     version: 3.7.0
     atomic: true

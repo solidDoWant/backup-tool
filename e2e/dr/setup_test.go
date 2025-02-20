@@ -1,4 +1,4 @@
-package vaultwarden
+package dr
 
 import (
 	"context"
@@ -54,8 +54,6 @@ func TestMain(m *testing.M) {
 	pushImageSetup, pushImageFinish := PushImage()
 	buildChartSetup, buildChartFinish := BuildChart()
 	deployDependentServicesSetup, deployDependentServicesFinish := DeployDependentServices(clusterName)
-	vaultWardenSetup, vaultWardenFinish := DeployVaultWarden()
-	vaultWardenRestoreSetup, vaultWardenRestoreFinish := DeployVaultWardenRestore()
 
 	// Use pre-defined environment funcs to create a kind cluster prior to test run
 	testenv.Setup(
@@ -64,14 +62,10 @@ func TestMain(m *testing.M) {
 		pushImageSetup,
 		buildChartSetup,
 		deployDependentServicesSetup,
-		vaultWardenSetup,
-		vaultWardenRestoreSetup,
 	)
 
 	// Use pre-defined environment funcs to teardown kind cluster after tests
 	testenv.Finish(
-		vaultWardenRestoreFinish,
-		vaultWardenFinish,
 		deployDependentServicesFinish,
 		buildChartFinish,
 		pushImageFinish,
@@ -86,7 +80,7 @@ func TestMain(m *testing.M) {
 func Cluster() (types.EnvFunc, types.EnvFunc, string) {
 	clusterName := envconf.RandomName("my-cluster", 16)
 
-	setup := envfuncs.CreateClusterWithConfig(kind.NewProvider(), clusterName, "config/kind-config.yaml")
+	setup := envfuncs.CreateClusterWithConfig(kind.NewProvider(), clusterName, "config/setup/kind-config.yaml")
 
 	finish := envfuncs.DestroyCluster(clusterName)
 
@@ -257,6 +251,7 @@ func Helmfile(helmfilePath string) (types.EnvFunc, types.EnvFunc) {
 	return setup, finish
 }
 
+// Services needed by multiple DR tests
 func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) {
 	imageFilePath := fmt.Sprintf("/tmp/%s-vdev.img", zpoolName)
 	defaultStorageClass := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard"}}
@@ -267,7 +262,7 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 		}
 	}
 	var loopDevice *string // This will be set during setup and used during finish
-	helmSetup, helmFinish := Helmfile("./config/dependent-services/helmfile.yaml")
+	helmSetup, helmFinish := Helmfile("./config/setup/dependent-services/helmfile.yaml")
 
 	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 		// Deploy ZFS zpool for openebs
@@ -381,78 +376,7 @@ func waitForCNPGClusterToBeReady(ctx context.Context, cfg *envconf.Config, clust
 
 		return false, nil
 	}, wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute))
-	return trace.Wrap(err, "failed to wait for vaultwarden CNPG cluster to be ready")
-}
-
-func DeployVaultWarden() (types.EnvFunc, types.EnvFunc) {
-	helmSetup, helmFinish := Helmfile("./config/vaultwarden-instance/helmfile.yaml")
-
-	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		if ctx, err := helmSetup(ctx, cfg); err != nil {
-			return ctx, trace.Wrap(err, "failed to deploy dependent services")
-		}
-
-		if err := waitForCNPGClusterToBeReady(ctx, cfg, "vaultwarden"); err != nil {
-			return ctx, trace.Wrap(err, "failed to wait for vaultwarden CNPG cluster to be ready")
-		}
-
-		// Wait for the Vaultwarden service to become ready, by checking for at least one endpoint
-		if err := wait.For(func(ctx context.Context) (done bool, err error) {
-			endpoints := &corev1.Endpoints{}
-			if err := cfg.Client().Resources().Get(ctx, "vaultwarden", "default", endpoints); err != nil {
-				return false, trace.Wrap(err, "failed to get vaultwarden CNPG cluster")
-			}
-
-			if len(endpoints.Subsets) == 0 {
-				return false, nil
-			}
-
-			for _, subset := range endpoints.Subsets {
-				if len(subset.Addresses) > 0 {
-					return true, nil
-				}
-			}
-
-			return false, nil
-		}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute)); err != nil {
-			return ctx, trace.Wrap(err, "failed to wait for vaultwarden service to be ready")
-		}
-
-		return ctx, nil
-	}
-
-	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		errors := []error{} // Collect errors to return as an aggregate so that all cleanup steps are attempted
-
-		// Remove the services
-		var err error
-		if ctx, err = helmFinish(ctx, cfg); err != nil {
-			errors = append(errors, trace.Wrap(err, "failed to remove dependent services"))
-		}
-
-		return ctx, trace.NewAggregate(errors...)
-	}
-
-	return setup, finish
-}
-
-func DeployVaultWardenRestore() (types.EnvFunc, types.EnvFunc) {
-	helmSetup, helmFinish := Helmfile("./config/vaultwarden-restore-backend/helmfile.yaml")
-
-	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		if ctx, err := helmSetup(ctx, cfg); err != nil {
-			return ctx, trace.Wrap(err, "failed to deploy dependent services")
-		}
-		if err := waitForCNPGClusterToBeReady(ctx, cfg, "vaultwarden-restore"); err != nil {
-			return ctx, trace.Wrap(err, "failed to wait for vaultwarden CNPG cluster to be ready")
-		}
-
-		return ctx, nil
-	}
-
-	finish := helmFinish
-
-	return setup, finish
+	return trace.Wrap(err, "failed to wait for CNPG cluster to be ready")
 }
 
 func RunNodesScript(clusterName string, commands []string) error {

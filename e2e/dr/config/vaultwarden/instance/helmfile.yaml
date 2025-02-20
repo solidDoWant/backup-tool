@@ -12,18 +12,18 @@ repositories:
     url: https://bjw-s.github.io/helm-charts
 
 releases:
-  - name: client-ca
+  - name: vaultwarden-client-ca
     chart: bjw-s-charts/app-template
     version: 3.7.0
     atomic: true
     values:
       - ./client-ca.values.yaml
-  - name: backend
+  - name: vaultwarden-backend
     chart: bjw-s-charts/app-template
     version: 3.7.0
     atomic: true
     needs:
-      - client-ca
+      - vaultwarden-client-ca
     values:
       - ./backend.values.yaml
   - name: vaultwarden
@@ -31,6 +31,6 @@ releases:
     version: 3.7.0
     atomic: true
     needs:
-      - backend
+      - vaultwarden-backend
     values:
       - ./vaultwarden.values.yaml

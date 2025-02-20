@@ -1,7 +1,7 @@
 ---
 jobConfig:
   configFile:
-    backupName: e2e
+    backupName: vw-e2e
     dataPVCName: vaultwarden-data
     cnpgClusterName: vaultwarden
     servingCertIssuerName: self-signed
