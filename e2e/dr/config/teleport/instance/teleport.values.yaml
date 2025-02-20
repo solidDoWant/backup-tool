@@ -1,0 +1,88 @@
+---
+clusterName: teleport.default.svc
+kubeClusterName: e2e-cluster
+auth:
+  teleportConfig:
+    teleport:
+      storage:
+        type: postgresql
+        conn_string: "\
+          postgresql://\
+          teleport-core@teleport-core-rw.default.svc:5432/teleport-core?\
+          pool_max_conns=20&\
+          sslrootcert=/etc/teleport-backend/secrets/core/server/ca.crt&\
+          sslcert=/etc/teleport-backend/secrets/core/client/tls.crt&\
+          sslkey=/etc/teleport-backend/secrets/core/client/tls.key&\
+          sslmode=verify-full"
+        audit_events_uri: "\
+          postgresql://\
+          teleport-audit@teleport-audit-rw.default.svc:5432/teleport-audit?\
+          sslrootcert=/etc/teleport-backend/secrets/audit/server/ca.crt&\
+          sslcert=/etc/teleport-backend/secrets/audit/client/tls.crt&\
+          sslkey=/etc/teleport-backend/secrets/audit/client/tls.key&\
+          sslmode=verify-full"
+        audit_sessions_uri: "\
+          s3://teleport-audit-session-logs?\
+          endpoint=http://seaweedfs-s3:8333&\
+          disablesse=true"
+  extraVolumes:
+    - name: teleport-core-postgres-serving-cert
+      secret:
+        secretName: teleport-core-postgres-serving-cert
+        defaultMode: 0440
+        items:
+          - key: ca.crt
+            path: ca.crt
+    - name: teleport-core-postgres-teleport-core-user-cert
+      secret:
+        secretName: teleport-core-postgres-teleport-core-user-cert
+        defaultMode: 0440
+        items:
+          - key: tls.crt
+            path: tls.crt
+          - key: tls.key
+            path: tls.key
+    - name: teleport-audit-postgres-serving-cert
+      secret:
+        secretName: teleport-audit-postgres-serving-cert
+        defaultMode: 0440
+        items:
+          - key: ca.crt
+            path: ca.crt
+    - name: teleport-audit-postgres-teleport-audit-user-cert
+      secret:
+        secretName: teleport-audit-postgres-teleport-audit-user-cert
+        defaultMode: 0440
+        items:
+          - key: tls.crt
+            path: tls.crt
+          - key: tls.key
+            path: tls.key
+  extraVolumeMounts:
+    - name: teleport-core-postgres-serving-cert
+      mountPath: /etc/teleport-backend/secrets/core/server
+    - name: teleport-core-postgres-teleport-core-user-cert
+      mountPath: /etc/teleport-backend/secrets/core/client
+    - name: teleport-audit-postgres-serving-cert
+      mountPath: /etc/teleport-backend/secrets/audit/server
+    - name: teleport-audit-postgres-teleport-audit-user-cert
+      mountPath: /etc/teleport-backend/secrets/audit/client
+  extraEnv:
+    # The S3 client will fail before attempting connection to Rook if this is not set
+    - name: AWS_DEFAULT_REGION
+      value: dummy-value
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: seaweedfs-s3-secret
+          key: admin_access_key_id
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: seaweedfs-s3-secret
+          key: admin_secret_access_key
+persistence:
+  enabled: false
+proxyListenerMode: multiplex
+service:
+  type: ClusterIP

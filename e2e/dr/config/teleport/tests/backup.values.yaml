@@ -1,0 +1,27 @@
+---
+jobConfig:
+  configFile:
+    backupName: tp-e2e
+    cnpgClusters:
+      core:
+        name: teleport-core
+      audit:
+        name: teleport-audit
+    servingCertIssuerName: self-signed
+    clientCACertIssuerName: self-signed
+    backupSnapshot:
+      snapshotClass: openebs-zfs
+    clusterCloning:
+      certificates:
+        servingCert:
+          issuerKind: Issuer
+        clientCACert:
+          issuerKind: Issuer
+        postgresUserCert:
+          certificateRequestPolicy:
+            enabled: true
+        streamingReplicaUserCert:
+          certificateRequestPolicy:
+            enabled: true
+    backupToolInstance:
+      creationTimeout: 10m

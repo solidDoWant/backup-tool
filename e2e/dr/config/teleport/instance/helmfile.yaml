@@ -1,0 +1,38 @@
+---
+helmDefaults:
+  cleanupOnFail: true
+  wait: true
+  waitForJobs: true
+  createNamespace: false
+  historyMax: 1
+  timeout: 120
+
+repositories:
+  - name: bjw-s-charts
+    url: https://bjw-s.github.io/helm-charts
+  - name: teleport-charts
+    url: https://charts.releases.teleport.dev
+
+releases:
+  - name: teleport-client-cas
+    chart: bjw-s-charts/app-template
+    version: 3.7.0
+    atomic: true
+    values:
+      - ./client-cas.values.yaml
+  - name: teleport-backend
+    chart: bjw-s-charts/app-template
+    version: 3.7.0
+    atomic: true
+    needs:
+      - teleport-client-cas
+    values:
+      - ./backend.values.yaml
+  - name: teleport
+    chart: teleport-charts/teleport-cluster
+    version: 17.0.2
+    atomic: true
+    needs:
+      - teleport-backend
+    values:
+      - ./teleport.values.yaml

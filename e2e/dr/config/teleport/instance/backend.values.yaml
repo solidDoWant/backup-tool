@@ -1,0 +1,293 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+controllers:
+  teleport-core-postgres-wal-bucket:
+    type: job
+    nameOverride: teleport-core-postgres-wal-bucket
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://teleport-core-postgres-wal/
+        env:
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+  teleport-audit-postgres-wal-bucket:
+    type: job
+    nameOverride: teleport-audit-postgres-wal-bucket
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://teleport-audit-postgres-wal/
+        env:
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+  teleport-audit-session-logs-bucket:
+    type: job
+    nameOverride: teleport-audit-session-logs-bucket
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://teleport-audit-session-logs/
+        env:
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+rawResources:
+  teleport-core-postgres-serving-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: teleport-core-postgres-serving-cert
+    spec:
+      spec:
+        commonName: Teleport Core Postgres serving
+        dnsNames:
+          - teleport-core-rw
+          - teleport-core-rw.default.svc
+        usages:
+          - server auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: teleport-core-postgres-serving-cert
+  teleport-core-postgres-streaming-replica-user-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: teleport-core-postgres-streaming-replica-user-cert
+    spec:
+      spec:
+        commonName: streaming_replica
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: teleport-core-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: teleport-core-postgres-streaming-replica-user-cert
+  teleport-core-postgres-teleport-core-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: teleport-core-postgres-teleport-core-user-cert
+    spec:
+      spec:
+        commonName: teleport-core
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: teleport-core-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: teleport-core-postgres-teleport-core-user-cert
+  teleport-core-postgres-cluster:
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    forceRename: teleport-core
+    spec:
+      spec:
+        instances: 2 # One replica, one primary
+        imageName: ghcr.io/soliddowant/postgresql-teleport:17.0 # Needed for wal2json plugin
+        bootstrap:
+          initdb:
+            database: teleport-core
+            owner: teleport-core
+            postInitSQL:
+              - ALTER USER "teleport-core" WITH PASSWORD NULL;
+        postgresql:
+          pg_hba:
+            - hostssl teleport-core all all cert
+        managed:
+          roles:
+            - name: teleport-core
+              login: true
+              # Required for Teleport for cluster state per https://github.com/gravitational/teleport/discussions/30247
+              # Docs are unclear if this is required for the "audit" database, audit database, or both.
+              replication: true
+        storage:
+          size: 5Gi
+          storageClass: openebs-zfs
+        backup:
+          target: prefer-standby
+          volumeSnapshot:
+            className: openebs-zfs
+            online: true
+            onlineConfiguration:
+              immediateCheckpoint: false
+              waitForArchive: true
+            snapshotOwnerReference: backup
+          barmanObjectStore:
+            destinationPath: s3://teleport-core-postgres-wal/
+            endpointURL: http://seaweedfs-s3:8333
+            s3Credentials:
+              accessKeyId:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+              secretAccessKey:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+        certificates:
+          serverTLSSecret: teleport-core-postgres-serving-cert
+          serverCASecret: teleport-core-postgres-serving-cert
+          clientCASecret: teleport-core-postgres-client-ca-cert
+          replicationTLSSecret: teleport-core-postgres-streaming-replica-user-cert
+  teleport-audit-postgres-serving-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: teleport-audit-postgres-serving-cert
+    spec:
+      spec:
+        commonName: Teleport audit Postgres serving
+        dnsNames:
+          - teleport-audit-rw
+          - teleport-audit-rw.default.svc
+        usages:
+          - server auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: teleport-audit-postgres-serving-cert
+  teleport-audit-postgres-streaming-replica-user-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: teleport-audit-postgres-streaming-replica-user-cert
+    spec:
+      spec:
+        commonName: streaming_replica
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: teleport-audit-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: teleport-audit-postgres-streaming-replica-user-cert
+  teleport-audit-postgres-teleport-audit-user-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: teleport-audit-postgres-teleport-audit-user-cert
+    spec:
+      spec:
+        commonName: teleport-audit
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: teleport-audit-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: teleport-audit-postgres-teleport-audit-user-cert
+  teleport-audit-postgres-cluster:
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    forceRename: teleport-audit
+    spec:
+      spec:
+        instances: 2 # One replica, one primary
+        bootstrap:
+          initdb:
+            database: teleport-audit
+            owner: teleport-audit
+            postInitSQL:
+              - ALTER USER "teleport-audit" WITH PASSWORD NULL;
+        postgresql:
+          pg_hba:
+            - hostssl teleport-audit all all cert
+        storage:
+          size: 5Gi
+          storageClass: openebs-zfs
+        backup:
+          target: prefer-standby
+          volumeSnapshot:
+            className: openebs-zfs
+            online: true
+            onlineConfiguration:
+              immediateCheckpoint: false
+              waitForArchive: true
+            snapshotOwnerReference: backup
+          barmanObjectStore:
+            destinationPath: s3://teleport-audit-postgres-wal/
+            endpointURL: http://seaweedfs-s3:8333
+            s3Credentials:
+              accessKeyId:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+              secretAccessKey:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+        certificates:
+          serverTLSSecret: teleport-audit-postgres-serving-cert
+          serverCASecret: teleport-audit-postgres-serving-cert
+          clientCASecret: teleport-audit-postgres-client-ca-cert
+          replicationTLSSecret: teleport-audit-postgres-streaming-replica-user-cert

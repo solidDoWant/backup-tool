@@ -9,9 +9,7 @@ import (
 	"testing"
 	"time"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/gravitational/trace"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg/gen/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +29,7 @@ import (
 )
 
 const (
-	repoRoot  = "./../../.."    // TODO look upwards for .git or main.go or something
+	repoRoot  = "./../.."       // TODO look upwards for .git or main.go or something
 	zpoolName = "openebs-zpool" // This must match the name used in the storage class
 )
 
@@ -351,32 +349,6 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 	}
 
 	return setup, finish
-}
-
-func waitForCNPGClusterToBeReady(ctx context.Context, cfg *envconf.Config, clusterName string) error {
-	// Wait for the CNPG cluster to become ready
-	cnpgClient, err := versioned.NewForConfig(cfg.Client().RESTConfig())
-	if err != nil {
-		return trace.Wrap(err, "failed to create CNPG client")
-	}
-
-	err = wait.For(func(ctx context.Context) (done bool, err error) {
-		cnpgCluster, err := cnpgClient.PostgresqlV1().Clusters("default").Get(ctx, clusterName, metav1.GetOptions{})
-		if err != nil {
-			return false, trace.Wrap(err, "failed to get CNPG cluster")
-		}
-
-		for _, condition := range cnpgCluster.Status.Conditions {
-			if condition.Type != string(apiv1.ConditionClusterReady) {
-				continue
-			}
-
-			return condition.Status == metav1.ConditionTrue, nil
-		}
-
-		return false, nil
-	}, wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute))
-	return trace.Wrap(err, "failed to wait for CNPG cluster to be ready")
 }
 
 func RunNodesScript(clusterName string, commands []string) error {

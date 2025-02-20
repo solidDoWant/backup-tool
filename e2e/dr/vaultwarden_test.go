@@ -2,10 +2,8 @@ package dr
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -20,56 +18,8 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
-	"sigs.k8s.io/e2e-framework/pkg/utils"
 	"sigs.k8s.io/e2e-framework/third_party/helm"
 )
-
-func getCommonHelmOpts(releaseName, namespace string) []helm.Option {
-	return []helm.Option{
-		helm.WithName(releaseName),
-		helm.WithNamespace(namespace),
-		helm.WithWait(),
-	}
-}
-
-func getBTInstallArgs(releaseName, namespace, action, valuesPath string) []helm.Option {
-	tagSeparatorIndex := strings.LastIndex(imageName, ":")
-	repository, tag := imageName[:tagSeparatorIndex], imageName[tagSeparatorIndex+1:]
-
-	installValues := []string{
-		fmt.Sprintf("resources.controllers.backup-tool.containers.backup-tool.image.repository=%s", repository),
-		fmt.Sprintf("resources.controllers.backup-tool.containers.backup-tool.image.tag=%s", tag),
-		fmt.Sprintf("jobConfig.configFile.namespace=%s", namespace),
-		"jobConfig.drType=vaultwarden",
-		fmt.Sprintf("jobConfig.drAction=%s", action),
-		"jobConfig.cronjob.schedule=@yearly", // Make the job as unlikely as possible to trigger automatically during the test
-	}
-
-	installArgs := []string{"--values", valuesPath}
-	for _, value := range installValues {
-		installArgs = append(installArgs, "--set", value)
-	}
-
-	return append(getCommonHelmOpts(releaseName, namespace), helm.WithChart(chartPath), helm.WithArgs(installArgs...))
-}
-
-func installBTHelmChart(releaseName, namespace, action, valuesPath string) func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
-	return func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
-		helmOpts := getBTInstallArgs(releaseName, namespace, action, valuesPath)
-		err := helm.New(c.KubeconfigFile()).RunInstall(helmOpts...)
-		assert.NoError(t, err)
-		return ctx
-	}
-}
-
-func uninstallBTHelmChart(releaseName, namespace string) func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
-	return func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
-		helmOpts := getCommonHelmOpts(releaseName, namespace)
-		err := helm.New(c.KubeconfigFile()).RunUninstall(helmOpts...)
-		assert.NoError(t, err)
-		return ctx
-	}
-}
 
 func verifyCronJobIsDeployed(cronjobName, namespace string) func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
 	return func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
@@ -238,34 +188,12 @@ func TestVaultWarden(t *testing.T) {
 		WithLabel("type", "dr").
 		Setup(vaultWardenSetup).
 		Setup(vaultWardenRestoreSetup).
-		Setup(installBTHelmChart(backupReleaseName, namespace, "backup", "config/vaultwarden/tests/backup.values.yaml")).
+		Setup(installBTHelmChart(backupReleaseName, namespace, "vaultwarden", "backup", "config/vaultwarden/tests/backup.values.yaml")).
 		Assess("backup resources are deployed", verifyCronJobIsDeployed(backupCronJobName, namespace)).
 		Assess("backup job succeeds", verifyJobSucceeds(backupCronJobName, namespace)).
 		Assess("backup files are created", func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
-			client := c.Client()
-
-			// Get the name of the persistent volume
-			pvc := &corev1.PersistentVolumeClaim{}
-			err := client.Resources().Get(ctx, "vw-e2e", namespace, pvc)
-			assert.NoError(t, err)
-
-			pvName := pvc.Spec.VolumeName
-			datasetName := fmt.Sprintf("%s/%s", zpoolName, pvName)
-
-			// Get the snapshot name
-			p := utils.RunCommand(fmt.Sprintf("zfs list -t snapshot -H -o name -d 1 %q", datasetName))
-			assert.NoError(t, p.Err())
-			snapshotName := strings.TrimSpace(p.Result())
-
-			// Create a new dataset from the snapshot
-			mountpoint := t.TempDir()
-			cloneDatasetName := fmt.Sprintf("%s/%s", zpoolName, "backup-test")
-			p = utils.RunCommand(fmt.Sprintf("zfs clone -o %q %q %q", "mountpoint="+mountpoint, snapshotName, cloneDatasetName))
-			assert.NoError(t, p.Err())
-			defer func() {
-				p = utils.RunCommand(fmt.Sprintf("zfs destroy -f %q", cloneDatasetName))
-				assert.NoError(t, p.Err())
-			}()
+			mountpoint, mountpointCleanup := getPVCLocalPath(ctx, t, c, namespace, "vw-e2e")
+			defer mountpointCleanup()
 
 			// Verify that the backup files are present
 			assert.FileExists(t, filepath.Join(mountpoint, "dump.sql"))
@@ -279,7 +207,7 @@ func TestVaultWarden(t *testing.T) {
 			return ctx
 		}).
 		Teardown(uninstallBTHelmChart(backupReleaseName, namespace)).
-		Setup(installBTHelmChart(restoreReleaseName, namespace, "restore", "config/vaultwarden/tests/restore.values.yaml")).
+		Setup(installBTHelmChart(restoreReleaseName, namespace, "vaultwarden", "restore", "config/vaultwarden/tests/restore.values.yaml")).
 		Assess("restore resources are deployed", verifyCronJobIsDeployed(restoreCronJobName, namespace)).
 		Assess("restore job succeeds", verifyJobSucceeds(restoreCronJobName, namespace)).
 		Assess("new vaultwarden instance successfully deploys", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
