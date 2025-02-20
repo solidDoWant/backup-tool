@@ -286,8 +286,8 @@ func TestVaultWardenBackup(t *testing.T) {
 					RunAndReturn(func(calledCtx *contexts.Context, src, dest string) error {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
 						assert.NotEqual(t, src, dest)
-						assert.True(t, strings.HasPrefix(src, baseMountPath))
-						assert.True(t, strings.HasPrefix(dest, baseMountPath))
+						assert.True(t, strings.HasPrefix(src, vaultwardenBaseMountPath))
+						assert.True(t, strings.HasPrefix(dest, vaultwardenBaseMountPath))
 						assert.True(t, filepath.Base(dest) == "data-vol") // Important: changing this is will break restoration of old backups!
 
 						return th.ErrIfTrue(tt.simulateSyncFilesErr)
@@ -300,8 +300,8 @@ func TestVaultWardenBackup(t *testing.T) {
 				clonedCluster.EXPECT().GetCredentials(mock.Anything, mock.Anything).
 					RunAndReturn(func(servingCertMountDirectory, clientCertMountDirectory string) postgres.Credentials {
 						assert.NotEqual(t, servingCertMountDirectory, clientCertMountDirectory)
-						assert.True(t, strings.HasPrefix(servingCertMountDirectory, baseMountPath))
-						assert.True(t, strings.HasPrefix(clientCertMountDirectory, baseMountPath))
+						assert.True(t, strings.HasPrefix(servingCertMountDirectory, vaultwardenBaseMountPath))
+						assert.True(t, strings.HasPrefix(clientCertMountDirectory, vaultwardenBaseMountPath))
 
 						return credentials
 					})

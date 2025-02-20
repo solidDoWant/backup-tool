@@ -28,9 +28,9 @@ import (
 )
 
 const (
-	baseMountPath = string(os.PathSeparator) + "mnt"
-	drVolPath     = "data-vol" // Important: changing this is will break restoration of old backups!
-	sqlFileName   = "dump.sql" // Important: changing this is will break restoration of old backups!
+	vaultwardenBaseMountPath = string(os.PathSeparator) + "mnt"
+	vaultwardenDRVolPath     = "data-vol" // Important: changing this is will break restoration of old backups!
+	vaultwardenSQLFileName   = "dump.sql" // Important: changing this is will break restoration of old backups!
 )
 
 type VaultWardenBackupOptionsBackupSnapshot struct {
@@ -137,9 +137,9 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 
 	// 4. Spawn a new tool instance with the cloned PVC attached, and DR mount and secrets attached
 	ctx.Log.Step().Info("Creating backup tool instance")
-	drVolumeMountPath := filepath.Join(baseMountPath, "dr")
-	clonedVolumeMountPath := filepath.Join(baseMountPath, "data")
-	secretsVolumeMountPath := filepath.Join(baseMountPath, "secrets")
+	drVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "dr")
+	clonedVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "data")
+	secretsVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "secrets")
 	servingCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "serving-cert")
 	clientCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "client-cert")
 	btOpts := backuptoolinstance.CreateBackupToolInstanceOptions{
@@ -167,7 +167,7 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 		return backup, trace.Wrap(err, "failed to create client for backup tool GRPC server")
 	}
 
-	drDataVolPath := filepath.Join(drVolumeMountPath, drVolPath)
+	drDataVolPath := filepath.Join(drVolumeMountPath, vaultwardenDRVolPath)
 	err = backupToolClient.Files().SyncFiles(ctx.Child(), clonedVolumeMountPath, drDataVolPath)
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to sync data directory files at %q to the disaster recovery volume at %q", clonedVolumeMountPath, drDataVolPath)
@@ -175,7 +175,7 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 
 	// 6. Perform a CNPG logical backup
 	ctx.Log.Step().Info("Performing Postgres logical backup")
-	podSQLFilePath := filepath.Join(drVolumeMountPath, sqlFileName)
+	podSQLFilePath := filepath.Join(drVolumeMountPath, vaultwardenSQLFileName)
 	clusterCredentials := clonedCluster.GetCredentials(servingCertVolumeMountPath, clientCertVolumeMountPath)
 	err = backupToolClient.Postgres().DumpAll(ctx.Child(), clusterCredentials, podSQLFilePath, postgres.DumpAllOptions{CleanupTimeout: backupOptions.CleanupTimeout})
 	if err != nil {
@@ -291,9 +291,9 @@ func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, da
 
 	// 3. Spawn a new backup-tool pod with data directory PVC attached, and DR mount attached
 	ctx.Log.Step().Info("Creating backup tool instance")
-	drVolumeMountPath := filepath.Join(baseMountPath, "dr")
-	dataVolumeMountPath := filepath.Join(baseMountPath, "data")
-	secretsVolumeMountPath := filepath.Join(baseMountPath, "secrets")
+	drVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "dr")
+	dataVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "data")
+	secretsVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "secrets")
 	servingCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "serving-cert")
 	clientCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "client-cert")
 	btOpts := backuptoolinstance.CreateBackupToolInstanceOptions{
@@ -321,7 +321,7 @@ func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, da
 		return restore, trace.Wrap(err, "failed to create client for backup tool GRPC server")
 	}
 
-	drDataVolPath := filepath.Join(drVolumeMountPath, drVolPath)
+	drDataVolPath := filepath.Join(drVolumeMountPath, vaultwardenDRVolPath)
 	err = backupToolClient.Files().SyncFiles(ctx.Child(), drDataVolPath, dataVolumeMountPath)
 	if err != nil {
 		return restore, trace.Wrap(err, "failed to sync data directory files at %q to the data PVC at %q", drDataVolPath, dataVolumeMountPath)
@@ -329,7 +329,7 @@ func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, da
 
 	// 5. Perform a CNPG logical recovery
 	ctx.Log.Step().Info("Performing Postgres logical recovery")
-	podSQLFilePath := filepath.Join(drVolumeMountPath, sqlFileName)
+	podSQLFilePath := filepath.Join(drVolumeMountPath, vaultwardenSQLFileName)
 	clusterCredentials := &postgres.EnvironmentCredentials{
 		postgres.HostVarName:        fmt.Sprintf("%s.%s.svc", cluster.Status.WriteService, namespace),
 		postgres.UserVarName:        "postgres",
