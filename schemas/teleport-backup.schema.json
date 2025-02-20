@@ -5,16 +5,16 @@
   "$defs": {
     "AWSElasticBlockStoreVolumeSource": {
       "properties": {
-        "volumeID": {
+        "VolumeID": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "partition": {
+        "Partition": {
           "type": "integer"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         }
       },
@@ -23,22 +23,22 @@
     },
     "AzureDiskVolumeSource": {
       "properties": {
-        "diskName": {
+        "DiskName": {
           "type": "string"
         },
-        "diskURI": {
+        "DataDiskURI": {
           "type": "string"
         },
-        "cachingMode": {
+        "CachingMode": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         },
-        "kind": {
+        "Kind": {
           "type": "string"
         }
       },
@@ -47,13 +47,13 @@
     },
     "AzureFileVolumeSource": {
       "properties": {
-        "secretName": {
+        "SecretName": {
           "type": "string"
         },
-        "shareName": {
+        "ShareName": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         }
       },
@@ -62,22 +62,22 @@
     },
     "CSIVolumeSource": {
       "properties": {
-        "driver": {
+        "Driver": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "volumeAttributes": {
+        "VolumeAttributes": {
           "additionalProperties": {
             "type": "string"
           },
           "type": "object"
         },
-        "nodePublishSecretRef": {
+        "NodePublishSecretRef": {
           "$ref": "#/$defs/LocalObjectReference"
         }
       },
@@ -86,25 +86,25 @@
     },
     "CephFSVolumeSource": {
       "properties": {
-        "monitors": {
+        "Monitors": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "path": {
+        "Path": {
           "type": "string"
         },
-        "user": {
+        "User": {
           "type": "string"
         },
-        "secretFile": {
+        "SecretFile": {
           "type": "string"
         },
-        "secretRef": {
+        "SecretRef": {
           "$ref": "#/$defs/LocalObjectReference"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         }
       },
@@ -113,16 +113,16 @@
     },
     "CinderVolumeSource": {
       "properties": {
-        "volumeID": {
+        "VolumeID": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         },
-        "secretRef": {
+        "SecretRef": {
           "$ref": "#/$defs/LocalObjectReference"
         }
       },
@@ -131,23 +131,23 @@
     },
     "CloneClusterOptions": {
       "properties": {
-        "WaitForBackupTimeout": {
+        "waitForBackupTimeout": {
           "type": "integer"
         },
-        "Certificates": {
+        "certificates": {
           "$ref": "#/$defs/CloneClusterOptionsCertificates"
         },
-        "ClientCAIssuer": {
+        "clientCAIssuer": {
           "$ref": "#/$defs/CloneClusterOptionsCAIssuer"
         },
-        "RecoveryTargetTime": {
+        "recoveryTargetTime": {
           "type": "string",
           "description": "The time to roll back to in RFC3339 format"
         },
-        "WaitForClusterTimeout": {
+        "waitForClusterTimeout": {
           "type": "integer"
         },
-        "CleanupTimeout": {
+        "cleanupTimeout": {
           "type": "integer"
         }
       },
@@ -156,7 +156,7 @@
     },
     "CloneClusterOptionsCAIssuer": {
       "properties": {
-        "WaitForReadyTimeout": {
+        "waitForReadyTimeout": {
           "type": "integer"
         }
       },
@@ -165,16 +165,16 @@
     },
     "CloneClusterOptionsCertificates": {
       "properties": {
-        "ServingCert": {
+        "servingCert": {
           "$ref": "#/$defs/CloneClusterOptionsExternallyIssuedCertificate"
         },
-        "ClientCACert": {
+        "clientCACert": {
           "$ref": "#/$defs/CloneClusterOptionsExternallyIssuedCertificate"
         },
-        "PostgresUserCert": {
+        "postgresUserCert": {
           "$ref": "#/$defs/CloneClusterOptionsInternallyIssuedCertificate"
         },
-        "StreamingReplicaUserCert": {
+        "streamingReplicaUserCert": {
           "$ref": "#/$defs/CloneClusterOptionsInternallyIssuedCertificate"
         }
       },
@@ -183,13 +183,13 @@
     },
     "CloneClusterOptionsExternallyIssuedCertificate": {
       "properties": {
-        "Subject": {
+        "subject": {
           "$ref": "#/$defs/X509Subject"
         },
-        "WaitForReadyTimeout": {
+        "waitForReadyTimeout": {
           "type": "integer"
         },
-        "IssuerKind": {
+        "issuerKind": {
           "type": "string"
         }
       },
@@ -198,13 +198,13 @@
     },
     "CloneClusterOptionsInternallyIssuedCertificate": {
       "properties": {
-        "Subject": {
+        "subject": {
           "$ref": "#/$defs/X509Subject"
         },
-        "WaitForReadyTimeout": {
+        "waitForReadyTimeout": {
           "type": "integer"
         },
-        "CRPOpts": {
+        "certificateRequestPolicy": {
           "$ref": "#/$defs/NewClusterUserCertOptsCRP"
         }
       },
@@ -213,19 +213,19 @@
     },
     "ClusterTrustBundleProjection": {
       "properties": {
-        "name": {
+        "Name": {
           "type": "string"
         },
-        "signerName": {
+        "SignerName": {
           "type": "string"
         },
-        "labelSelector": {
+        "LabelSelector": {
           "$ref": "#/$defs/LabelSelector"
         },
-        "optional": {
+        "Optional": {
           "type": "boolean"
         },
-        "path": {
+        "Path": {
           "type": "string"
         }
       },
@@ -234,16 +234,16 @@
     },
     "ConfigMapProjection": {
       "properties": {
-        "name": {
+        "Name": {
           "type": "string"
         },
-        "items": {
+        "Items": {
           "items": {
             "$ref": "#/$defs/KeyToPath"
           },
           "type": "array"
         },
-        "optional": {
+        "Optional": {
           "type": "boolean"
         }
       },
@@ -252,47 +252,20 @@
     },
     "ConfigMapVolumeSource": {
       "properties": {
-        "name": {
+        "Name": {
           "type": "string"
         },
-        "items": {
+        "Items": {
           "items": {
             "$ref": "#/$defs/KeyToPath"
           },
           "type": "array"
         },
-        "defaultMode": {
+        "DefaultMode": {
           "type": "integer"
         },
-        "optional": {
+        "Optional": {
           "type": "boolean"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "CreateBackupToolInstanceOptions": {
-      "properties": {
-        "NamePrefix": {
-          "type": "string"
-        },
-        "Volumes": {
-          "items": {
-            "$ref": "#/$defs/SingleContainerVolume"
-          },
-          "type": "array"
-        },
-        "CleanupTimeout": {
-          "type": "integer"
-        },
-        "ServiceType": {
-          "type": "string"
-        },
-        "PodWaitTimeout": {
-          "type": "integer"
-        },
-        "ServiceWaitTimeout": {
-          "type": "integer"
         }
       },
       "additionalProperties": false,
@@ -300,7 +273,7 @@
     },
     "DownwardAPIProjection": {
       "properties": {
-        "items": {
+        "Items": {
           "items": {
             "$ref": "#/$defs/DownwardAPIVolumeFile"
           },
@@ -312,16 +285,16 @@
     },
     "DownwardAPIVolumeFile": {
       "properties": {
-        "path": {
+        "Path": {
           "type": "string"
         },
-        "fieldRef": {
+        "FieldRef": {
           "$ref": "#/$defs/ObjectFieldSelector"
         },
-        "resourceFieldRef": {
+        "ResourceFieldRef": {
           "$ref": "#/$defs/ResourceFieldSelector"
         },
-        "mode": {
+        "Mode": {
           "type": "integer"
         }
       },
@@ -330,13 +303,13 @@
     },
     "DownwardAPIVolumeSource": {
       "properties": {
-        "items": {
+        "Items": {
           "items": {
             "$ref": "#/$defs/DownwardAPIVolumeFile"
           },
           "type": "array"
         },
-        "defaultMode": {
+        "DefaultMode": {
           "type": "integer"
         }
       },
@@ -345,10 +318,10 @@
     },
     "EmptyDirVolumeSource": {
       "properties": {
-        "medium": {
+        "Medium": {
           "type": "string"
         },
-        "sizeLimit": {
+        "SizeLimit": {
           "$ref": "#/$defs/Quantity"
         }
       },
@@ -357,7 +330,7 @@
     },
     "EphemeralVolumeSource": {
       "properties": {
-        "volumeClaimTemplate": {
+        "VolumeClaimTemplate": {
           "$ref": "#/$defs/PersistentVolumeClaimTemplate"
         }
       },
@@ -366,22 +339,22 @@
     },
     "FCVolumeSource": {
       "properties": {
-        "targetWWNs": {
+        "TargetWWNs": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "lun": {
+        "Lun": {
           "type": "integer"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         },
-        "wwids": {
+        "WWIDs": {
           "items": {
             "type": "string"
           },
@@ -392,25 +365,30 @@
       "type": "object"
     },
     "FieldsV1": {
-      "properties": {},
+      "properties": {
+        "Raw": {
+          "type": "string",
+          "contentEncoding": "base64"
+        }
+      },
       "additionalProperties": false,
       "type": "object"
     },
     "FlexVolumeSource": {
       "properties": {
-        "driver": {
+        "Driver": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "secretRef": {
+        "SecretRef": {
           "$ref": "#/$defs/LocalObjectReference"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         },
-        "options": {
+        "Options": {
           "additionalProperties": {
             "type": "string"
           },
@@ -422,10 +400,10 @@
     },
     "FlockerVolumeSource": {
       "properties": {
-        "datasetName": {
+        "DatasetName": {
           "type": "string"
         },
-        "datasetUUID": {
+        "DatasetUUID": {
           "type": "string"
         }
       },
@@ -434,16 +412,16 @@
     },
     "GCEPersistentDiskVolumeSource": {
       "properties": {
-        "pdName": {
+        "PDName": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "partition": {
+        "Partition": {
           "type": "integer"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         }
       },
@@ -452,13 +430,13 @@
     },
     "GitRepoVolumeSource": {
       "properties": {
-        "repository": {
+        "Repository": {
           "type": "string"
         },
-        "revision": {
+        "Revision": {
           "type": "string"
         },
-        "directory": {
+        "Directory": {
           "type": "string"
         }
       },
@@ -467,13 +445,13 @@
     },
     "GlusterfsVolumeSource": {
       "properties": {
-        "endpoints": {
+        "EndpointsName": {
           "type": "string"
         },
-        "path": {
+        "Path": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         }
       },
@@ -482,10 +460,10 @@
     },
     "HostPathVolumeSource": {
       "properties": {
-        "path": {
+        "Path": {
           "type": "string"
         },
-        "type": {
+        "Type": {
           "type": "string"
         }
       },
@@ -494,40 +472,40 @@
     },
     "ISCSIVolumeSource": {
       "properties": {
-        "targetPortal": {
+        "TargetPortal": {
           "type": "string"
         },
-        "iqn": {
+        "IQN": {
           "type": "string"
         },
-        "lun": {
+        "Lun": {
           "type": "integer"
         },
-        "iscsiInterface": {
+        "ISCSIInterface": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         },
-        "portals": {
+        "Portals": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "chapAuthDiscovery": {
+        "DiscoveryCHAPAuth": {
           "type": "boolean"
         },
-        "chapAuthSession": {
+        "SessionCHAPAuth": {
           "type": "boolean"
         },
-        "secretRef": {
+        "SecretRef": {
           "$ref": "#/$defs/LocalObjectReference"
         },
-        "initiatorName": {
+        "InitiatorName": {
           "type": "string"
         }
       },
@@ -536,10 +514,10 @@
     },
     "ImageVolumeSource": {
       "properties": {
-        "reference": {
+        "Reference": {
           "type": "string"
         },
-        "pullPolicy": {
+        "PullPolicy": {
           "type": "string"
         }
       },
@@ -548,13 +526,13 @@
     },
     "KeyToPath": {
       "properties": {
-        "key": {
+        "Key": {
           "type": "string"
         },
-        "path": {
+        "Path": {
           "type": "string"
         },
-        "mode": {
+        "Mode": {
           "type": "integer"
         }
       },
@@ -563,13 +541,13 @@
     },
     "LabelSelector": {
       "properties": {
-        "matchLabels": {
+        "MatchLabels": {
           "additionalProperties": {
             "type": "string"
           },
           "type": "object"
         },
-        "matchExpressions": {
+        "MatchExpressions": {
           "items": {
             "$ref": "#/$defs/LabelSelectorRequirement"
           },
@@ -581,13 +559,13 @@
     },
     "LabelSelectorRequirement": {
       "properties": {
-        "key": {
+        "Key": {
           "type": "string"
         },
-        "operator": {
+        "Operator": {
           "type": "string"
         },
-        "values": {
+        "Values": {
           "items": {
             "type": "string"
           },
@@ -599,7 +577,7 @@
     },
     "LocalObjectReference": {
       "properties": {
-        "name": {
+        "Name": {
           "type": "string"
         }
       },
@@ -608,25 +586,25 @@
     },
     "ManagedFieldsEntry": {
       "properties": {
-        "manager": {
+        "Manager": {
           "type": "string"
         },
-        "operation": {
+        "Operation": {
           "type": "string"
         },
-        "apiVersion": {
+        "APIVersion": {
           "type": "string"
         },
-        "time": {
+        "Time": {
           "$ref": "#/$defs/Time"
         },
-        "fieldsType": {
+        "FieldsType": {
           "type": "string"
         },
-        "fieldsV1": {
+        "FieldsV1": {
           "$ref": "#/$defs/FieldsV1"
         },
-        "subresource": {
+        "Subresource": {
           "type": "string"
         }
       },
@@ -635,13 +613,13 @@
     },
     "NFSVolumeSource": {
       "properties": {
-        "server": {
+        "Server": {
           "type": "string"
         },
-        "path": {
+        "Path": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         }
       },
@@ -650,10 +628,10 @@
     },
     "NewClusterUserCertOptsCRP": {
       "properties": {
-        "Enabled": {
+        "enabled": {
           "type": "boolean"
         },
-        "WaitForCRPTimeout": {
+        "waitForCRPTimeout": {
           "type": "integer"
         }
       },
@@ -662,77 +640,11 @@
     },
     "ObjectFieldSelector": {
       "properties": {
-        "apiVersion": {
+        "APIVersion": {
           "type": "string"
         },
-        "fieldPath": {
+        "FieldPath": {
           "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "ObjectMeta": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "generateName": {
-          "type": "string"
-        },
-        "namespace": {
-          "type": "string"
-        },
-        "selfLink": {
-          "type": "string"
-        },
-        "uid": {
-          "type": "string"
-        },
-        "resourceVersion": {
-          "type": "string"
-        },
-        "generation": {
-          "type": "integer"
-        },
-        "creationTimestamp": {
-          "$ref": "#/$defs/Time"
-        },
-        "deletionTimestamp": {
-          "$ref": "#/$defs/Time"
-        },
-        "deletionGracePeriodSeconds": {
-          "type": "integer"
-        },
-        "labels": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
-        },
-        "annotations": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
-        },
-        "ownerReferences": {
-          "items": {
-            "$ref": "#/$defs/OwnerReference"
-          },
-          "type": "array"
-        },
-        "finalizers": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "managedFields": {
-          "items": {
-            "$ref": "#/$defs/ManagedFieldsEntry"
-          },
-          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -740,22 +652,22 @@
     },
     "OwnerReference": {
       "properties": {
-        "apiVersion": {
+        "APIVersion": {
           "type": "string"
         },
-        "kind": {
+        "Kind": {
           "type": "string"
         },
-        "name": {
+        "Name": {
           "type": "string"
         },
-        "uid": {
+        "UID": {
           "type": "string"
         },
-        "controller": {
+        "Controller": {
           "type": "boolean"
         },
-        "blockOwnerDeletion": {
+        "BlockOwnerDeletion": {
           "type": "boolean"
         }
       },
@@ -764,34 +676,34 @@
     },
     "PersistentVolumeClaimSpec": {
       "properties": {
-        "accessModes": {
+        "AccessModes": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "selector": {
+        "Selector": {
           "$ref": "#/$defs/LabelSelector"
         },
-        "resources": {
+        "Resources": {
           "$ref": "#/$defs/VolumeResourceRequirements"
         },
-        "volumeName": {
+        "VolumeName": {
           "type": "string"
         },
-        "storageClassName": {
+        "StorageClassName": {
           "type": "string"
         },
-        "volumeMode": {
+        "VolumeMode": {
           "type": "string"
         },
-        "dataSource": {
+        "DataSource": {
           "$ref": "#/$defs/TypedLocalObjectReference"
         },
-        "dataSourceRef": {
+        "DataSourceRef": {
           "$ref": "#/$defs/TypedObjectReference"
         },
-        "volumeAttributesClassName": {
+        "VolumeAttributesClassName": {
           "type": "string"
         }
       },
@@ -800,10 +712,67 @@
     },
     "PersistentVolumeClaimTemplate": {
       "properties": {
-        "metadata": {
-          "$ref": "#/$defs/ObjectMeta"
+        "Name": {
+          "type": "string"
         },
-        "spec": {
+        "GenerateName": {
+          "type": "string"
+        },
+        "Namespace": {
+          "type": "string"
+        },
+        "SelfLink": {
+          "type": "string"
+        },
+        "UID": {
+          "type": "string"
+        },
+        "ResourceVersion": {
+          "type": "string"
+        },
+        "Generation": {
+          "type": "integer"
+        },
+        "CreationTimestamp": {
+          "$ref": "#/$defs/Time"
+        },
+        "DeletionTimestamp": {
+          "$ref": "#/$defs/Time"
+        },
+        "DeletionGracePeriodSeconds": {
+          "type": "integer"
+        },
+        "Labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "Annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "OwnerReferences": {
+          "items": {
+            "$ref": "#/$defs/OwnerReference"
+          },
+          "type": "array"
+        },
+        "Finalizers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ManagedFields": {
+          "items": {
+            "$ref": "#/$defs/ManagedFieldsEntry"
+          },
+          "type": "array"
+        },
+        "Spec": {
           "$ref": "#/$defs/PersistentVolumeClaimSpec"
         }
       },
@@ -812,10 +781,10 @@
     },
     "PersistentVolumeClaimVolumeSource": {
       "properties": {
-        "claimName": {
+        "ClaimName": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         }
       },
@@ -824,10 +793,10 @@
     },
     "PhotonPersistentDiskVolumeSource": {
       "properties": {
-        "pdID": {
+        "PdID": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         }
       },
@@ -836,13 +805,13 @@
     },
     "PortworxVolumeSource": {
       "properties": {
-        "volumeID": {
+        "VolumeID": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         }
       },
@@ -851,13 +820,13 @@
     },
     "ProjectedVolumeSource": {
       "properties": {
-        "sources": {
+        "Sources": {
           "items": {
             "$ref": "#/$defs/VolumeProjection"
           },
           "type": "array"
         },
-        "defaultMode": {
+        "DefaultMode": {
           "type": "integer"
         }
       },
@@ -875,22 +844,22 @@
     },
     "QuobyteVolumeSource": {
       "properties": {
-        "registry": {
+        "Registry": {
           "type": "string"
         },
-        "volume": {
+        "Volume": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         },
-        "user": {
+        "User": {
           "type": "string"
         },
-        "group": {
+        "Group": {
           "type": "string"
         },
-        "tenant": {
+        "Tenant": {
           "type": "string"
         }
       },
@@ -899,31 +868,31 @@
     },
     "RBDVolumeSource": {
       "properties": {
-        "monitors": {
+        "CephMonitors": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "image": {
+        "RBDImage": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "pool": {
+        "RBDPool": {
           "type": "string"
         },
-        "user": {
+        "RadosUser": {
           "type": "string"
         },
-        "keyring": {
+        "Keyring": {
           "type": "string"
         },
-        "secretRef": {
+        "SecretRef": {
           "$ref": "#/$defs/LocalObjectReference"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         }
       },
@@ -932,13 +901,13 @@
     },
     "ResourceFieldSelector": {
       "properties": {
-        "containerName": {
+        "ContainerName": {
           "type": "string"
         },
-        "resource": {
+        "Resource": {
           "type": "string"
         },
-        "divisor": {
+        "Divisor": {
           "$ref": "#/$defs/Quantity"
         }
       },
@@ -953,34 +922,34 @@
     },
     "ScaleIOVolumeSource": {
       "properties": {
-        "gateway": {
+        "Gateway": {
           "type": "string"
         },
-        "system": {
+        "System": {
           "type": "string"
         },
-        "secretRef": {
+        "SecretRef": {
           "$ref": "#/$defs/LocalObjectReference"
         },
-        "sslEnabled": {
+        "SSLEnabled": {
           "type": "boolean"
         },
-        "protectionDomain": {
+        "ProtectionDomain": {
           "type": "string"
         },
-        "storagePool": {
+        "StoragePool": {
           "type": "string"
         },
-        "storageMode": {
+        "StorageMode": {
           "type": "string"
         },
-        "volumeName": {
+        "VolumeName": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         }
       },
@@ -989,16 +958,16 @@
     },
     "SecretProjection": {
       "properties": {
-        "name": {
+        "Name": {
           "type": "string"
         },
-        "items": {
+        "Items": {
           "items": {
             "$ref": "#/$defs/KeyToPath"
           },
           "type": "array"
         },
-        "optional": {
+        "Optional": {
           "type": "boolean"
         }
       },
@@ -1007,19 +976,19 @@
     },
     "SecretVolumeSource": {
       "properties": {
-        "secretName": {
+        "SecretName": {
           "type": "string"
         },
-        "items": {
+        "Items": {
           "items": {
             "$ref": "#/$defs/KeyToPath"
           },
           "type": "array"
         },
-        "defaultMode": {
+        "DefaultMode": {
           "type": "integer"
         },
-        "optional": {
+        "Optional": {
           "type": "boolean"
         }
       },
@@ -1028,13 +997,13 @@
     },
     "ServiceAccountTokenProjection": {
       "properties": {
-        "audience": {
+        "Audience": {
           "type": "string"
         },
-        "expirationSeconds": {
+        "ExpirationSeconds": {
           "type": "integer"
         },
-        "path": {
+        "Path": {
           "type": "string"
         }
       },
@@ -1043,39 +1012,39 @@
     },
     "SingleContainerVolume": {
       "properties": {
-        "Name": {
+        "name": {
           "type": "string"
         },
-        "MountPath": {
+        "mountPath": {
           "type": "string"
         },
-        "VolumeSource": {
+        "volumeSource": {
           "$ref": "#/$defs/VolumeSource"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "Name",
-        "MountPath",
-        "VolumeSource"
+        "name",
+        "mountPath",
+        "volumeSource"
       ]
     },
     "StorageOSVolumeSource": {
       "properties": {
-        "volumeName": {
+        "VolumeName": {
           "type": "string"
         },
-        "volumeNamespace": {
+        "VolumeNamespace": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "readOnly": {
+        "ReadOnly": {
           "type": "boolean"
         },
-        "secretRef": {
+        "SecretRef": {
           "$ref": "#/$defs/LocalObjectReference"
         }
       },
@@ -1084,60 +1053,78 @@
     },
     "TeleportBackupConfig": {
       "properties": {
-        "Namespace": {
+        "namespace": {
           "type": "string"
         },
-        "BackupName": {
+        "backupName": {
           "type": "string"
         },
-        "CNPGClusters": {
+        "cnpgClusters": {
           "$ref": "#/$defs/TeleportBackupConfigClustersConfig"
         },
-        "ServingCertIssuerName": {
+        "servingCertIssuerName": {
           "type": "string"
         },
-        "ClientCACertIssuerName": {
+        "clientCACertIssuerName": {
           "type": "string"
         },
-        "BackupVolume": {
+        "backupVolume": {
           "$ref": "#/$defs/TeleportBackupConfigBackupVolume"
         },
-        "BackupSnapshot": {
+        "backupSnapshot": {
           "$ref": "#/$defs/VaultWardenBackupOptionsBackupSnapshot"
         },
-        "CloneClusterOptions": {
+        "clusterCloning": {
           "$ref": "#/$defs/CloneClusterOptions"
         },
-        "BackupToolInstance": {
+        "backupToolInstance": {
           "$ref": "#/$defs/TeleportBackupConfigBTI"
         },
-        "ServiceSearchDomains": {
+        "serviceSearchDomains": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "CleanupTimeout": {
+        "cleanupTimeout": {
           "type": "integer"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "Namespace",
-        "BackupName",
-        "CNPGClusters",
-        "ServingCertIssuerName",
-        "ClientCACertIssuerName"
+        "namespace",
+        "backupName",
+        "cnpgClusters",
+        "servingCertIssuerName",
+        "clientCACertIssuerName"
       ]
     },
     "TeleportBackupConfigBTI": {
       "properties": {
-        "CreationTimeout": {
+        "creationTimeout": {
           "type": "integer"
         },
-        "CreationOptions": {
-          "$ref": "#/$defs/CreateBackupToolInstanceOptions"
+        "namePrefix": {
+          "type": "string"
+        },
+        "volumes": {
+          "items": {
+            "$ref": "#/$defs/SingleContainerVolume"
+          },
+          "type": "array"
+        },
+        "cleanupTimeout": {
+          "type": "integer"
+        },
+        "serviceType": {
+          "type": "string"
+        },
+        "podWaitTimeout": {
+          "type": "integer"
+        },
+        "serviceWaitTimeout": {
+          "type": "integer"
         }
       },
       "additionalProperties": false,
@@ -1145,10 +1132,10 @@
     },
     "TeleportBackupConfigBackupVolume": {
       "properties": {
-        "Size": {
+        "size": {
           "$ref": "#/$defs/Quantity"
         },
-        "StorageClass": {
+        "storageClass": {
           "type": "string"
         }
       },
@@ -1157,30 +1144,30 @@
     },
     "TeleportBackupConfigClusterConfig": {
       "properties": {
-        "CNPGClusterName": {
+        "name": {
           "type": "string"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "CNPGClusterName"
+        "name"
       ]
     },
     "TeleportBackupConfigClustersConfig": {
       "properties": {
-        "Core": {
+        "core": {
           "$ref": "#/$defs/TeleportBackupConfigClusterConfig"
         },
-        "Audit": {
+        "audit": {
           "$ref": "#/$defs/TeleportBackupConfigClusterConfig"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "Core",
-        "Audit"
+        "core",
+        "audit"
       ]
     },
     "Time": {
@@ -1190,13 +1177,13 @@
     },
     "TypedLocalObjectReference": {
       "properties": {
-        "apiGroup": {
+        "APIGroup": {
           "type": "string"
         },
-        "kind": {
+        "Kind": {
           "type": "string"
         },
-        "name": {
+        "Name": {
           "type": "string"
         }
       },
@@ -1205,16 +1192,16 @@
     },
     "TypedObjectReference": {
       "properties": {
-        "apiGroup": {
+        "APIGroup": {
           "type": "string"
         },
-        "kind": {
+        "Kind": {
           "type": "string"
         },
-        "name": {
+        "Name": {
           "type": "string"
         },
-        "namespace": {
+        "Namespace": {
           "type": "string"
         }
       },
@@ -1223,10 +1210,10 @@
     },
     "VaultWardenBackupOptionsBackupSnapshot": {
       "properties": {
-        "ReadyTimeout": {
+        "snapshotReadyTimeout": {
           "type": "integer"
         },
-        "SnapshotClass": {
+        "snapshotClass": {
           "type": "string"
         }
       },
@@ -1235,19 +1222,19 @@
     },
     "VolumeProjection": {
       "properties": {
-        "secret": {
+        "Secret": {
           "$ref": "#/$defs/SecretProjection"
         },
-        "downwardAPI": {
+        "DownwardAPI": {
           "$ref": "#/$defs/DownwardAPIProjection"
         },
-        "configMap": {
+        "ConfigMap": {
           "$ref": "#/$defs/ConfigMapProjection"
         },
-        "serviceAccountToken": {
+        "ServiceAccountToken": {
           "$ref": "#/$defs/ServiceAccountTokenProjection"
         },
-        "clusterTrustBundle": {
+        "ClusterTrustBundle": {
           "$ref": "#/$defs/ClusterTrustBundleProjection"
         }
       },
@@ -1256,10 +1243,10 @@
     },
     "VolumeResourceRequirements": {
       "properties": {
-        "limits": {
+        "Limits": {
           "$ref": "#/$defs/ResourceList"
         },
-        "requests": {
+        "Requests": {
           "$ref": "#/$defs/ResourceList"
         }
       },
@@ -1268,94 +1255,94 @@
     },
     "VolumeSource": {
       "properties": {
-        "hostPath": {
+        "HostPath": {
           "$ref": "#/$defs/HostPathVolumeSource"
         },
-        "emptyDir": {
+        "EmptyDir": {
           "$ref": "#/$defs/EmptyDirVolumeSource"
         },
-        "gcePersistentDisk": {
+        "GCEPersistentDisk": {
           "$ref": "#/$defs/GCEPersistentDiskVolumeSource"
         },
-        "awsElasticBlockStore": {
+        "AWSElasticBlockStore": {
           "$ref": "#/$defs/AWSElasticBlockStoreVolumeSource"
         },
-        "gitRepo": {
+        "GitRepo": {
           "$ref": "#/$defs/GitRepoVolumeSource"
         },
-        "secret": {
+        "Secret": {
           "$ref": "#/$defs/SecretVolumeSource"
         },
-        "nfs": {
+        "NFS": {
           "$ref": "#/$defs/NFSVolumeSource"
         },
-        "iscsi": {
+        "ISCSI": {
           "$ref": "#/$defs/ISCSIVolumeSource"
         },
-        "glusterfs": {
+        "Glusterfs": {
           "$ref": "#/$defs/GlusterfsVolumeSource"
         },
-        "persistentVolumeClaim": {
+        "PersistentVolumeClaim": {
           "$ref": "#/$defs/PersistentVolumeClaimVolumeSource"
         },
-        "rbd": {
+        "RBD": {
           "$ref": "#/$defs/RBDVolumeSource"
         },
-        "flexVolume": {
+        "FlexVolume": {
           "$ref": "#/$defs/FlexVolumeSource"
         },
-        "cinder": {
+        "Cinder": {
           "$ref": "#/$defs/CinderVolumeSource"
         },
-        "cephfs": {
+        "CephFS": {
           "$ref": "#/$defs/CephFSVolumeSource"
         },
-        "flocker": {
+        "Flocker": {
           "$ref": "#/$defs/FlockerVolumeSource"
         },
-        "downwardAPI": {
+        "DownwardAPI": {
           "$ref": "#/$defs/DownwardAPIVolumeSource"
         },
-        "fc": {
+        "FC": {
           "$ref": "#/$defs/FCVolumeSource"
         },
-        "azureFile": {
+        "AzureFile": {
           "$ref": "#/$defs/AzureFileVolumeSource"
         },
-        "configMap": {
+        "ConfigMap": {
           "$ref": "#/$defs/ConfigMapVolumeSource"
         },
-        "vsphereVolume": {
+        "VsphereVolume": {
           "$ref": "#/$defs/VsphereVirtualDiskVolumeSource"
         },
-        "quobyte": {
+        "Quobyte": {
           "$ref": "#/$defs/QuobyteVolumeSource"
         },
-        "azureDisk": {
+        "AzureDisk": {
           "$ref": "#/$defs/AzureDiskVolumeSource"
         },
-        "photonPersistentDisk": {
+        "PhotonPersistentDisk": {
           "$ref": "#/$defs/PhotonPersistentDiskVolumeSource"
         },
-        "projected": {
+        "Projected": {
           "$ref": "#/$defs/ProjectedVolumeSource"
         },
-        "portworxVolume": {
+        "PortworxVolume": {
           "$ref": "#/$defs/PortworxVolumeSource"
         },
-        "scaleIO": {
+        "ScaleIO": {
           "$ref": "#/$defs/ScaleIOVolumeSource"
         },
-        "storageos": {
+        "StorageOS": {
           "$ref": "#/$defs/StorageOSVolumeSource"
         },
-        "csi": {
+        "CSI": {
           "$ref": "#/$defs/CSIVolumeSource"
         },
-        "ephemeral": {
+        "Ephemeral": {
           "$ref": "#/$defs/EphemeralVolumeSource"
         },
-        "image": {
+        "Image": {
           "$ref": "#/$defs/ImageVolumeSource"
         }
       },
@@ -1364,16 +1351,16 @@
     },
     "VsphereVirtualDiskVolumeSource": {
       "properties": {
-        "volumePath": {
+        "VolumePath": {
           "type": "string"
         },
-        "fsType": {
+        "FSType": {
           "type": "string"
         },
-        "storagePolicyName": {
+        "StoragePolicyName": {
           "type": "string"
         },
-        "storagePolicyID": {
+        "StoragePolicyID": {
           "type": "string"
         }
       },
@@ -1382,49 +1369,49 @@
     },
     "X509Subject": {
       "properties": {
-        "organizations": {
+        "Organizations": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "countries": {
+        "Countries": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "organizationalUnits": {
+        "OrganizationalUnits": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "localities": {
+        "Localities": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "provinces": {
+        "Provinces": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "streetAddresses": {
+        "StreetAddresses": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "postalCodes": {
+        "PostalCodes": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "serialNumber": {
+        "SerialNumber": {
           "type": "string"
         }
       },
