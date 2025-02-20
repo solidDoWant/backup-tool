@@ -1,105 +1,93 @@
 package disasterrecovery
 
 import (
-	"context"
+	"fmt"
 
-	"github.com/gravitational/trace"
-	"github.com/solidDoWant/backup-tool/pkg/cli/features"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery"
-	"github.com/spf13/cobra"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-type TeleportDRCommand struct{}
-
-func NewTeleportDRCommand() *TeleportDRCommand {
-	return &TeleportDRCommand{}
+type TeleportBackupConfigBTI struct {
+	CreationTimeout helpers.MaxWaitTime                                `yaml:"creationTimeout,omitempty"`
+	CreationOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:",inline"`
 }
 
-func (vwdrc *TeleportDRCommand) Name() string {
-	return "Teleport"
+type TeleportBackupConfigBackupVolume struct {
+	Size         resource.Quantity `yaml:"size, omitempty"`
+	StorageClass string            `yaml:"storageClass, omitempty"`
 }
 
-func (vwdrc *TeleportDRCommand) GetBackupCommand() DREventCommand {
-	return NewTeleportBackupCommand()
+type TeleportBackupConfigClusterConfig struct {
+	CNPGClusterName string `yaml:"name" jsonschema:"required"`
 }
 
-// func (vwdrc *TeleportDRCommand) GetRestoreCommand() DREventCommand {
-// 	return NewTeleportRestoreCommand()
-// }
-
-type TeleportDREventCommand[T interface{}] struct {
-	kubeCluster features.KubeClusterCommandInterface
-	context     features.ContextCommandInterface
-	configFile  features.ConfigFileCommandInterface[T]
-}
-
-func NewTeleportDREventCommand[T interface{}]() *TeleportDREventCommand[T] {
-	return &TeleportDREventCommand[T]{
-		context:     features.NewContextCommand(true),
-		configFile:  features.NewConfigFileCommand[T](),
-		kubeCluster: features.NewKubeClusterCommand(),
-	}
-}
-
-func (vwdrec *TeleportDREventCommand[T]) setup() (*contexts.Context, context.CancelFunc, T, *disasterrecovery.Teleport, error) {
-	var defaultConfigValue T
-
-	ctx, cancel := vwdrec.context.GetCommandContext()
-
-	config, err := vwdrec.configFile.ReadConfigFile(ctx)
-	if err != nil {
-		return nil, nil, defaultConfigValue, nil, trace.Wrap(err, "failed to read backup configuration from file")
-	}
-
-	clusterClient, err := vwdrec.kubeCluster.NewKubeClusterClient()
-	if err != nil {
-		return nil, nil, defaultConfigValue, nil, trace.Wrap(err, "failed to create new kubernetes cluster client")
-	}
-
-	vw := disasterrecovery.NewTeleport(clusterClient)
-
-	return ctx, cancel, config, vw, nil
-}
-
-func (vwdrec *TeleportDREventCommand[T]) ConfigureFlags(cmd *cobra.Command) {
-	vwdrec.context.ConfigureFlags(cmd)
-	vwdrec.configFile.ConfigureFlags(cmd)
-	vwdrec.kubeCluster.ConfigureFlags(cmd)
-}
-
-func (vwdrec *TeleportDREventCommand[T]) GenerateConfigSchema() ([]byte, error) {
-	return vwdrec.configFile.GenerateConfigSchema()
+type TeleportBackupConfigClustersConfig struct {
+	Core  TeleportBackupConfigClusterConfig `yaml:"core" jsonschema:"required"`
+	Audit TeleportBackupConfigClusterConfig `yaml:"audit" jsonschema:"required"`
 }
 
 type TeleportBackupConfig struct {
-	disasterrecovery.TeleportBackupOptions `yaml:",inline"`
-	// TODO test if these can be moved to an embedded "required" struct
-	Namespace              string `yaml:"namespace" jsonschema:"required"`
-	BackupName             string `yaml:"backupName" jsonschema:"required"`
-	DataPVCName            string `yaml:"dataPVCName" jsonschema:"required"`
-	CNPGClusterName        string `yaml:"cnpgClusterName" jsonschema:"required"`
-	ServingCertIssuerName  string `yaml:"servingCertIssuerName" jsonschema:"required"`
-	ClientCACertIssuerName string `yaml:"clientCACertIssuerName" jsonschema:"required"`
+	Namespace              string                                                  `yaml:"namespace" jsonschema:"required"`
+	BackupName             string                                                  `yaml:"backupName" jsonschema:"required"`
+	CNPGClusters           TeleportBackupConfigClustersConfig                      `yaml:"cnpgClusters" jsonschema:"required"`
+	ServingCertIssuerName  string                                                  `yaml:"servingCertIssuerName" jsonschema:"required"`
+	ClientCACertIssuerName string                                                  `yaml:"clientCACertIssuerName" jsonschema:"required"`
+	BackupVolume           TeleportBackupConfigBackupVolume                        `yaml:"backupVolume" jsonschema:"omitempty"`
+	BackupSnapshot         disasterrecovery.VaultWardenBackupOptionsBackupSnapshot `yaml:"backupSnapshot" jsonschema:"omitempty"`
+	CloneClusterOptions    clonedcluster.CloneClusterOptions                       `yaml:"clusterCloning,omitempty"`
+	BackupToolInstance     TeleportBackupConfigBTI                                 `yaml:"backupToolInstance,omitempty"`
+	ServiceSearchDomains   []string                                                `yaml:"serviceSearchDomains,omitempty"`
+	CleanupTimeout         helpers.MaxWaitTime                                     `yaml:"cleanupTimeout,omitempty"`
 }
 
-type TeleportBackupCommand struct {
-	*TeleportDREventCommand[TeleportBackupConfig]
+type TeleportRestoreConfig struct {
+	// TODO
 }
 
-func NewTeleportBackupCommand() *TeleportBackupCommand {
-	return &TeleportBackupCommand{
-		TeleportDREventCommand: NewTeleportDREventCommand[TeleportBackupConfig](),
+type TeleportDRCommand struct {
+	*ClusterDRCommand[TeleportBackupConfig, TeleportRestoreConfig]
+}
+
+func NewTeleportDRCommand() *TeleportDRCommand {
+	tBackup := func(ctx *contexts.Context, config TeleportBackupConfig, kubeCluster kubecluster.ClientInterface) error {
+		t := disasterrecovery.NewTeleport(kubeCluster)
+
+		auditClusterEnabled := false
+		if config.CNPGClusters.Audit.CNPGClusterName != "" {
+			auditClusterEnabled = true
+		}
+
+		opts := disasterrecovery.TeleportBackupOptions{
+			VolumeSize:          config.BackupVolume.Size,
+			VolumeStorageClass:  config.BackupVolume.StorageClass,
+			CloneClusterOptions: config.CloneClusterOptions,
+			AuditCluster: disasterrecovery.TeleportBackupOptionsAudit{
+				Name:    config.CNPGClusters.Audit.CNPGClusterName,
+				Enabled: auditClusterEnabled,
+			},
+			BackupToolPodCreationTimeout: config.BackupToolInstance.CreationTimeout,
+			RemoteBackupToolOptions:      config.BackupToolInstance.CreationOptions,
+			ClusterServiceSearchDomains:  config.ServiceSearchDomains,
+			BackupSnapshot:               config.BackupSnapshot,
+			CleanupTimeout:               config.CleanupTimeout,
+		}
+
+		_, err := t.Backup(ctx, config.Namespace, config.BackupName, config.CNPGClusters.Core.CNPGClusterName,
+			config.ServingCertIssuerName, config.ClientCACertIssuerName, opts)
+
+		return err
 	}
-}
 
-func (vwbc *TeleportBackupCommand) Run() error {
-	ctx, cancel, config, vw, err := vwbc.setup()
-	if err != nil {
-		return trace.Wrap(err, "failed to setup for Teleport backup")
+	tRestore := func(ctx *contexts.Context, config TeleportRestoreConfig, kubeCluster kubecluster.ClientInterface) error {
+		return fmt.Errorf("not implemented")
 	}
-	defer cancel()
 
-	_, err = vw.Backup(ctx, config.Namespace, config.BackupName, config.DataPVCName, config.CNPGClusterName, config.ServingCertIssuerName, config.ClientCACertIssuerName, config.TeleportBackupOptions)
-	return trace.Wrap(err, "failed to backup Teleport")
+	return &TeleportDRCommand{
+		ClusterDRCommand: NewClusterDRCommand("teleport", tBackup, tRestore),
+	}
 }

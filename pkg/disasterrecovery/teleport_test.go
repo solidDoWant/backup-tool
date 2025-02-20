@@ -79,7 +79,10 @@ func TestTeleportBackup(t *testing.T) {
 				CloneClusterOptions: clonedcluster.CloneClusterOptions{
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
-				BackupAuditCluster:           true,
+				AuditCluster: TeleportBackupOptionsAudit{
+					Name:    auditClusterName,
+					Enabled: true,
+				},
 				BackupToolPodCreationTimeout: helpers.MaxWaitTime(1 * time.Second),
 				BackupSnapshot: VaultWardenBackupOptionsBackupSnapshot{
 					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
@@ -94,6 +97,7 @@ func TestTeleportBackup(t *testing.T) {
 		},
 		{
 			desc:                             "error getting audit cluster size",
+			backupOptions:                    TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{Name: auditClusterName, Enabled: true}},
 			simulateGetAuditClusterSizeError: true,
 		},
 		{
@@ -106,7 +110,7 @@ func TestTeleportBackup(t *testing.T) {
 		},
 		{
 			desc:                         "error cloning audit cluster",
-			backupOptions:                TeleportBackupOptions{BackupAuditCluster: true},
+			backupOptions:                TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{Name: auditClusterName, Enabled: true}},
 			simulateCloneAuditClusterErr: true,
 		},
 		{
@@ -127,7 +131,7 @@ func TestTeleportBackup(t *testing.T) {
 		},
 		{
 			desc:                    "error dumping audit logical backup",
-			backupOptions:           TeleportBackupOptions{BackupAuditCluster: true},
+			backupOptions:           TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{Name: auditClusterName, Enabled: true}},
 			simulateAuditDumpAllErr: true,
 		},
 		{
@@ -144,7 +148,7 @@ func TestTeleportBackup(t *testing.T) {
 		},
 		{
 			desc:                                "error cleaning up audit cluster",
-			backupOptions:                       TeleportBackupOptions{BackupAuditCluster: true},
+			backupOptions:                       TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{Name: auditClusterName, Enabled: true}},
 			simulateCloneAuditClusterCleanupErr: true,
 		},
 	}
@@ -249,25 +253,29 @@ func TestTeleportBackup(t *testing.T) {
 					if tt.simulateGetCoreClusterSizeError {
 						return
 					}
+					// 2x sum of cluster allocated size
+					expectedPVCSize = resource.MustParse("2Gi")
 
-					mockCNPGClient.EXPECT().GetCluster(mock.Anything, namespace, auditClusterName).
-						RunAndReturn(func(calledCtx *contexts.Context, namespace, auditClusterName string) (*apiv1.Cluster, error) {
-							assert.True(t, calledCtx.IsChildOf(rootCtx))
+					if tt.backupOptions.AuditCluster.Enabled {
+						mockCNPGClient.EXPECT().GetCluster(mock.Anything, namespace, auditClusterName).
+							RunAndReturn(func(calledCtx *contexts.Context, namespace, auditClusterName string) (*apiv1.Cluster, error) {
+								assert.True(t, calledCtx.IsChildOf(rootCtx))
 
-							return th.ErrOr1Val(&apiv1.Cluster{
-								Spec: apiv1.ClusterSpec{
-									StorageConfiguration: apiv1.StorageConfiguration{
-										Size: "1Gi",
+								return th.ErrOr1Val(&apiv1.Cluster{
+									Spec: apiv1.ClusterSpec{
+										StorageConfiguration: apiv1.StorageConfiguration{
+											Size: "1Gi",
+										},
 									},
-								},
-							}, tt.simulateGetAuditClusterSizeError)
-						})
-					if tt.simulateGetAuditClusterSizeError {
-						return
+								}, tt.simulateGetAuditClusterSizeError)
+							})
+						if tt.simulateGetAuditClusterSizeError {
+							return
+						}
+						// 2x sum of cluster allocated size
+						expectedPVCSize = resource.MustParse("4Gi")
 					}
 
-					// 2x sum of cluster allocated size
-					expectedPVCSize = resource.MustParse("4Gi")
 				}
 
 				// Ensure PVC exists
@@ -301,7 +309,7 @@ func TestTeleportBackup(t *testing.T) {
 				})
 
 				// Clone audit cluster if enabled
-				if tt.backupOptions.BackupAuditCluster {
+				if tt.backupOptions.AuditCluster.Enabled {
 					mockClient.EXPECT().CloneCluster(mock.Anything, namespace, auditClusterName, mock.Anything, servingIssuerName, clientIssuerName, mock.Anything).
 						RunAndReturn(func(calledCtx *contexts.Context, namespace, auditClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
 							assert.True(t, calledCtx.IsChildOf(rootCtx))
@@ -324,7 +332,7 @@ func TestTeleportBackup(t *testing.T) {
 				coreClusterUserCert := clusterusercert.NewMockClusterUserCertInterface(t)
 				coreClusterUserCert.EXPECT().GetCertificate().Return(&coreUserCertificate)
 				clonedCoreCluster.EXPECT().GetPostgresUserCert().Return(coreClusterUserCert)
-				if tt.backupOptions.BackupAuditCluster {
+				if tt.backupOptions.AuditCluster.Enabled {
 					clonedAuditCluster.EXPECT().GetServingCert().Return(&auditServingCert)
 					auditClusterUserCert := clusterusercert.NewMockClusterUserCertInterface(t)
 					auditClusterUserCert.EXPECT().GetCertificate().Return(&auditUserCertificate)
@@ -338,7 +346,7 @@ func TestTeleportBackup(t *testing.T) {
 						assert.Contains(t, opts.NamePrefix, constants.ToolName)
 						// TODO add test to ensure that the secrets specifically are attached, as well as the DR volume
 						expectedVolCount := 3
-						if tt.backupOptions.BackupAuditCluster {
+						if tt.backupOptions.AuditCluster.Enabled {
 							expectedVolCount += 2
 						}
 						assert.Len(t, opts.Volumes, expectedVolCount)
@@ -394,7 +402,7 @@ func TestTeleportBackup(t *testing.T) {
 				}
 
 				// Audit cluster dump if enabled
-				if tt.backupOptions.BackupAuditCluster {
+				if tt.backupOptions.AuditCluster.Enabled {
 					clonedAuditCluster.EXPECT().GetCredentials(mock.Anything, mock.Anything).
 						RunAndReturn(func(servingCertMountDirectory, clientCertMountDirectory string) postgres.Credentials {
 							assert.NotEqual(t, servingCertMountDirectory, clientCertMountDirectory)
@@ -450,7 +458,7 @@ func TestTeleportBackup(t *testing.T) {
 			}()
 
 			backup, err := teleport.Backup(rootCtx, namespace, backupName, coreClusterName,
-				auditClusterName, servingIssuerName, clientIssuerName, tt.backupOptions)
+				servingIssuerName, clientIssuerName, tt.backupOptions)
 
 			require.NotNil(t, backup)
 			assert.NotEmpty(t, backup.StartTime)

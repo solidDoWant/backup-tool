@@ -42,6 +42,7 @@ func buildDRCommand(drCmd DRCommand) *cobra.Command {
 
 var drCommands = []DRCommand{
 	NewVaultWardenDRCommand(),
+	NewTeleportDRCommand(),
 }
 
 func getDRSubcommands() []*cobra.Command {

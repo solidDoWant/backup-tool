@@ -28,11 +28,16 @@ const (
 	teleportAuditSQLFileName = "backup-audit.sql"
 )
 
+type TeleportBackupOptionsAudit struct {
+	Enabled bool   `yaml:"enabled,omitempty"`
+	Name    string `yaml:"name,omitempty"`
+}
+
 type TeleportBackupOptions struct {
 	VolumeSize                   resource.Quantity                                  `yaml:"volumeSize,omitempty"`
 	VolumeStorageClass           string                                             `yaml:"volumeStorageClass,omitempty"`
 	CloneClusterOptions          clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
-	BackupAuditCluster           bool                                               `yaml:"backupAuditCluster,omitempty"`
+	AuditCluster                 TeleportBackupOptionsAudit                         `yaml:"auditCluster,omitempty"`
 	BackupToolPodCreationTimeout helpers.MaxWaitTime                                `yaml:"backupToolPodCreationTimeout,omitempty"`
 	RemoteBackupToolOptions      backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	ClusterServiceSearchDomains  []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
@@ -58,7 +63,7 @@ func NewTeleport(kubeClusterClient kubecluster.ClientInterface) *Teleport {
 // 5. Perform a logical backup of the Core cluster
 // 6. Perform a logical backup of the Audit cluster (if enabled)
 // 7. Snapshot the backup PVC
-func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClusterName, auditClusterName, servingCertIssuerName, clientCertIssuerName string, opts TeleportBackupOptions) (backup *DREvent, err error) {
+func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClusterName, servingCertIssuerName, clientCertIssuerName string, opts TeleportBackupOptions) (backup *DREvent, err error) {
 	backup = NewDREventNow(backupName)
 	ctx.Log.With("backupName", backup.GetFullName(), "namespace", namespace).Info("Starting backup process")
 	defer func() {
@@ -88,12 +93,14 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 		}
 		drVolumeSize.Add(coreClusterSize)
 
-		lookupCtx.Log.Step().Info("Looking up the audit CNPG cluster size")
-		auditClusterSize, err := t.getClusterSize(lookupCtx.Child(), namespace, auditClusterName)
-		if err != nil {
-			return backup, trace.Wrap(err, "failed to get the %q cluster size", helpers.FullNameStr(namespace, auditClusterName))
+		if opts.AuditCluster.Enabled {
+			lookupCtx.Log.Step().Info("Looking up the audit CNPG cluster size")
+			auditClusterSize, err := t.getClusterSize(lookupCtx.Child(), namespace, opts.AuditCluster.Name)
+			if err != nil {
+				return backup, trace.Wrap(err, "failed to get the %q cluster size", helpers.FullNameStr(namespace, opts.AuditCluster.Name))
+			}
+			drVolumeSize.Add(auditClusterSize)
 		}
-		drVolumeSize.Add(auditClusterSize)
 
 		// Default to roughly twice the sum of the CNPG cluster sizes. This may still be too small. If it is, the user
 		// should specify the volume size.
@@ -116,13 +123,13 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 
 	// 3. Clone the Audit cluster (if enabled) with PITR set to the same time as the Core cluster clone
 	var clonedAuditCluster clonedcluster.ClonedClusterInterface
-	if opts.BackupAuditCluster {
-		ctx.Log.Step().Info("Cloning CNPG cluster", "clusterName", auditClusterName)
+	if opts.AuditCluster.Enabled {
+		ctx.Log.Step().Info("Cloning CNPG cluster", "clusterName", opts.AuditCluster.Name)
 		var cleanupClonedAuditCluster func()
-		clonedAuditCluster, cleanupClonedAuditCluster, err = t.cloneCluster(ctx, namespace, auditClusterName, "audit", backup.Name,
+		clonedAuditCluster, cleanupClonedAuditCluster, err = t.cloneCluster(ctx, namespace, opts.AuditCluster.Name, "audit", backup.Name,
 			servingCertIssuerName, clientCertIssuerName, backup.StartTime, opts.CleanupTimeout, &err, opts.CloneClusterOptions)
 		if err != nil {
-			return backup, trace.Wrap(err, "failed to clone the %q cluster", auditClusterName)
+			return backup, trace.Wrap(err, "failed to clone the %q cluster", opts.AuditCluster.Name)
 		}
 
 		defer cleanupClonedAuditCluster()
@@ -150,7 +157,7 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 
 	var auditClusterServingCertVolumeMountPath string
 	var auditClusterClientCertVolumeMountPath string
-	if opts.BackupAuditCluster {
+	if opts.AuditCluster.Enabled {
 		auditClusterSecretsDirectoryPath := filepath.Join(secretsDirectoryPath, "audit")
 		auditClusterServingCertVolumeMountPath = filepath.Join(auditClusterSecretsDirectoryPath, "serving-cert")
 		auditClusterClientCertVolumeMountPath = filepath.Join(auditClusterSecretsDirectoryPath, "client-cert")
@@ -184,7 +191,7 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 	}
 
 	// 6. Perform a logical backup of the Audit cluster (if enabled)
-	if opts.BackupAuditCluster {
+	if opts.AuditCluster.Enabled {
 		ctx.Log.Step().Info("Performing Audit cluster Postgres logical backup")
 		podSQLFilePath = filepath.Join(drVolumeMountPath, teleportAuditSQLFileName)
 		clusterCredentials = clonedAuditCluster.GetCredentials(auditClusterServingCertVolumeMountPath, auditClusterClientCertVolumeMountPath)
