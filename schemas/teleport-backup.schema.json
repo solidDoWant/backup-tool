@@ -650,6 +650,18 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "OptionsBackupSnapshot": {
+      "properties": {
+        "snapshotReadyTimeout": {
+          "type": "integer"
+        },
+        "snapshotClass": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "OwnerReference": {
       "properties": {
         "APIVersion": {
@@ -1072,13 +1084,13 @@
           "$ref": "#/$defs/TeleportBackupConfigBackupVolume"
         },
         "backupSnapshot": {
-          "$ref": "#/$defs/VaultWardenBackupOptionsBackupSnapshot"
+          "$ref": "#/$defs/OptionsBackupSnapshot"
         },
         "clusterCloning": {
           "$ref": "#/$defs/CloneClusterOptions"
         },
         "backupToolInstance": {
-          "$ref": "#/$defs/TeleportBackupConfigBTI"
+          "$ref": "#/$defs/TeleportConfigBTI"
         },
         "serviceSearchDomains": {
           "items": {
@@ -1099,36 +1111,6 @@
         "servingCertIssuerName",
         "clientCACertIssuerName"
       ]
-    },
-    "TeleportBackupConfigBTI": {
-      "properties": {
-        "creationTimeout": {
-          "type": "integer"
-        },
-        "namePrefix": {
-          "type": "string"
-        },
-        "volumes": {
-          "items": {
-            "$ref": "#/$defs/SingleContainerVolume"
-          },
-          "type": "array"
-        },
-        "cleanupTimeout": {
-          "type": "integer"
-        },
-        "serviceType": {
-          "type": "string"
-        },
-        "podWaitTimeout": {
-          "type": "integer"
-        },
-        "serviceWaitTimeout": {
-          "type": "integer"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
     },
     "TeleportBackupConfigBackupVolume": {
       "properties": {
@@ -1166,9 +1148,35 @@
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "core",
-        "audit"
+        "core"
       ]
+    },
+    "TeleportConfigBTI": {
+      "properties": {
+        "namePrefix": {
+          "type": "string"
+        },
+        "volumes": {
+          "items": {
+            "$ref": "#/$defs/SingleContainerVolume"
+          },
+          "type": "array"
+        },
+        "cleanupTimeout": {
+          "type": "integer"
+        },
+        "serviceType": {
+          "type": "string"
+        },
+        "podWaitTimeout": {
+          "type": "integer"
+        },
+        "serviceWaitTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
     },
     "Time": {
       "properties": {},
@@ -1202,18 +1210,6 @@
           "type": "string"
         },
         "Namespace": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "VaultWardenBackupOptionsBackupSnapshot": {
-      "properties": {
-        "snapshotReadyTimeout": {
-          "type": "integer"
-        },
-        "snapshotClass": {
           "type": "string"
         }
       },

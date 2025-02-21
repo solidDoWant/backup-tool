@@ -595,6 +595,21 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "OptionsClusterUserCert": {
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/X509Subject"
+        },
+        "waitForReadyTimeout": {
+          "type": "integer"
+        },
+        "certificateRequestPolicy": {
+          "$ref": "#/$defs/NewClusterUserCertOptsCRP"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "OwnerReference": {
       "properties": {
         "APIVersion": {
@@ -1276,22 +1291,7 @@
     "vaultWardenRestoreOptionsCertificates": {
       "properties": {
         "postgresUserCert": {
-          "$ref": "#/$defs/vaultWardenRestoreOptionsClusterUserCert"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "vaultWardenRestoreOptionsClusterUserCert": {
-      "properties": {
-        "subject": {
-          "$ref": "#/$defs/X509Subject"
-        },
-        "waitForReadyTimeout": {
-          "type": "integer"
-        },
-        "certificateRequestPolicy": {
-          "$ref": "#/$defs/NewClusterUserCertOptsCRP"
+          "$ref": "#/$defs/OptionsClusterUserCert"
         }
       },
       "additionalProperties": false,

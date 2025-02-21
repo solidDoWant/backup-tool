@@ -677,6 +677,18 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "OptionsBackupSnapshot": {
+      "properties": {
+        "snapshotReadyTimeout": {
+          "type": "integer"
+        },
+        "snapshotClass": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "OwnerReference": {
       "properties": {
         "APIVersion": {
@@ -1131,7 +1143,7 @@
           "type": "integer"
         },
         "backupSnapshot": {
-          "$ref": "#/$defs/VaultWardenBackupOptionsBackupSnapshot"
+          "$ref": "#/$defs/OptionsBackupSnapshot"
         },
         "remoteBackupToolOptions": {
           "$ref": "#/$defs/CreateBackupToolInstanceOptions"
@@ -1174,18 +1186,6 @@
         "servingCertIssuerName",
         "clientCACertIssuerName"
       ]
-    },
-    "VaultWardenBackupOptionsBackupSnapshot": {
-      "properties": {
-        "snapshotReadyTimeout": {
-          "type": "integer"
-        },
-        "snapshotClass": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
     },
     "VolumeProjection": {
       "properties": {
