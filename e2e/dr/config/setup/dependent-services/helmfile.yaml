@@ -8,7 +8,7 @@ helmDefaults:
   waitForJobs: true
   createNamespace: false
   historyMax: 1
-  timeout: 120
+  timeout: 600 # Increased due to throttling
 
 repositories:
   - name: piraeus-charts
@@ -61,6 +61,7 @@ releases:
     chart: cert-manager-charts/cert-manager
     version: 1.16.1
     atomic: true
+    timeout: 600
     values:
       - ./cert-manager.values.yaml
   - name: approver-policy
