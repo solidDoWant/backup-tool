@@ -21,7 +21,7 @@ func NewPostgresServer() *PostgresServer {
 	}
 }
 
-func decodeCredentials(encodedCredentials *postgres_v1.EnvironmentCredentials) postgres.Credentials {
+func decodePostgresCredentials(encodedCredentials *postgres_v1.EnvironmentCredentials) postgres.Credentials {
 	encodedCredentialEntries := encodedCredentials.GetCredentials()
 	decodedCredentials := make(map[postgres.CredentialVariable]string, len(encodedCredentialEntries))
 	for _, encodedCredentialEntry := range encodedCredentialEntries {
@@ -34,7 +34,7 @@ func decodeCredentials(encodedCredentials *postgres_v1.EnvironmentCredentials) p
 	return postgres.EnvironmentCredentials(postgres.CredentialVariables(decodedCredentials))
 }
 
-func decodeDumpAllOptions(encodedOptions *postgres_v1.DumpAllOptions) postgres.DumpAllOptions {
+func decodePostgresDumpAllOptions(encodedOptions *postgres_v1.DumpAllOptions) postgres.DumpAllOptions {
 	opts := postgres.DumpAllOptions{}
 
 	timeout := encodedOptions.GetCleanupTimeout()
@@ -47,7 +47,7 @@ func decodeDumpAllOptions(encodedOptions *postgres_v1.DumpAllOptions) postgres.D
 
 func (ps *PostgresServer) DumpAll(ctx context.Context, req *postgres_v1.DumpAllRequest) (*postgres_v1.DumpAllResponse, error) {
 	grpcCtx := contexts.UnwrapHandlerContext(ctx)
-	err := ps.runtime.DumpAll(grpcCtx, decodeCredentials(req.GetCredentials()), req.GetOutputFilePath(), decodeDumpAllOptions(req.GetOptions()))
+	err := ps.runtime.DumpAll(grpcCtx, decodePostgresCredentials(req.GetCredentials()), req.GetOutputFilePath(), decodePostgresDumpAllOptions(req.GetOptions()))
 	if err != nil {
 		return nil, trail.Send(grpcCtx, err)
 	}
@@ -55,13 +55,13 @@ func (ps *PostgresServer) DumpAll(ctx context.Context, req *postgres_v1.DumpAllR
 	return &postgres_v1.DumpAllResponse{}, nil
 }
 
-func decodeRestoreOptions(_ *postgres_v1.RestoreOptions) postgres.RestoreOptions {
+func decodePostgresRestoreOptions(_ *postgres_v1.RestoreOptions) postgres.RestoreOptions {
 	return postgres.RestoreOptions{}
 }
 
 func (ps *PostgresServer) Restore(ctx context.Context, req *postgres_v1.RestoreRequest) (*postgres_v1.RestoreResponse, error) {
 	grpcCtx := contexts.UnwrapHandlerContext(ctx)
-	err := ps.runtime.Restore(grpcCtx, decodeCredentials(req.GetCredentials()), req.GetInputFilePath(), decodeRestoreOptions(req.GetOptions()))
+	err := ps.runtime.Restore(grpcCtx, decodePostgresCredentials(req.GetCredentials()), req.GetInputFilePath(), decodePostgresRestoreOptions(req.GetOptions()))
 	if err != nil {
 		return nil, trail.Send(grpcCtx, err)
 	}

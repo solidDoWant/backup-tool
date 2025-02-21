@@ -2,7 +2,7 @@ edition = "2023";
 
 option go_package = "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/postgres/v1;postgres_v1";
 
-import "credentials.proto";
+import "postgres_credentials.proto";
 
 message RestoreRequest {
   EnvironmentCredentials credentials = 1;

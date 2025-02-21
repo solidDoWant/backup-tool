@@ -21,7 +21,7 @@ func TestNewPostgresServer(t *testing.T) {
 	assert.NotNil(t, server.runtime)
 }
 
-func TestDecodeCredentials(t *testing.T) {
+func TestDecodePostgresCredentials(t *testing.T) {
 	testCases := []struct {
 		desc     string
 		input    *postgres_v1.EnvironmentCredentials
@@ -71,13 +71,13 @@ func TestDecodeCredentials(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			result := decodeCredentials(tc.input)
+			result := decodePostgresCredentials(tc.input)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
 }
 
-func TestDecodeDumpAllOptions(t *testing.T) {
+func TestDecodePostgresDumpAllOptions(t *testing.T) {
 	tests := []struct {
 		name  string
 		input *postgres_v1.DumpAllOptions
@@ -100,7 +100,7 @@ func TestDecodeDumpAllOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := decodeDumpAllOptions(tt.input)
+			got := decodePostgresDumpAllOptions(tt.input)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -149,8 +149,8 @@ func TestDumpAll(t *testing.T) {
 			server.runtime = runtime
 
 			ctx := th.NewTestContext()
-			decodedCredentials := decodeCredentials(tc.credentials)
-			decodedOpts := decodeDumpAllOptions(tc.opts)
+			decodedCredentials := decodePostgresCredentials(tc.credentials)
+			decodedOpts := decodePostgresDumpAllOptions(tc.opts)
 			runtime.EXPECT().DumpAll(contexts.UnwrapHandlerContext(ctx), decodedCredentials, tc.outputPath, decodedOpts).Return(tc.runtimeErr)
 
 			// Create request
@@ -176,7 +176,7 @@ func TestDumpAll(t *testing.T) {
 }
 
 func TestDecodeRestoreOptions(t *testing.T) {
-	assert.Equal(t, postgres.RestoreOptions{}, decodeRestoreOptions(&postgres_v1.RestoreOptions{}))
+	assert.Equal(t, postgres.RestoreOptions{}, decodePostgresRestoreOptions(&postgres_v1.RestoreOptions{}))
 }
 
 func TestRestore(t *testing.T) {
@@ -219,8 +219,8 @@ func TestRestore(t *testing.T) {
 			server.runtime = runtime
 
 			ctx := th.NewTestContext()
-			decodedCredentials := decodeCredentials(tc.credentials)
-			decodedOpts := decodeRestoreOptions(tc.opts)
+			decodedCredentials := decodePostgresCredentials(tc.credentials)
+			decodedOpts := decodePostgresRestoreOptions(tc.opts)
 			runtime.EXPECT().Restore(contexts.UnwrapHandlerContext(ctx), decodedCredentials, tc.inputPath, decodedOpts).Return(tc.runtimeErr)
 
 			// Create request

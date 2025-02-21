@@ -2,7 +2,7 @@ edition = "2023";
 
 option go_package = "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/files/v1;files_v1";
 
-import "transfer.proto";
+import "files_transfer.proto";
 
 service Files {
   rpc CopyFiles(CopyFilesRequest) returns (CopyFilesResponse);
