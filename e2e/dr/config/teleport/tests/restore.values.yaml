@@ -1,0 +1,13 @@
+---
+jobConfig:
+  configFile:
+    backupName: tp-e2e
+    cnpgClusters:
+      core:
+        name: tpr-core
+        servingCertName: tpr-core-postgres-serving-cert
+        clientCertIssuerName: tpr-core-postgres-auth-ca-issuer
+      audit:
+        name: tpr-audit
+        servingCertName: tpr-audit-postgres-serving-cert
+        clientCertIssuerName: tpr-audit-postgres-auth-ca-issuer

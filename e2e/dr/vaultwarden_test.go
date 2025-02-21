@@ -12,95 +12,11 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	batchv1 "k8s.io/api/batch/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 	"sigs.k8s.io/e2e-framework/third_party/helm"
 )
-
-func verifyCronJobIsDeployed(cronjobName, namespace string) func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
-	return func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
-		client := c.Client()
-
-		cronjob := &batchv1.CronJob{}
-		err := client.Resources().Get(ctx, cronjobName, namespace, cronjob)
-
-		assert.NoError(t, err)
-		assert.NotNil(t, cronjob)
-
-		return ctx
-	}
-}
-
-func verifyJobSucceeds(cronJobName, namespace string) func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
-	return func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
-		client := c.Client()
-		jobName := cronJobName + "-manual"
-
-		// Get the cronjob
-		cronjob := &batchv1.CronJob{}
-		err := client.Resources().Get(ctx, cronJobName, namespace, cronjob)
-		assert.NoError(t, err)
-
-		// Use it to build a normal job using what `kubectl create job --from=cronjob/...` would do
-		annotations := make(map[string]string)
-		annotations["cronjob.kubernetes.io/instantiate"] = "manual"
-		for k, v := range cronjob.Spec.JobTemplate.Annotations {
-			annotations[k] = v
-		}
-
-		job := &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        jobName,
-				Namespace:   namespace,
-				Annotations: annotations,
-				Labels:      cronjob.Spec.JobTemplate.Labels,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: batchv1.SchemeGroupVersion.String(),
-						Kind:       "CronJob",
-						Name:       cronjob.GetName(),
-						UID:        cronjob.GetUID(),
-						Controller: ptr.To(true),
-					},
-				},
-			},
-			Spec: cronjob.Spec.JobTemplate.Spec,
-		}
-
-		// Start the job
-		err = client.Resources().Create(ctx, job)
-		assert.NoError(t, err)
-
-		// Wait for the job to finish, whether it succeeds or fails
-		var finalCondition batchv1.JobCondition
-		err = wait.For(func(ctx context.Context) (bool, error) {
-			if err := client.Resources().Get(ctx, jobName, namespace, job); err != nil {
-				return false, trace.Wrap(err, "failed to get job")
-			}
-
-			for _, condition := range job.Status.Conditions {
-				finalCondition = condition
-				if (condition.Type == batchv1.JobComplete || condition.Type == batchv1.JobFailed) &&
-					condition.Status == "True" {
-					return true, nil
-				}
-			}
-
-			return false, nil
-		}, wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(20*time.Minute))
-		assert.NoError(t, err)
-
-		// Verify that the job reports success
-		assert.Equal(t, batchv1.JobComplete, finalCondition.Type)
-		assert.Equal(t, corev1.ConditionTrue, finalCondition.Status)
-
-		return ctx
-	}
-}
 
 func DeployVaultWarden() (features.Func, features.Func) {
 	helmSetup, helmFinish := Helmfile("./config/vaultwarden/instance/helmfile.yaml")
@@ -173,7 +89,7 @@ func TestVaultWarden(t *testing.T) {
 	backupReleaseName := "vw-test-successfull-backup"
 	backupCronJobName := backupReleaseName + "-dr-job"
 
-	restoreReleaseName := "vw-successfull-restore"
+	restoreReleaseName := "vw-test-successfull-restore"
 	restoreCronJobName := restoreReleaseName + "-dr-job"
 
 	vaultwardenRestoreReleaseName := "vaultwarden-restore"

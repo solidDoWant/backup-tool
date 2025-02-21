@@ -1,0 +1,293 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+controllers:
+  tpr-core-postgres-wal-bucket:
+    type: job
+    nameOverride: tpr-core-postgres-wal-bucket
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://tpr-core-postgres-wal/
+        env:
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+  tpr-audit-postgres-wal-bucket:
+    type: job
+    nameOverride: tpr-audit-postgres-wal-bucket
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://tpr-audit-postgres-wal/
+        env:
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+  tpr-audit-session-logs-bucket:
+    type: job
+    nameOverride: tpr-audit-session-logs-bucket
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://tpr-audit-session-logs/
+        env:
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+rawResources:
+  tpr-core-postgres-serving-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: tpr-core-postgres-serving-cert
+    spec:
+      spec:
+        commonName: Teleport Core Postgres serving
+        dnsNames:
+          - tpr-core-rw
+          - tpr-core-rw.default.svc
+        usages:
+          - server auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: tpr-core-postgres-serving-cert
+  tpr-core-postgres-streaming-replica-user-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: tpr-core-postgres-streaming-replica-user-cert
+    spec:
+      spec:
+        commonName: streaming_replica
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: tpr-core-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: tpr-core-postgres-streaming-replica-user-cert
+  tpr-core-postgres-tpr-core-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: tpr-core-postgres-tpr-core-user-cert
+    spec:
+      spec:
+        commonName: tpr-core
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: tpr-core-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: tpr-core-postgres-tpr-core-user-cert
+  tpr-core-postgres-cluster:
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    forceRename: tpr-core
+    spec:
+      spec:
+        instances: 2 # One replica, one primary
+        imageName: ghcr.io/soliddowant/postgresql-teleport:17.0 # Needed for wal2json plugin
+        bootstrap:
+          initdb:
+            database: tpr-core
+            owner: tpr-core
+            postInitSQL:
+              - ALTER USER "tpr-core" WITH PASSWORD NULL;
+        postgresql:
+          pg_hba:
+            - hostssl all all all cert # Allow and enforce TLS connections to all databases from all users from everywhere
+        managed:
+          roles:
+            - name: tpr-core
+              login: true
+              # Required for Teleport for cluster state per https://github.com/gravitational/teleport/discussions/30247
+              # Docs are unclear if this is required for the "audit" database, audit database, or both.
+              replication: true
+        storage:
+          size: 5Gi
+          storageClass: openebs-zfs
+        backup:
+          target: prefer-standby
+          volumeSnapshot:
+            className: openebs-zfs
+            online: true
+            onlineConfiguration:
+              immediateCheckpoint: false
+              waitForArchive: true
+            snapshotOwnerReference: backup
+          barmanObjectStore:
+            destinationPath: s3://tpr-core-postgres-wal/
+            endpointURL: http://seaweedfs-s3:8333
+            s3Credentials:
+              accessKeyId:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+              secretAccessKey:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+        certificates:
+          serverTLSSecret: tpr-core-postgres-serving-cert
+          serverCASecret: tpr-core-postgres-serving-cert
+          clientCASecret: tpr-core-postgres-client-ca-cert
+          replicationTLSSecret: tpr-core-postgres-streaming-replica-user-cert
+  tpr-audit-postgres-serving-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: tpr-audit-postgres-serving-cert
+    spec:
+      spec:
+        commonName: Teleport audit Postgres serving
+        dnsNames:
+          - tpr-audit-rw
+          - tpr-audit-rw.default.svc
+        usages:
+          - server auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: tpr-audit-postgres-serving-cert
+  tpr-audit-postgres-streaming-replica-user-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: tpr-audit-postgres-streaming-replica-user-cert
+    spec:
+      spec:
+        commonName: streaming_replica
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: tpr-audit-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: tpr-audit-postgres-streaming-replica-user-cert
+  tpr-audit-postgres-tpr-audit-user-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: tpr-audit-postgres-tpr-audit-user-cert
+    spec:
+      spec:
+        commonName: tpr-audit
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: tpr-audit-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: tpr-audit-postgres-tpr-audit-user-cert
+  tpr-audit-postgres-cluster:
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    forceRename: tpr-audit
+    spec:
+      spec:
+        instances: 2 # One replica, one primary
+        bootstrap:
+          initdb:
+            database: tpr-audit
+            owner: tpr-audit
+            postInitSQL:
+              - ALTER USER "tpr-audit" WITH PASSWORD NULL;
+        postgresql:
+          pg_hba:
+            - hostssl all all all cert # Allow and enforce TLS connections to all databases from all users from everywhere
+        storage:
+          size: 5Gi
+          storageClass: openebs-zfs
+        backup:
+          target: prefer-standby
+          volumeSnapshot:
+            className: openebs-zfs
+            online: true
+            onlineConfiguration:
+              immediateCheckpoint: false
+              waitForArchive: true
+            snapshotOwnerReference: backup
+          barmanObjectStore:
+            destinationPath: s3://tpr-audit-postgres-wal/
+            endpointURL: http://seaweedfs-s3:8333
+            s3Credentials:
+              accessKeyId:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+              secretAccessKey:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+        certificates:
+          serverTLSSecret: tpr-audit-postgres-serving-cert
+          serverCASecret: tpr-audit-postgres-serving-cert
+          clientCASecret: tpr-audit-postgres-client-ca-cert
+          replicationTLSSecret: tpr-audit-postgres-streaming-replica-user-cert

@@ -1,0 +1,88 @@
+---
+clusterName: teleport-restore.default.svc
+kubeClusterName: e2e-cluster
+auth:
+  teleportConfig:
+    teleport:
+      storage:
+        type: postgresql
+        conn_string: "\
+          postgresql://\
+          tpr-core@tpr-core-rw.default.svc:5432/tpr-core?\
+          pool_max_conns=20&\
+          sslrootcert=/etc/tpr-backend/secrets/core/server/ca.crt&\
+          sslcert=/etc/tpr-backend/secrets/core/client/tls.crt&\
+          sslkey=/etc/tpr-backend/secrets/core/client/tls.key&\
+          sslmode=verify-full"
+        audit_events_uri: "\
+          postgresql://\
+          tpr-audit@tpr-audit-rw.default.svc:5432/tpr-audit?\
+          sslrootcert=/etc/tpr-backend/secrets/audit/server/ca.crt&\
+          sslcert=/etc/tpr-backend/secrets/audit/client/tls.crt&\
+          sslkey=/etc/tpr-backend/secrets/audit/client/tls.key&\
+          sslmode=verify-full"
+        audit_sessions_uri: "\
+          s3://tpr-audit-session-logs?\
+          endpoint=http://seaweedfs-s3:8333&\
+          disablesse=true"
+  extraVolumes:
+    - name: tpr-core-postgres-serving-cert
+      secret:
+        secretName: tpr-core-postgres-serving-cert
+        defaultMode: 0440
+        items:
+          - key: ca.crt
+            path: ca.crt
+    - name: tpr-core-postgres-tpr-core-user-cert
+      secret:
+        secretName: tpr-core-postgres-tpr-core-user-cert
+        defaultMode: 0440
+        items:
+          - key: tls.crt
+            path: tls.crt
+          - key: tls.key
+            path: tls.key
+    - name: tpr-audit-postgres-serving-cert
+      secret:
+        secretName: tpr-audit-postgres-serving-cert
+        defaultMode: 0440
+        items:
+          - key: ca.crt
+            path: ca.crt
+    - name: tpr-audit-postgres-tpr-audit-user-cert
+      secret:
+        secretName: tpr-audit-postgres-tpr-audit-user-cert
+        defaultMode: 0440
+        items:
+          - key: tls.crt
+            path: tls.crt
+          - key: tls.key
+            path: tls.key
+  extraVolumeMounts:
+    - name: tpr-core-postgres-serving-cert
+      mountPath: /etc/tpr-backend/secrets/core/server
+    - name: tpr-core-postgres-tpr-core-user-cert
+      mountPath: /etc/tpr-backend/secrets/core/client
+    - name: tpr-audit-postgres-serving-cert
+      mountPath: /etc/tpr-backend/secrets/audit/server
+    - name: tpr-audit-postgres-tpr-audit-user-cert
+      mountPath: /etc/tpr-backend/secrets/audit/client
+  extraEnv:
+    # The S3 client will fail before attempting connection to Rook if this is not set
+    - name: AWS_DEFAULT_REGION
+      value: dummy-value
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: seaweedfs-s3-secret
+          key: admin_access_key_id
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: seaweedfs-s3-secret
+          key: admin_secret_access_key
+persistence:
+  enabled: false
+proxyListenerMode: multiplex
+service:
+  type: ClusterIP

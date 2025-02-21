@@ -23,5 +23,3 @@ jobConfig:
         streamingReplicaUserCert:
           certificateRequestPolicy:
             enabled: true
-    backupToolInstance:
-      creationTimeout: 10m
