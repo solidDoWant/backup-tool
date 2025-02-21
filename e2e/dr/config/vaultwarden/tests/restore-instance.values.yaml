@@ -28,7 +28,7 @@ service:
 persistence:
   data:
     type: persistentVolumeClaim
-    existingClaim: restore-backend-restore-data-vol
+    existingClaim: vaultwarden-restore-backend-restore-data-vol
     globalMounts:
       - path: /data
   serving-cert:
