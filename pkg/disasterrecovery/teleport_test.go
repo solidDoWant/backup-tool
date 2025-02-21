@@ -86,7 +86,6 @@ func TestTeleportBackup(t *testing.T) {
 						Enabled: true,
 					},
 				},
-				BackupToolPodCreationTimeout: helpers.MaxWaitTime(1 * time.Second),
 				BackupSnapshot: OptionsBackupSnapshot{
 					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
 					SnapshotClass: "custom-snapshot-class",
@@ -585,18 +584,20 @@ func TestTeleportRestore(t *testing.T) {
 
 			func() {
 				mockCoreCNPGRestore.EXPECT().Configure(mock.Anything, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, mock.Anything, "backup-core.sql", CNPGRestoreOpts{
-					PostgresUserCert:        tt.opts.PostgresUserCert,
-					RemoteBackupToolOptions: tt.opts.RemoteBackupToolOptions,
-					CleanupTimeout:          tt.opts.CleanupTimeout,
+					PostgresUserCert:            tt.opts.PostgresUserCert,
+					RemoteBackupToolOptions:     tt.opts.RemoteBackupToolOptions,
+					ClusterServiceSearchDomains: tt.opts.ClusterServiceSearchDomains,
+					CleanupTimeout:              tt.opts.CleanupTimeout,
 				}).RunAndReturn(func(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertName, clientCertIssuerName, drVolName, fullRestoreName, backupFileRelPath string, opts CNPGRestoreOpts) {
 					assert.Equal(t, kubeClusterClient, mockClient)
 				})
 
 				if tt.opts.AuditCluster.Enabled {
 					mockAuditCNPGRestore.EXPECT().Configure(mock.Anything, namespace, auditClusterName, auditServingCertName, auditClientCertIssuerName, restoreName, mock.Anything, "backup-audit.sql", CNPGRestoreOpts{
-						PostgresUserCert:        tt.opts.AuditCluster.PostgresUserCert,
-						RemoteBackupToolOptions: tt.opts.RemoteBackupToolOptions,
-						CleanupTimeout:          tt.opts.CleanupTimeout,
+						PostgresUserCert:            tt.opts.AuditCluster.PostgresUserCert,
+						RemoteBackupToolOptions:     tt.opts.RemoteBackupToolOptions,
+						ClusterServiceSearchDomains: tt.opts.ClusterServiceSearchDomains,
+						CleanupTimeout:              tt.opts.CleanupTimeout,
 					}).RunAndReturn(func(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertName, clientCertIssuerName, drVolName, fullRestoreName, backupFileRelPath string, opts CNPGRestoreOpts) {
 						assert.Equal(t, kubeClusterClient, mockClient)
 					})

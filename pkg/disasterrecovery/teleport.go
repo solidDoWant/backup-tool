@@ -38,15 +38,14 @@ type TeleportBackupOptionsAudit struct {
 }
 
 type TeleportBackupOptions struct {
-	VolumeSize                   resource.Quantity                                  `yaml:"volumeSize,omitempty"`
-	VolumeStorageClass           string                                             `yaml:"volumeStorageClass,omitempty"`
-	CloneClusterOptions          clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
-	AuditCluster                 TeleportBackupOptionsAudit                         `yaml:"auditCluster,omitempty"`
-	BackupToolPodCreationTimeout helpers.MaxWaitTime                                `yaml:"backupToolPodCreationTimeout,omitempty"`
-	RemoteBackupToolOptions      backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
-	ClusterServiceSearchDomains  []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
-	BackupSnapshot               OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
-	CleanupTimeout               helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
+	VolumeSize                  resource.Quantity                                  `yaml:"volumeSize,omitempty"`
+	VolumeStorageClass          string                                             `yaml:"volumeStorageClass,omitempty"`
+	CloneClusterOptions         clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
+	AuditCluster                TeleportBackupOptionsAudit                         `yaml:"auditCluster,omitempty"`
+	RemoteBackupToolOptions     backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
+	ClusterServiceSearchDomains []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
+	BackupSnapshot              OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
+	CleanupTimeout              helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
 type Teleport struct {
@@ -281,10 +280,11 @@ type TeleportRestoreOptionsAudit struct {
 }
 
 type TeleportRestoreOptions struct {
-	AuditCluster            TeleportRestoreOptionsAudit                        `yaml:"auditCluster,omitempty"`
-	PostgresUserCert        OptionsClusterUserCert                             `yaml:"postgresUserCert,omitempty"`
-	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
-	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
+	AuditCluster                TeleportRestoreOptionsAudit                        `yaml:"auditCluster,omitempty"`
+	PostgresUserCert            OptionsClusterUserCert                             `yaml:"postgresUserCert,omitempty"`
+	RemoteBackupToolOptions     backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
+	ClusterServiceSearchDomains []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
+	CleanupTimeout              helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
 // Restore requirements:
@@ -327,9 +327,10 @@ func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreCl
 	auditRestore := t.newCNPGRestore()
 	if opts.AuditCluster.Enabled {
 		auditRestore.Configure(t.kubeClusterClient, namespace, opts.AuditCluster.Name, opts.AuditCluster.ServingCertName, opts.AuditCluster.ClientCertIssuerName, restoreName, restore.GetFullName(), teleportAuditSQLFileName, CNPGRestoreOpts{
-			PostgresUserCert:        opts.AuditCluster.PostgresUserCert,
-			RemoteBackupToolOptions: opts.RemoteBackupToolOptions,
-			CleanupTimeout:          opts.CleanupTimeout,
+			PostgresUserCert:            opts.AuditCluster.PostgresUserCert,
+			RemoteBackupToolOptions:     opts.RemoteBackupToolOptions,
+			CleanupTimeout:              opts.CleanupTimeout,
+			ClusterServiceSearchDomains: opts.ClusterServiceSearchDomains,
 		})
 	}
 
