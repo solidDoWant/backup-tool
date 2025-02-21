@@ -36,6 +36,7 @@ func TestNewTeleport(t *testing.T) {
 
 	require.NotNil(t, teleport)
 	assert.Equal(t, mockClient, teleport.kubeClusterClient)
+	assert.NotNil(t, teleport.newCNPGRestore)
 }
 
 func TestTeleportBackupOptions(t *testing.T) {
@@ -80,11 +81,13 @@ func TestTeleportBackup(t *testing.T) {
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
 				AuditCluster: TeleportBackupOptionsAudit{
-					Name:    auditClusterName,
-					Enabled: true,
+					TeleportOptionsAudit{
+						Name:    auditClusterName,
+						Enabled: true,
+					},
 				},
 				BackupToolPodCreationTimeout: helpers.MaxWaitTime(1 * time.Second),
-				BackupSnapshot: VaultWardenBackupOptionsBackupSnapshot{
+				BackupSnapshot: OptionsBackupSnapshot{
 					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
 					SnapshotClass: "custom-snapshot-class",
 				},
@@ -97,7 +100,7 @@ func TestTeleportBackup(t *testing.T) {
 		},
 		{
 			desc:                             "error getting audit cluster size",
-			backupOptions:                    TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{Name: auditClusterName, Enabled: true}},
+			backupOptions:                    TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{TeleportOptionsAudit{Name: auditClusterName, Enabled: true}}},
 			simulateGetAuditClusterSizeError: true,
 		},
 		{
@@ -110,7 +113,7 @@ func TestTeleportBackup(t *testing.T) {
 		},
 		{
 			desc:                         "error cloning audit cluster",
-			backupOptions:                TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{Name: auditClusterName, Enabled: true}},
+			backupOptions:                TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{TeleportOptionsAudit{Name: auditClusterName, Enabled: true}}},
 			simulateCloneAuditClusterErr: true,
 		},
 		{
@@ -131,7 +134,7 @@ func TestTeleportBackup(t *testing.T) {
 		},
 		{
 			desc:                    "error dumping audit logical backup",
-			backupOptions:           TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{Name: auditClusterName, Enabled: true}},
+			backupOptions:           TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{TeleportOptionsAudit{Name: auditClusterName, Enabled: true}}},
 			simulateAuditDumpAllErr: true,
 		},
 		{
@@ -148,7 +151,7 @@ func TestTeleportBackup(t *testing.T) {
 		},
 		{
 			desc:                                "error cleaning up audit cluster",
-			backupOptions:                       TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{Name: auditClusterName, Enabled: true}},
+			backupOptions:                       TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{TeleportOptionsAudit{Name: auditClusterName, Enabled: true}}},
 			simulateCloneAuditClusterCleanupErr: true,
 		},
 	}
@@ -463,6 +466,205 @@ func TestTeleportBackup(t *testing.T) {
 			require.NotNil(t, backup)
 			assert.NotEmpty(t, backup.StartTime)
 			assert.NotEmpty(t, backup.EndTime)
+
+			if wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestTeleportRestoreOptions(t *testing.T) {
+	th.OptStructTest[TeleportRestoreOptions](t)
+}
+
+func TestTeleportRestore(t *testing.T) {
+	namespace := "test-ns"
+	restoreName := "test-restore"
+	coreClusterName := "test-core-cluster"
+	coreServingCertName := "test-core-serving-cert"
+	coreClientCertIssuerName := "test-core-client-cert-issuer"
+	auditClusterName := "test-audit-cluster"
+	auditServingCertName := "test-audit-serving-cert"
+	auditClientCertIssuerName := "test-audit-client-cert-issuer"
+
+	auditClusterOptions := TeleportRestoreOptionsAudit{
+		TeleportOptionsAudit: TeleportOptionsAudit{
+			Name:    auditClusterName,
+			Enabled: true,
+		},
+		ServingCertName:      auditServingCertName,
+		ClientCertIssuerName: auditClientCertIssuerName,
+	}
+
+	tests := []struct {
+		desc                                  string
+		opts                                  TeleportRestoreOptions
+		simulateGetDRPVCError                 bool
+		simulateCoreCheckResourcesReadyError  bool
+		simulateAuditCheckResourcesReadyError bool
+		simulateCoreRestoreError              bool
+		simulateAuditRestoreError             bool
+	}{
+		{
+			desc: "success - no options set",
+		},
+		{
+			desc: "success - all options set",
+			opts: TeleportRestoreOptions{
+				AuditCluster:   auditClusterOptions,
+				CleanupTimeout: helpers.MaxWaitTime(3 * time.Second),
+			},
+		},
+		{
+			desc:                  "error getting DR PVC",
+			simulateGetDRPVCError: true,
+		},
+		{
+			desc:                                 "error checking core cluster resources",
+			simulateCoreCheckResourcesReadyError: true,
+		},
+		{
+			desc:                                  "error checking audit cluster resources",
+			opts:                                  TeleportRestoreOptions{AuditCluster: auditClusterOptions},
+			simulateAuditCheckResourcesReadyError: true,
+		},
+		{
+			desc:                     "error restoring core cluster",
+			simulateCoreRestoreError: true,
+		},
+		{
+			desc:                      "error restoring audit cluster",
+			opts:                      TeleportRestoreOptions{AuditCluster: auditClusterOptions},
+			simulateAuditRestoreError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			mockClient := kubecluster.NewMockClientInterface(t)
+			mockCoreClient := core.NewMockClientInterface(t)
+			mockCNPGClient := cnpg.NewMockClientInterface(t)
+			mockESClient := externalsnapshotter.NewMockClientInterface(t)
+			mockClient.EXPECT().Core().Return(mockCoreClient).Maybe()
+			mockClient.EXPECT().CNPG().Return(mockCNPGClient).Maybe()
+			mockClient.EXPECT().ES().Return(mockESClient).Maybe()
+
+			mockCoreCNPGRestore := NewMockCNPGRestoreInterface(t)
+			mockAuditCNPGRestore := NewMockCNPGRestoreInterface(t)
+
+			restoreCount := 0
+
+			teleport := &Teleport{
+				kubeClusterClient: mockClient,
+				newCNPGRestore: func() CNPGRestoreInterface {
+					restoreCount++
+					switch restoreCount {
+					case 1:
+						return mockCoreCNPGRestore
+					case 2:
+						return mockAuditCNPGRestore
+					default:
+						assert.Fail(t, "too many calls to newCNPGRestore")
+						return nil
+					}
+				},
+			}
+
+			rootCtx := th.NewTestContext()
+
+			wantErr := th.ErrExpected(
+				tt.simulateGetDRPVCError,
+				tt.simulateCoreCheckResourcesReadyError,
+				tt.simulateAuditCheckResourcesReadyError,
+				tt.simulateCoreRestoreError,
+				tt.simulateAuditRestoreError,
+			)
+
+			func() {
+				mockCoreCNPGRestore.EXPECT().Configure(mock.Anything, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, mock.Anything, "backup-core.sql", CNPGRestoreOpts{
+					PostgresUserCert:        tt.opts.PostgresUserCert,
+					RemoteBackupToolOptions: tt.opts.RemoteBackupToolOptions,
+					CleanupTimeout:          tt.opts.CleanupTimeout,
+				}).RunAndReturn(func(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertName, clientCertIssuerName, drVolName, fullRestoreName, backupFileRelPath string, opts CNPGRestoreOpts) {
+					assert.Equal(t, kubeClusterClient, mockClient)
+				})
+
+				if tt.opts.AuditCluster.Enabled {
+					mockAuditCNPGRestore.EXPECT().Configure(mock.Anything, namespace, auditClusterName, auditServingCertName, auditClientCertIssuerName, restoreName, mock.Anything, "backup-audit.sql", CNPGRestoreOpts{
+						PostgresUserCert:        tt.opts.AuditCluster.PostgresUserCert,
+						RemoteBackupToolOptions: tt.opts.RemoteBackupToolOptions,
+						CleanupTimeout:          tt.opts.CleanupTimeout,
+					}).RunAndReturn(func(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertName, clientCertIssuerName, drVolName, fullRestoreName, backupFileRelPath string, opts CNPGRestoreOpts) {
+						assert.Equal(t, kubeClusterClient, mockClient)
+					})
+				}
+
+				// 1. Ensure the require resources already exist
+				mockCoreClient.EXPECT().GetPVC(mock.Anything, namespace, restoreName).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, pvcName string) (*corev1.PersistentVolumeClaim, error) {
+						assert.True(t, calledCtx.IsChildOf(rootCtx))
+
+						return th.ErrOr1Val(&corev1.PersistentVolumeClaim{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      restoreName,
+								Namespace: namespace,
+							},
+						}, tt.simulateGetDRPVCError)
+					})
+				if tt.simulateGetDRPVCError {
+					return
+				}
+
+				mockCoreCNPGRestore.EXPECT().CheckResourcesReady(mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context) error {
+						assert.True(t, calledCtx.IsChildOf(rootCtx))
+
+						return th.ErrIfTrue(tt.simulateCoreCheckResourcesReadyError)
+					})
+				if tt.simulateCoreCheckResourcesReadyError {
+					return
+				}
+
+				if tt.opts.AuditCluster.Enabled {
+					mockAuditCNPGRestore.EXPECT().CheckResourcesReady(mock.Anything).
+						RunAndReturn(func(calledCtx *contexts.Context) error {
+							assert.True(t, calledCtx.IsChildOf(rootCtx))
+
+							return th.ErrIfTrue(tt.simulateAuditCheckResourcesReadyError)
+						})
+					if tt.simulateAuditCheckResourcesReadyError {
+						return
+					}
+				}
+
+				// 2. Restore the core CNPG cluster
+				mockCoreCNPGRestore.EXPECT().Restore(mock.Anything).RunAndReturn(func(calledCtx *contexts.Context) error {
+					assert.True(t, calledCtx.IsChildOf(rootCtx))
+
+					return th.ErrIfTrue(tt.simulateCoreRestoreError)
+				})
+				if tt.simulateCoreRestoreError {
+					return
+				}
+
+				// 3. Restore the audit CNPG cluster if enabled
+				if tt.opts.AuditCluster.Enabled {
+					mockAuditCNPGRestore.EXPECT().Restore(mock.Anything).RunAndReturn(func(calledCtx *contexts.Context) error {
+						assert.True(t, calledCtx.IsChildOf(rootCtx))
+
+						return th.ErrIfTrue(tt.simulateAuditRestoreError)
+					})
+				}
+			}()
+
+			restore, err := teleport.Restore(rootCtx, namespace, restoreName, coreClusterName, coreServingCertName, coreClientCertIssuerName, tt.opts)
+
+			require.NotNil(t, restore)
+			assert.NotEmpty(t, restore.StartTime)
+			assert.NotEmpty(t, restore.EndTime)
 
 			if wantErr {
 				assert.Error(t, err)

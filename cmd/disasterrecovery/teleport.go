@@ -32,17 +32,17 @@ type TeleportBackupConfigClustersConfig struct {
 }
 
 type TeleportBackupConfig struct {
-	Namespace              string                                                  `yaml:"namespace" jsonschema:"required"`
-	BackupName             string                                                  `yaml:"backupName" jsonschema:"required"`
-	CNPGClusters           TeleportBackupConfigClustersConfig                      `yaml:"cnpgClusters" jsonschema:"required"`
-	ServingCertIssuerName  string                                                  `yaml:"servingCertIssuerName" jsonschema:"required"`
-	ClientCACertIssuerName string                                                  `yaml:"clientCACertIssuerName" jsonschema:"required"`
-	BackupVolume           TeleportBackupConfigBackupVolume                        `yaml:"backupVolume" jsonschema:"omitempty"`
-	BackupSnapshot         disasterrecovery.VaultWardenBackupOptionsBackupSnapshot `yaml:"backupSnapshot" jsonschema:"omitempty"`
-	CloneClusterOptions    clonedcluster.CloneClusterOptions                       `yaml:"clusterCloning,omitempty"`
-	BackupToolInstance     TeleportBackupConfigBTI                                 `yaml:"backupToolInstance,omitempty"`
-	ServiceSearchDomains   []string                                                `yaml:"serviceSearchDomains,omitempty"`
-	CleanupTimeout         helpers.MaxWaitTime                                     `yaml:"cleanupTimeout,omitempty"`
+	Namespace              string                                 `yaml:"namespace" jsonschema:"required"`
+	BackupName             string                                 `yaml:"backupName" jsonschema:"required"`
+	CNPGClusters           TeleportBackupConfigClustersConfig     `yaml:"cnpgClusters" jsonschema:"required"`
+	ServingCertIssuerName  string                                 `yaml:"servingCertIssuerName" jsonschema:"required"`
+	ClientCACertIssuerName string                                 `yaml:"clientCACertIssuerName" jsonschema:"required"`
+	BackupVolume           TeleportBackupConfigBackupVolume       `yaml:"backupVolume" jsonschema:"omitempty"`
+	BackupSnapshot         disasterrecovery.OptionsBackupSnapshot `yaml:"backupSnapshot" jsonschema:"omitempty"`
+	CloneClusterOptions    clonedcluster.CloneClusterOptions      `yaml:"clusterCloning,omitempty"`
+	BackupToolInstance     TeleportBackupConfigBTI                `yaml:"backupToolInstance,omitempty"`
+	ServiceSearchDomains   []string                               `yaml:"serviceSearchDomains,omitempty"`
+	CleanupTimeout         helpers.MaxWaitTime                    `yaml:"cleanupTimeout,omitempty"`
 }
 
 type TeleportRestoreConfig struct {
@@ -67,8 +67,11 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 			VolumeStorageClass:  config.BackupVolume.StorageClass,
 			CloneClusterOptions: config.CloneClusterOptions,
 			AuditCluster: disasterrecovery.TeleportBackupOptionsAudit{
-				Name:    config.CNPGClusters.Audit.CNPGClusterName,
-				Enabled: auditClusterEnabled,
+				disasterrecovery.TeleportOptionsAudit{
+
+					Enabled: auditClusterEnabled,
+					Name:    config.CNPGClusters.Audit.CNPGClusterName,
+				},
 			},
 			BackupToolPodCreationTimeout: config.BackupToolInstance.CreationTimeout,
 			RemoteBackupToolOptions:      config.BackupToolInstance.CreationOptions,

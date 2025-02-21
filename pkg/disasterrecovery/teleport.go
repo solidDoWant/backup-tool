@@ -28,9 +28,13 @@ const (
 	teleportAuditSQLFileName = "backup-audit.sql"
 )
 
-type TeleportBackupOptionsAudit struct {
+type TeleportOptionsAudit struct {
 	Enabled bool   `yaml:"enabled,omitempty"`
 	Name    string `yaml:"name,omitempty"`
+}
+
+type TeleportBackupOptionsAudit struct {
+	TeleportOptionsAudit
 }
 
 type TeleportBackupOptions struct {
@@ -41,17 +45,20 @@ type TeleportBackupOptions struct {
 	BackupToolPodCreationTimeout helpers.MaxWaitTime                                `yaml:"backupToolPodCreationTimeout,omitempty"`
 	RemoteBackupToolOptions      backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	ClusterServiceSearchDomains  []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
-	BackupSnapshot               VaultWardenBackupOptionsBackupSnapshot             `yaml:"backupSnapshot,omitempty"`
+	BackupSnapshot               OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
 	CleanupTimeout               helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
 type Teleport struct {
 	kubeClusterClient kubecluster.ClientInterface
+	// Testing injection
+	newCNPGRestore func() CNPGRestoreInterface
 }
 
 func NewTeleport(kubeClusterClient kubecluster.ClientInterface) *Teleport {
 	return &Teleport{
 		kubeClusterClient: kubeClusterClient,
+		newCNPGRestore:    NewCNPGRestore,
 	}
 }
 
@@ -264,4 +271,104 @@ func (t *Teleport) cloneCluster(ctx *contexts.Context, namespace, clusterName, s
 	}
 
 	return clonedCluster, cleanupFunc, nil
+}
+
+type TeleportRestoreOptionsAudit struct {
+	TeleportOptionsAudit
+	ServingCertName      string                 `yaml:"servingCertName,omitempty"`
+	ClientCertIssuerName string                 `yaml:"clientCertIssuerName,omitempty"`
+	PostgresUserCert     OptionsClusterUserCert `yaml:"postgresUserCert,omitempty"`
+}
+
+type TeleportRestoreOptions struct {
+	AuditCluster            TeleportRestoreOptionsAudit                        `yaml:"auditCluster,omitempty"`
+	PostgresUserCert        OptionsClusterUserCert                             `yaml:"postgresUserCert,omitempty"`
+	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
+	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
+}
+
+// Restore requirements:
+// * The DR PVC must exist
+// * Replacement clusters must be already deployed
+// * The enabled CNPG cluster must already exist, but not be in use
+// * The enabled  CNPG client CA issuer must already exist
+// * The enabled  CNPG cluster must support TLS auth for the postgres user
+// * The enabled  CNPG cluster serving cert must already exist
+// Restore process:
+// 1. Ensure that the provided resources exist and are ready
+// 2. Restore the core CNPG cluster
+// 2. 1. Create postgres user cert
+// 2. 2. Spawn a new backup-tool pod with postgres auth and serving certs, and DR mount attached
+// 2. 3. Perform a Postgres logical recovery of the cluster
+// 3. Restore the audit CNPG cluster (if enabled)
+// 3. 1. Create postgres user cert
+// 3. 2. Spawn a new backup-tool pod with postgres auth and serving certs, and DR mount attached
+// 3. 3. Perform a Postgres logical recovery of the cluster
+func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreClusterName, coreServingCertName, coreClientCertIssuerName string, opts TeleportRestoreOptions) (restore *DREvent, err error) {
+	restore = NewDREventNow(restoreName)
+	ctx.Log.With("restoreName", restore.GetFullName(), "namespace", namespace).Info("Starting restore process")
+	defer func() {
+		restore.Stop()
+		keyvals := []interface{}{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
+		if err != nil {
+			ctx.Log.Warn("Restore process failed", keyvals...)
+		} else {
+			ctx.Log.Info("Restore process completed", keyvals...)
+		}
+	}()
+
+	coreRestore := t.newCNPGRestore()
+	coreRestore.Configure(t.kubeClusterClient, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, restore.GetFullName(), teleportCoreSQLFileName, CNPGRestoreOpts{
+		PostgresUserCert:        opts.PostgresUserCert,
+		RemoteBackupToolOptions: opts.RemoteBackupToolOptions,
+		CleanupTimeout:          opts.CleanupTimeout,
+	})
+
+	auditRestore := t.newCNPGRestore()
+	if opts.AuditCluster.Enabled {
+		auditRestore.Configure(t.kubeClusterClient, namespace, opts.AuditCluster.Name, opts.AuditCluster.ServingCertName, opts.AuditCluster.ClientCertIssuerName, restoreName, restore.GetFullName(), teleportAuditSQLFileName, CNPGRestoreOpts{
+			PostgresUserCert:        opts.AuditCluster.PostgresUserCert,
+			RemoteBackupToolOptions: opts.RemoteBackupToolOptions,
+			CleanupTimeout:          opts.CleanupTimeout,
+		})
+	}
+
+	// 1. Ensure the require resources already exist
+	ctx.Log.Step().Info("Ensuring required resources exist")
+	_, err = t.kubeClusterClient.Core().GetPVC(ctx.Child(), namespace, restoreName)
+	if err != nil {
+		return restore, trace.Wrap(err, "failed to get DR PVC %q", restoreName)
+	}
+
+	err = coreRestore.CheckResourcesReady(ctx.Child())
+	if err != nil {
+		return restore, trace.Wrap(err, "failed to verify that resources for core cluster restoration are ready")
+	}
+
+	if opts.AuditCluster.Enabled {
+		err = auditRestore.CheckResourcesReady(ctx.Child())
+		if err != nil {
+			return restore, trace.Wrap(err, "failed to verify that resources for audit cluster restoration are ready")
+		}
+	}
+
+	// 2. Restore the core CNPG cluster
+	ctx.Log.Step().Info("Restoring the core cluster")
+	err = coreRestore.Restore(ctx.Child())
+	if err != nil {
+		return restore, trace.Wrap(err, "failed to restore the core cluster")
+	}
+
+	// 3. Restore the audit CNPG cluster (if enabled)
+	if !opts.AuditCluster.Enabled {
+		return restore, nil
+	}
+
+	ctx.Log.Step().Info("Restoring the audit cluster")
+	err = auditRestore.Restore(ctx.Child())
+	if err != nil {
+		return restore, trace.Wrap(err, "failed to restore audit cluster")
+	}
+
+	return restore, nil
 }

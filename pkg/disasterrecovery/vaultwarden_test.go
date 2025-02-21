@@ -84,7 +84,7 @@ func TestVaultWardenBackup(t *testing.T) {
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
 				BackupToolPodCreationTimeout: helpers.MaxWaitTime(1 * time.Second),
-				BackupSnapshot: VaultWardenBackupOptionsBackupSnapshot{
+				BackupSnapshot: OptionsBackupSnapshot{
 					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
 					SnapshotClass: "custom-snapshot-class",
 				},
@@ -395,7 +395,7 @@ func TestVaultWardenRestore(t *testing.T) {
 			desc: "success - all options set",
 			restoreOptions: VaultWardenRestoreOptions{
 				Certificates: vaultWardenRestoreOptionsCertificates{
-					PostgresUserCert: vaultWardenRestoreOptionsClusterUserCert{
+					PostgresUserCert: OptionsClusterUserCert{
 						Subject: &certmanagerv1.X509Subject{
 							Organizations: []string{"test-org"},
 						},

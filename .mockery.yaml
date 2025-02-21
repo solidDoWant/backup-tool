@@ -19,6 +19,10 @@ packages:
       ContextCommandInterface:
       KubeClusterCommandInterface:
       KubernetesCommandInterface:
+  github.com/solidDoWant/backup-tool/pkg/disasterrecovery:
+    <<: *baseline_config
+    interfaces:
+      CNPGRestoreInterface:
   github.com/solidDoWant/backup-tool/pkg/files:
     <<: *baseline_config
     interfaces:

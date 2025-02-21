@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"dario.cat/mergo"
-	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
@@ -33,18 +32,13 @@ const (
 	vaultwardenSQLFileName   = "dump.sql" // Important: changing this is will break restoration of old backups!
 )
 
-type VaultWardenBackupOptionsBackupSnapshot struct {
-	ReadyTimeout  helpers.MaxWaitTime `yaml:"snapshotReadyTimeout,omitempty"`
-	SnapshotClass string              `yaml:"snapshotClass,omitempty"`
-}
-
 // TODO plumb a lot more options through to here
 type VaultWardenBackupOptions struct {
 	VolumeSize                   resource.Quantity                                  `yaml:"volumeSize,omitempty"`
 	VolumeStorageClass           string                                             `yaml:"volumeStorageClass,omitempty"`
 	CloneClusterOptions          clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
 	BackupToolPodCreationTimeout helpers.MaxWaitTime                                `yaml:"backupToolPodCreationTimeout,omitempty"`
-	BackupSnapshot               VaultWardenBackupOptionsBackupSnapshot             `yaml:"backupSnapshot,omitempty"`
+	BackupSnapshot               OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
 	RemoteBackupToolOptions      backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	ClusterServiceSearchDomains  []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
 	CleanupTimeout               helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
@@ -198,14 +192,8 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 	return backup, nil
 }
 
-type vaultWardenRestoreOptionsClusterUserCert struct {
-	Subject             *certmanagerv1.X509Subject                `yaml:"subject,omitempty"`
-	WaitForReadyTimeout helpers.MaxWaitTime                       `yaml:"waitForReadyTimeout,omitempty"`
-	CRPOpts             clusterusercert.NewClusterUserCertOptsCRP `yaml:"certificateRequestPolicy,omitempty"`
-}
-
 type vaultWardenRestoreOptionsCertificates struct {
-	PostgresUserCert vaultWardenRestoreOptionsClusterUserCert `yaml:"postgresUserCert,omitempty"`
+	PostgresUserCert OptionsClusterUserCert `yaml:"postgresUserCert,omitempty"`
 }
 
 type VaultWardenRestoreOptions struct {
