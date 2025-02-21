@@ -10,6 +10,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/grpc"
 	files_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/files/v1"
 	postgres_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/postgres/v1"
+	s3_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/s3/v1"
 	gogrpc "google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	grpchealth_v1 "google.golang.org/grpc/health/grpc_health_v1"
@@ -36,6 +37,7 @@ var registerServers = func(registrar gogrpc.ServiceRegistrar) {
 
 	files_v1.RegisterFilesServer(registrar, NewFilesServer())
 	postgres_v1.RegisterPostgresServer(registrar, NewPostgresServer())
+	s3_v1.RegisterS3Server(registrar, NewS3Server())
 	grpchealth_v1.RegisterHealthServer(registrar, healthcheckService)
 
 	healthcheckService.SetServingStatus(grpc.SystemService, grpchealth_v1.HealthCheckResponse_SERVING)

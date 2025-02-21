@@ -75,6 +75,7 @@ func TestRegisterServers(t *testing.T) {
 	// Verify all services are registered
 	assert.Contains(t, serviceInfo, "Files")
 	assert.Contains(t, serviceInfo, "Postgres")
+	assert.Contains(t, serviceInfo, "S3")
 	assert.Contains(t, serviceInfo, "grpc.health.v1.Health")
 }
 

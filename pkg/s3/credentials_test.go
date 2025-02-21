@@ -73,6 +73,36 @@ func TestWithRegion(t *testing.T) {
 	assert.Equal(t, credentials.Region, region)
 }
 
+func TestGetAccessKeyID(t *testing.T) {
+	accessKeyID := "accessKeyID"
+	credentials := NewCredentials(accessKeyID, "")
+	assert.Equal(t, credentials.GetAccessKeyID(), accessKeyID)
+}
+
+func TestGetSecretAccessKey(t *testing.T) {
+	secretAccessKey := "secretAccessKey"
+	credentials := NewCredentials("", secretAccessKey)
+	assert.Equal(t, credentials.GetSecretAccessKey(), secretAccessKey)
+}
+
+func TestGetSessionToken(t *testing.T) {
+	sessionToken := "sessionToken"
+	credentials := NewCredentials("", "").WithSessionToken(sessionToken)
+	assert.Equal(t, credentials.GetSessionToken(), sessionToken)
+}
+
+func TestGetEndpoint(t *testing.T) {
+	endpoint := "endpoint"
+	credentials := NewCredentials("", "").WithEndpoint(endpoint)
+	assert.Equal(t, credentials.GetEndpoint(), endpoint)
+}
+
+func TestGetRegion(t *testing.T) {
+	region := "region"
+	credentials := NewCredentials("", "").WithRegion(region)
+	assert.Equal(t, credentials.GetRegion(), region)
+}
+
 func TestAWSConfig(t *testing.T) {
 	accesKeyId := "accessKeyId"
 	secretAccessKey := "secretAccessKey"

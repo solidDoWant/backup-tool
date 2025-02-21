@@ -25,7 +25,7 @@ func NewPostgresClient(grpcConnection grpc.ClientConnInterface) *PostgresClient 
 	}
 }
 
-func encodeCredentialVariable(variable postgres.CredentialVariable) (postgres_v1.VarName, error) {
+func encodePostgresCredentialVariable(variable postgres.CredentialVariable) (postgres_v1.VarName, error) {
 	if i, ok := postgres_v1.VarName_value[string(variable)]; ok {
 		return postgres_v1.VarName(i), nil
 	}
@@ -36,7 +36,7 @@ func encodeCredentialVariable(variable postgres.CredentialVariable) (postgres_v1
 }
 
 // Encode a credential implementation instance into a protobuf-compatible value
-func encodeCredentials(credentials postgres.Credentials) (*postgres_v1.EnvironmentCredentials, error) {
+func encodePostgresCredentials(credentials postgres.Credentials) (*postgres_v1.EnvironmentCredentials, error) {
 	variables := credentials.GetVariables()
 	encodedEnvironmentVariables := make([]*postgres_v1.EnvironmentCredentials_EnvironmentVariable, 0, len(variables))
 
@@ -46,7 +46,7 @@ func encodeCredentials(credentials postgres.Credentials) (*postgres_v1.Environme
 
 	for _, variableName := range variableNames {
 		variableValue := variables[variableName]
-		encodedVariable, err := encodeCredentialVariable(variableName)
+		encodedVariable, err := encodePostgresCredentialVariable(variableName)
 		if err != nil {
 			return nil, trace.Wrap(err, "failed to encode credential variable")
 		}
@@ -62,7 +62,7 @@ func encodeCredentials(credentials postgres.Credentials) (*postgres_v1.Environme
 	return encodedCredentials, nil
 }
 
-func encodeDumpAllOptions(opts postgres.DumpAllOptions) *postgres_v1.DumpAllOptions {
+func encodePostgresDumpAllOptions(opts postgres.DumpAllOptions) *postgres_v1.DumpAllOptions {
 	encodedOpts := &postgres_v1.DumpAllOptions{}
 
 	if opts.CleanupTimeout != 0 {
@@ -76,7 +76,7 @@ func (pc *PostgresClient) DumpAll(ctx *contexts.Context, credentials postgres.Cr
 	ctx.Log.With("outputFilePath", outputFilePath, "address", postgres.GetServerAddress(credentials), "username", credentials.GetUsername()).Info("Dumping all databases")
 	defer ctx.Log.Info("Finished dumping databases", ctx.Stopwatch.Keyval())
 
-	encodedCredentials, err := encodeCredentials(credentials)
+	encodedCredentials, err := encodePostgresCredentials(credentials)
 	if err != nil {
 		return trace.Wrap(err, "failed to encode credentials")
 	}
@@ -84,7 +84,7 @@ func (pc *PostgresClient) DumpAll(ctx *contexts.Context, credentials postgres.Cr
 	request := postgres_v1.DumpAllRequest_builder{
 		Credentials:    encodedCredentials,
 		OutputFilePath: &outputFilePath,
-		Options:        encodeDumpAllOptions(opts),
+		Options:        encodePostgresDumpAllOptions(opts),
 	}.Build()
 
 	var header metadata.MD
@@ -92,7 +92,7 @@ func (pc *PostgresClient) DumpAll(ctx *contexts.Context, credentials postgres.Cr
 	return trail.FromGRPC(err, header)
 }
 
-func encodeRestoreOptions(_ postgres.RestoreOptions) *postgres_v1.RestoreOptions {
+func encodePostgresRestoreOptions(_ postgres.RestoreOptions) *postgres_v1.RestoreOptions {
 	return &postgres_v1.RestoreOptions{}
 }
 
@@ -100,7 +100,7 @@ func (pc *PostgresClient) Restore(ctx *contexts.Context, credentials postgres.Cr
 	ctx.Log.With("inputFilePath", inputFilePath, "address", postgres.GetServerAddress(credentials), "username", credentials.GetUsername()).Info("Restoring all databases")
 	defer ctx.Log.Info("Finished restoring databases", ctx.Stopwatch.Keyval())
 
-	encodedCredentials, err := encodeCredentials(credentials)
+	encodedCredentials, err := encodePostgresCredentials(credentials)
 	if err != nil {
 		return trace.Wrap(err, "failed to encode credentials")
 	}
@@ -108,7 +108,7 @@ func (pc *PostgresClient) Restore(ctx *contexts.Context, credentials postgres.Cr
 	request := postgres_v1.RestoreRequest_builder{
 		Credentials:   encodedCredentials,
 		InputFilePath: &inputFilePath,
-		Options:       encodeRestoreOptions(opts),
+		Options:       encodePostgresRestoreOptions(opts),
 	}.Build()
 
 	var header metadata.MD

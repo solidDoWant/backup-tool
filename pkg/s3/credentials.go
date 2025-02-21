@@ -8,6 +8,11 @@ import (
 )
 
 type CredentialsInterface interface {
+	GetAccessKeyID() string
+	GetSecretAccessKey() string
+	GetSessionToken() string
+	GetRegion() string
+	GetEndpoint() string
 	AWSConfig() *aws.Config
 }
 
@@ -59,6 +64,26 @@ func (c *Credentials) WithEndpoint(endpoint string) *Credentials {
 func (c *Credentials) WithRegion(region string) *Credentials {
 	c.Region = region
 	return c
+}
+
+func (c *Credentials) GetAccessKeyID() string {
+	return c.AccessKeyID
+}
+
+func (c *Credentials) GetSecretAccessKey() string {
+	return c.SecretAccessKey
+}
+
+func (c *Credentials) GetSessionToken() string {
+	return c.SessionToken
+}
+
+func (c *Credentials) GetRegion() string {
+	return c.Region
+}
+
+func (c *Credentials) GetEndpoint() string {
+	return c.Endpoint
 }
 
 func (c *Credentials) AWSConfig() *aws.Config {

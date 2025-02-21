@@ -175,7 +175,7 @@ func TestDumpAll(t *testing.T) {
 	}
 }
 
-func TestDecodeRestoreOptions(t *testing.T) {
+func TestDecodePostgresRestoreOptions(t *testing.T) {
 	assert.Equal(t, postgres.RestoreOptions{}, decodePostgresRestoreOptions(&postgres_v1.RestoreOptions{}))
 }
 

@@ -90,6 +90,7 @@ func TestNewClient(t *testing.T) {
 			assert.NotNil(t, client)
 			assert.NotNil(t, client.Files())
 			assert.NotNil(t, client.Postgres())
+			assert.NotNil(t, client.S3())
 			assert.NotNil(t, client.Health())
 		})
 	}

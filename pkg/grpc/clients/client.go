@@ -9,6 +9,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
+	"github.com/solidDoWant/backup-tool/pkg/s3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
@@ -17,6 +18,7 @@ import (
 type ClientInterface interface {
 	Files() files.Runtime
 	Postgres() postgres.Runtime
+	S3() s3.Runtime
 	Close() error
 }
 
@@ -24,6 +26,7 @@ type Client struct {
 	conn     *grpc.ClientConn
 	files    *FilesClient
 	postgres *PostgresClient
+	s3       *S3Client
 	health   grpc_health_v1.HealthClient
 }
 
@@ -45,6 +48,7 @@ func NewClient(ctx *contexts.Context, serverAddress string) (*Client, error) {
 		conn:     conn,
 		files:    NewFilesClient(conn),
 		postgres: NewPostgresClient(conn),
+		s3:       NewS3Client(conn),
 		health:   grpc_health_v1.NewHealthClient(conn),
 	}, nil
 }
@@ -105,6 +109,10 @@ func (c *Client) Files() files.Runtime {
 
 func (c *Client) Postgres() postgres.Runtime {
 	return c.postgres
+}
+
+func (c *Client) S3() s3.Runtime {
+	return c.s3
 }
 
 func (c *Client) Health() grpc_health_v1.HealthClient {

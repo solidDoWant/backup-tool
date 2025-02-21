@@ -67,6 +67,231 @@ func (_c *MockCredentialsInterface_AWSConfig_Call) RunAndReturn(run func() *aws.
 	return _c
 }
 
+// GetAccessKeyID provides a mock function with no fields
+func (_m *MockCredentialsInterface) GetAccessKeyID() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccessKeyID")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockCredentialsInterface_GetAccessKeyID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAccessKeyID'
+type MockCredentialsInterface_GetAccessKeyID_Call struct {
+	*mock.Call
+}
+
+// GetAccessKeyID is a helper method to define mock.On call
+func (_e *MockCredentialsInterface_Expecter) GetAccessKeyID() *MockCredentialsInterface_GetAccessKeyID_Call {
+	return &MockCredentialsInterface_GetAccessKeyID_Call{Call: _e.mock.On("GetAccessKeyID")}
+}
+
+func (_c *MockCredentialsInterface_GetAccessKeyID_Call) Run(run func()) *MockCredentialsInterface_GetAccessKeyID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetAccessKeyID_Call) Return(_a0 string) *MockCredentialsInterface_GetAccessKeyID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetAccessKeyID_Call) RunAndReturn(run func() string) *MockCredentialsInterface_GetAccessKeyID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetEndpoint provides a mock function with no fields
+func (_m *MockCredentialsInterface) GetEndpoint() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEndpoint")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockCredentialsInterface_GetEndpoint_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEndpoint'
+type MockCredentialsInterface_GetEndpoint_Call struct {
+	*mock.Call
+}
+
+// GetEndpoint is a helper method to define mock.On call
+func (_e *MockCredentialsInterface_Expecter) GetEndpoint() *MockCredentialsInterface_GetEndpoint_Call {
+	return &MockCredentialsInterface_GetEndpoint_Call{Call: _e.mock.On("GetEndpoint")}
+}
+
+func (_c *MockCredentialsInterface_GetEndpoint_Call) Run(run func()) *MockCredentialsInterface_GetEndpoint_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetEndpoint_Call) Return(_a0 string) *MockCredentialsInterface_GetEndpoint_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetEndpoint_Call) RunAndReturn(run func() string) *MockCredentialsInterface_GetEndpoint_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetRegion provides a mock function with no fields
+func (_m *MockCredentialsInterface) GetRegion() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRegion")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockCredentialsInterface_GetRegion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRegion'
+type MockCredentialsInterface_GetRegion_Call struct {
+	*mock.Call
+}
+
+// GetRegion is a helper method to define mock.On call
+func (_e *MockCredentialsInterface_Expecter) GetRegion() *MockCredentialsInterface_GetRegion_Call {
+	return &MockCredentialsInterface_GetRegion_Call{Call: _e.mock.On("GetRegion")}
+}
+
+func (_c *MockCredentialsInterface_GetRegion_Call) Run(run func()) *MockCredentialsInterface_GetRegion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetRegion_Call) Return(_a0 string) *MockCredentialsInterface_GetRegion_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetRegion_Call) RunAndReturn(run func() string) *MockCredentialsInterface_GetRegion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetSecretAccessKey provides a mock function with no fields
+func (_m *MockCredentialsInterface) GetSecretAccessKey() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSecretAccessKey")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockCredentialsInterface_GetSecretAccessKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSecretAccessKey'
+type MockCredentialsInterface_GetSecretAccessKey_Call struct {
+	*mock.Call
+}
+
+// GetSecretAccessKey is a helper method to define mock.On call
+func (_e *MockCredentialsInterface_Expecter) GetSecretAccessKey() *MockCredentialsInterface_GetSecretAccessKey_Call {
+	return &MockCredentialsInterface_GetSecretAccessKey_Call{Call: _e.mock.On("GetSecretAccessKey")}
+}
+
+func (_c *MockCredentialsInterface_GetSecretAccessKey_Call) Run(run func()) *MockCredentialsInterface_GetSecretAccessKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetSecretAccessKey_Call) Return(_a0 string) *MockCredentialsInterface_GetSecretAccessKey_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetSecretAccessKey_Call) RunAndReturn(run func() string) *MockCredentialsInterface_GetSecretAccessKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetSessionToken provides a mock function with no fields
+func (_m *MockCredentialsInterface) GetSessionToken() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSessionToken")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockCredentialsInterface_GetSessionToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSessionToken'
+type MockCredentialsInterface_GetSessionToken_Call struct {
+	*mock.Call
+}
+
+// GetSessionToken is a helper method to define mock.On call
+func (_e *MockCredentialsInterface_Expecter) GetSessionToken() *MockCredentialsInterface_GetSessionToken_Call {
+	return &MockCredentialsInterface_GetSessionToken_Call{Call: _e.mock.On("GetSessionToken")}
+}
+
+func (_c *MockCredentialsInterface_GetSessionToken_Call) Run(run func()) *MockCredentialsInterface_GetSessionToken_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetSessionToken_Call) Return(_a0 string) *MockCredentialsInterface_GetSessionToken_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetSessionToken_Call) RunAndReturn(run func() string) *MockCredentialsInterface_GetSessionToken_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockCredentialsInterface creates a new instance of MockCredentialsInterface. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockCredentialsInterface(t interface {

@@ -30,7 +30,7 @@ func TestNewPostgresClient(t *testing.T) {
 	assert.Implements(t, (*postgres.Runtime)(nil), client)
 }
 
-func TestEncodeCredentialVariable(t *testing.T) {
+func TestEncodePostgresCredentialVariable(t *testing.T) {
 	tests := []struct {
 		name     string
 		variable postgres.CredentialVariable
@@ -52,7 +52,7 @@ func TestEncodeCredentialVariable(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := encodeCredentialVariable(tt.variable)
+			got, err := encodePostgresCredentialVariable(tt.variable)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -64,7 +64,7 @@ func TestEncodeCredentialVariable(t *testing.T) {
 	}
 }
 
-func TestEncodeCredentials(t *testing.T) {
+func TestEncodePostgresCredentials(t *testing.T) {
 	tests := []struct {
 		name        string
 		credentials map[postgres.CredentialVariable]string
@@ -113,7 +113,7 @@ func TestEncodeCredentials(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := encodeCredentials(postgres.Credentials(postgres.EnvironmentCredentials(tt.credentials)))
+			got, err := encodePostgresCredentials(postgres.Credentials(postgres.EnvironmentCredentials(tt.credentials)))
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -125,7 +125,7 @@ func TestEncodeCredentials(t *testing.T) {
 	}
 }
 
-func TestEncodeDumpAllOptions(t *testing.T) {
+func TestEncodePostgresDumpAllOptions(t *testing.T) {
 	tests := []struct {
 		name string
 		opts postgres.DumpAllOptions
@@ -146,7 +146,7 @@ func TestEncodeDumpAllOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := encodeDumpAllOptions(tt.opts)
+			got := encodePostgresDumpAllOptions(tt.opts)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -202,8 +202,8 @@ func TestDumpAll(t *testing.T) {
 
 			// Setup the mock function call
 			// The returned error is ignored to ensure that the function under test errors if the credentials are invalid
-			encodedCredentials, credErr := encodeCredentials(credentials)
-			encodedOpts := encodeDumpAllOptions(tt.opts)
+			encodedCredentials, credErr := encodePostgresCredentials(credentials)
+			encodedOpts := encodePostgresDumpAllOptions(tt.opts)
 			expectedRequest := postgres_v1.DumpAllRequest_builder{
 				Credentials:    encodedCredentials,
 				OutputFilePath: &tt.outputPath,
@@ -235,8 +235,8 @@ func TestDumpAll(t *testing.T) {
 	}
 }
 
-func TestEncodeRestoreOptions(t *testing.T) {
-	assert.Equal(t, &postgres_v1.RestoreOptions{}, encodeRestoreOptions(postgres.RestoreOptions{}))
+func TestEncodePostgresRestoreOptions(t *testing.T) {
+	assert.Equal(t, &postgres_v1.RestoreOptions{}, encodePostgresRestoreOptions(postgres.RestoreOptions{}))
 }
 
 func TestRestore(t *testing.T) {
@@ -285,11 +285,11 @@ func TestRestore(t *testing.T) {
 
 			// Setup the mock function call
 			// The returned error is ignored to ensure that the function under test errors if the credentials are invalid
-			encodedCredentials, credErr := encodeCredentials(credentials)
+			encodedCredentials, credErr := encodePostgresCredentials(credentials)
 			expectedRequest := postgres_v1.RestoreRequest_builder{
 				Credentials:   encodedCredentials,
 				InputFilePath: &tt.inputPath,
-				Options:       encodeRestoreOptions(postgres.RestoreOptions{}),
+				Options:       encodePostgresRestoreOptions(postgres.RestoreOptions{}),
 			}.Build()
 			mockClient.On("Restore", mock.Anything, expectedRequest, mock.Anything).
 				Run(func(args mock.Arguments) {

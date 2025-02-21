@@ -1,0 +1,9 @@
+edition = "2023";
+
+option go_package = "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/s3/v1;s3_v1";
+
+import "s3_transfer.proto";
+
+service S3 {
+  rpc Sync(SyncRequest) returns (SyncResponse);
+}
