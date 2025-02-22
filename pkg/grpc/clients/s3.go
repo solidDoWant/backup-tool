@@ -22,11 +22,12 @@ func NewS3Client(grpcConnection grpc.ClientConnInterface) *S3Client {
 
 func encodedS3Credentials(credentials s3.CredentialsInterface) *s3_v1.Credentials {
 	return s3_v1.Credentials_builder{
-		AccessKeyId:     ptr.To(credentials.GetAccessKeyID()),
-		SecretAccessKey: ptr.To(credentials.GetSecretAccessKey()),
-		SessionToken:    ptr.To(credentials.GetSessionToken()),
-		Region:          ptr.To(credentials.GetRegion()),
-		Endpoint:        ptr.To(credentials.GetEndpoint()),
+		AccessKeyId:      ptr.To(credentials.GetAccessKeyID()),
+		SecretAccessKey:  ptr.To(credentials.GetSecretAccessKey()),
+		SessionToken:     ptr.To(credentials.GetSessionToken()),
+		Region:           ptr.To(credentials.GetRegion()),
+		Endpoint:         ptr.To(credentials.GetEndpoint()),
+		S3ForcePathStyle: ptr.To(credentials.GetS3ForcePathStyle()),
 	}.Build()
 }
 

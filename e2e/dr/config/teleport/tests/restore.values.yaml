@@ -11,3 +11,9 @@ jobConfig:
         name: tpr-audit
         servingCertName: tpr-audit-postgres-serving-cert
         clientCertIssuerName: tpr-audit-postgres-auth-ca-issuer
+    auditSessionLogs:
+      s3Path: s3://teleport-audit-session-logs/
+      credentials:
+        endpoint: http://seaweedfs-s3:8333
+        region: dummy-value
+        s3ForcePathStyle: true

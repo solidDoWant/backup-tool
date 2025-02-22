@@ -29,7 +29,7 @@ func getCommonHelmOpts(releaseName, namespace string) []helm.Option {
 	}
 }
 
-func getBTInstallArgs(releaseName, namespace, service, action, valuesPath string) []helm.Option {
+func getBTInstallArgs(releaseName, namespace, service, action, valuesPath string, extraInstallValues []string) []helm.Option {
 	tagSeparatorIndex := strings.LastIndex(imageName, ":")
 	repository, tag := imageName[:tagSeparatorIndex], imageName[tagSeparatorIndex+1:]
 
@@ -41,6 +41,7 @@ func getBTInstallArgs(releaseName, namespace, service, action, valuesPath string
 		fmt.Sprintf("jobConfig.drAction=%s", action),
 		"jobConfig.cronjob.schedule=@yearly", // Make the job as unlikely as possible to trigger automatically during the test
 	}
+	installValues = append(installValues, extraInstallValues...)
 
 	installArgs := []string{"--values", valuesPath}
 	for _, value := range installValues {
@@ -50,9 +51,9 @@ func getBTInstallArgs(releaseName, namespace, service, action, valuesPath string
 	return append(getCommonHelmOpts(releaseName, namespace), helm.WithChart(chartPath), helm.WithArgs(installArgs...))
 }
 
-func installBTHelmChart(releaseName, namespace, service, action, valuesPath string) func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
+func installBTHelmChart(releaseName, namespace, service, action, valuesPath string, extraInstallValues ...string) func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
 	return func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
-		helmOpts := getBTInstallArgs(releaseName, namespace, service, action, valuesPath)
+		helmOpts := getBTInstallArgs(releaseName, namespace, service, action, valuesPath, extraInstallValues)
 		err := helm.New(c.KubeconfigFile()).RunInstall(helmOpts...)
 		assert.NoError(t, err)
 		return ctx

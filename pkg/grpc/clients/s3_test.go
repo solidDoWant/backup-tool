@@ -27,11 +27,12 @@ func TestNewS3Client(t *testing.T) {
 
 func TestEncodedS3Credentials(t *testing.T) {
 	credentials := &s3.Credentials{
-		AccessKeyID:     "accessKeyID",
-		SecretAccessKey: "secretAccessKey",
-		SessionToken:    "sessionToken",
-		Region:          "region",
-		Endpoint:        "endpoint",
+		AccessKeyID:      "accessKeyID",
+		SecretAccessKey:  "secretAccessKey",
+		SessionToken:     "sessionToken",
+		Region:           "region",
+		Endpoint:         "endpoint",
+		S3ForcePathStyle: true,
 	}
 
 	encodedCredentials := encodedS3Credentials(credentials)
@@ -41,6 +42,7 @@ func TestEncodedS3Credentials(t *testing.T) {
 	assert.Equal(t, credentials.SessionToken, encodedCredentials.GetSessionToken())
 	assert.Equal(t, credentials.Region, encodedCredentials.GetRegion())
 	assert.Equal(t, credentials.Endpoint, encodedCredentials.GetEndpoint())
+	assert.Equal(t, credentials.S3ForcePathStyle, encodedCredentials.GetS3ForcePathStyle())
 }
 
 func TestS3Sync(t *testing.T) {

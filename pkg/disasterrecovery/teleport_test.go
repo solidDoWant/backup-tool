@@ -21,6 +21,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
+	"github.com/solidDoWant/backup-tool/pkg/s3"
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -50,6 +51,8 @@ func TestTeleportBackup(t *testing.T) {
 	auditClusterName := "test-audit-cluster"
 	servingIssuerName := "serving-cert-issuer"
 	clientIssuerName := "client-cert-issuer"
+	auditSessionLogsS3Path := "s3://audit-session-logs"
+	auditSessionLogsS3Credentials := s3.NewCredentials("accessKeyID", "secretAccessKey")
 
 	tests := []struct {
 		desc                                string
@@ -67,6 +70,7 @@ func TestTeleportBackup(t *testing.T) {
 		simulateCoreDumpAllErr              bool
 		simulateAuditDumpAllErr             bool
 		simulateSnapshotErr                 bool
+		simulateS3SyncErr                   bool
 		simulateWaitSnapErr                 bool
 	}{
 		{
@@ -85,6 +89,11 @@ func TestTeleportBackup(t *testing.T) {
 						Name:    auditClusterName,
 						Enabled: true,
 					},
+				},
+				AuditSessionLogs: TeleportOptionsS3Sync{
+					S3Path:      auditSessionLogsS3Path,
+					Credentials: *auditSessionLogsS3Credentials,
+					Enabled:     true,
 				},
 				BackupSnapshot: OptionsBackupSnapshot{
 					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
@@ -135,6 +144,11 @@ func TestTeleportBackup(t *testing.T) {
 			desc:                    "error dumping audit logical backup",
 			backupOptions:           TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{TeleportOptionsAudit{Name: auditClusterName, Enabled: true}}},
 			simulateAuditDumpAllErr: true,
+		},
+		{
+			desc:              "error syncing to S3",
+			backupOptions:     TeleportBackupOptions{AuditSessionLogs: TeleportOptionsS3Sync{S3Path: auditSessionLogsS3Path, Credentials: *auditSessionLogsS3Credentials, Enabled: true}},
+			simulateS3SyncErr: true,
 		},
 		{
 			desc:                "error creating snapshot",
@@ -210,7 +224,9 @@ func TestTeleportBackup(t *testing.T) {
 
 			mockGRPCClient := clients.NewMockClientInterface(t)
 			mockPostgresRuntime := postgres.NewMockRuntime(t)
+			mockS3Runtime := s3.NewMockRuntime(t)
 			mockGRPCClient.EXPECT().Postgres().Return(mockPostgresRuntime).Maybe()
+			mockGRPCClient.EXPECT().S3().Return(mockS3Runtime).Maybe()
 
 			teleport := &Teleport{
 				kubeClusterClient: mockClient,
@@ -231,6 +247,7 @@ func TestTeleportBackup(t *testing.T) {
 				tt.simulateGRPCClientErr,
 				tt.simulateCoreDumpAllErr,
 				tt.simulateAuditDumpAllErr,
+				tt.simulateS3SyncErr,
 				tt.simulateSnapshotErr,
 				tt.simulateWaitSnapErr,
 			)
@@ -427,6 +444,20 @@ func TestTeleportBackup(t *testing.T) {
 					}
 				}
 
+				// Audit session log sync if enabled
+				if tt.backupOptions.AuditSessionLogs.Enabled {
+					mockS3Runtime.EXPECT().Sync(mock.Anything, auditSessionLogsS3Credentials, auditSessionLogsS3Path, mock.Anything).
+						RunAndReturn(func(calledCtx *contexts.Context, credentials s3.CredentialsInterface, src string, dest string) error {
+							assert.True(t, calledCtx.IsChildOf(rootCtx))
+							assert.True(t, filepath.Base(dest) == "audit-session-logs") // Important: changing this is will break restoration of old backups!
+
+							return th.ErrIfTrue(tt.simulateS3SyncErr)
+						})
+					if tt.simulateS3SyncErr {
+						return
+					}
+				}
+
 				// Snapshot volume
 				var createdSnapshotName string
 				mockESClient.EXPECT().SnapshotVolume(mock.Anything, namespace, drPVC.Name, mock.Anything).
@@ -488,6 +519,8 @@ func TestTeleportRestore(t *testing.T) {
 	auditClusterName := "test-audit-cluster"
 	auditServingCertName := "test-audit-serving-cert"
 	auditClientCertIssuerName := "test-audit-client-cert-issuer"
+	auditSessionLogsS3Path := "s3://audit-session-logs"
+	auditSessionLogsS3Credentials := s3.NewCredentials("accessKeyID", "secretAccessKey")
 
 	auditClusterOptions := TeleportRestoreOptionsAudit{
 		TeleportOptionsAudit: TeleportOptionsAudit{
@@ -498,6 +531,12 @@ func TestTeleportRestore(t *testing.T) {
 		ClientCertIssuerName: auditClientCertIssuerName,
 	}
 
+	auditSessionLogsOptions := TeleportOptionsS3Sync{
+		S3Path:      auditSessionLogsS3Path,
+		Credentials: *auditSessionLogsS3Credentials,
+		Enabled:     true,
+	}
+
 	tests := []struct {
 		desc                                  string
 		opts                                  TeleportRestoreOptions
@@ -506,6 +545,7 @@ func TestTeleportRestore(t *testing.T) {
 		simulateAuditCheckResourcesReadyError bool
 		simulateCoreRestoreError              bool
 		simulateAuditRestoreError             bool
+		simulateAuditSessionLogsS3SyncError   bool
 	}{
 		{
 			desc: "success - no options set",
@@ -513,8 +553,9 @@ func TestTeleportRestore(t *testing.T) {
 		{
 			desc: "success - all options set",
 			opts: TeleportRestoreOptions{
-				AuditCluster:   auditClusterOptions,
-				CleanupTimeout: helpers.MaxWaitTime(3 * time.Second),
+				AuditCluster:     auditClusterOptions,
+				AuditSessionLogs: auditSessionLogsOptions,
+				CleanupTimeout:   helpers.MaxWaitTime(3 * time.Second),
 			},
 		},
 		{
@@ -539,6 +580,11 @@ func TestTeleportRestore(t *testing.T) {
 			opts:                      TeleportRestoreOptions{AuditCluster: auditClusterOptions},
 			simulateAuditRestoreError: true,
 		},
+		{
+			desc:                                "error syncing audit session logs to S3",
+			opts:                                TeleportRestoreOptions{AuditSessionLogs: auditSessionLogsOptions},
+			simulateAuditSessionLogsS3SyncError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -553,6 +599,7 @@ func TestTeleportRestore(t *testing.T) {
 
 			mockCoreCNPGRestore := NewMockCNPGRestoreInterface(t)
 			mockAuditCNPGRestore := NewMockCNPGRestoreInterface(t)
+			mockAuditSessionLogsS3Sync := NewMockS3SyncInterface(t)
 
 			restoreCount := 0
 
@@ -570,6 +617,9 @@ func TestTeleportRestore(t *testing.T) {
 						return nil
 					}
 				},
+				newS3Sync: func() S3SyncInterface {
+					return mockAuditSessionLogsS3Sync
+				},
 			}
 
 			rootCtx := th.NewTestContext()
@@ -580,26 +630,31 @@ func TestTeleportRestore(t *testing.T) {
 				tt.simulateAuditCheckResourcesReadyError,
 				tt.simulateCoreRestoreError,
 				tt.simulateAuditRestoreError,
+				tt.simulateAuditSessionLogsS3SyncError,
 			)
 
 			func() {
-				mockCoreCNPGRestore.EXPECT().Configure(mock.Anything, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, mock.Anything, "backup-core.sql", CNPGRestoreOpts{
+				mockCoreCNPGRestore.EXPECT().Configure(mockClient, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, mock.Anything, "backup-core.sql", CNPGRestoreOpts{
 					PostgresUserCert:            tt.opts.PostgresUserCert,
 					RemoteBackupToolOptions:     tt.opts.RemoteBackupToolOptions,
 					ClusterServiceSearchDomains: tt.opts.ClusterServiceSearchDomains,
 					CleanupTimeout:              tt.opts.CleanupTimeout,
-				}).RunAndReturn(func(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertName, clientCertIssuerName, drVolName, fullRestoreName, backupFileRelPath string, opts CNPGRestoreOpts) {
-					assert.Equal(t, kubeClusterClient, mockClient)
 				})
 
 				if tt.opts.AuditCluster.Enabled {
-					mockAuditCNPGRestore.EXPECT().Configure(mock.Anything, namespace, auditClusterName, auditServingCertName, auditClientCertIssuerName, restoreName, mock.Anything, "backup-audit.sql", CNPGRestoreOpts{
+					mockAuditCNPGRestore.EXPECT().Configure(mockClient, namespace, auditClusterName, auditServingCertName, auditClientCertIssuerName, restoreName, mock.Anything, "backup-audit.sql", CNPGRestoreOpts{
 						PostgresUserCert:            tt.opts.AuditCluster.PostgresUserCert,
 						RemoteBackupToolOptions:     tt.opts.RemoteBackupToolOptions,
 						ClusterServiceSearchDomains: tt.opts.ClusterServiceSearchDomains,
 						CleanupTimeout:              tt.opts.CleanupTimeout,
-					}).RunAndReturn(func(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertName, clientCertIssuerName, drVolName, fullRestoreName, backupFileRelPath string, opts CNPGRestoreOpts) {
-						assert.Equal(t, kubeClusterClient, mockClient)
+					})
+				}
+
+				if tt.opts.AuditSessionLogs.Enabled {
+					mockAuditSessionLogsS3Sync.EXPECT().Configure(mockClient, namespace, restoreName, "audit-session-logs", auditSessionLogsS3Path, mock.Anything, auditSessionLogsS3Credentials, s3SyncOpts{
+						RemoteBackupToolOptions:     tt.opts.RemoteBackupToolOptions,
+						CleanupTimeout:              tt.opts.CleanupTimeout,
+						ClusterServiceSearchDomains: tt.opts.ClusterServiceSearchDomains,
 					})
 				}
 
@@ -657,6 +712,15 @@ func TestTeleportRestore(t *testing.T) {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
 
 						return th.ErrIfTrue(tt.simulateAuditRestoreError)
+					})
+				}
+
+				// 4. Sync audit session logs if enabled
+				if tt.opts.AuditSessionLogs.Enabled {
+					mockAuditSessionLogsS3Sync.EXPECT().Sync(mock.Anything).RunAndReturn(func(calledCtx *contexts.Context) error {
+						assert.True(t, calledCtx.IsChildOf(rootCtx))
+
+						return th.ErrIfTrue(tt.simulateAuditSessionLogsS3SyncError)
 					})
 				}
 			}()

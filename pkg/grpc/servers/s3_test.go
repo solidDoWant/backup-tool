@@ -21,11 +21,12 @@ func TestNewS3Server(t *testing.T) {
 
 func TestDecodeS3Credentials(t *testing.T) {
 	credentials := s3_v1.Credentials_builder{
-		AccessKeyId:     ptr.To("accessKeyID"),
-		SecretAccessKey: ptr.To("secretAccessKey"),
-		SessionToken:    ptr.To("sessionToken"),
-		Region:          ptr.To("region"),
-		Endpoint:        ptr.To("endpoint"),
+		AccessKeyId:      ptr.To("accessKeyID"),
+		SecretAccessKey:  ptr.To("secretAccessKey"),
+		SessionToken:     ptr.To("sessionToken"),
+		Region:           ptr.To("region"),
+		Endpoint:         ptr.To("endpoint"),
+		S3ForcePathStyle: ptr.To(true),
 	}.Build()
 
 	decodedCredentials := decodeS3Credentials(credentials)
@@ -35,6 +36,7 @@ func TestDecodeS3Credentials(t *testing.T) {
 	assert.Equal(t, credentials.GetSessionToken(), decodedCredentials.SessionToken)
 	assert.Equal(t, credentials.GetRegion(), decodedCredentials.Region)
 	assert.Equal(t, credentials.GetEndpoint(), decodedCredentials.Endpoint)
+	assert.Equal(t, credentials.GetS3ForcePathStyle(), decodedCredentials.S3ForcePathStyle)
 }
 
 func TestS3Sync(t *testing.T) {

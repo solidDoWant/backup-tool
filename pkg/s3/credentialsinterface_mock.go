@@ -202,6 +202,51 @@ func (_c *MockCredentialsInterface_GetRegion_Call) RunAndReturn(run func() strin
 	return _c
 }
 
+// GetS3ForcePathStyle provides a mock function with no fields
+func (_m *MockCredentialsInterface) GetS3ForcePathStyle() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetS3ForcePathStyle")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// MockCredentialsInterface_GetS3ForcePathStyle_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetS3ForcePathStyle'
+type MockCredentialsInterface_GetS3ForcePathStyle_Call struct {
+	*mock.Call
+}
+
+// GetS3ForcePathStyle is a helper method to define mock.On call
+func (_e *MockCredentialsInterface_Expecter) GetS3ForcePathStyle() *MockCredentialsInterface_GetS3ForcePathStyle_Call {
+	return &MockCredentialsInterface_GetS3ForcePathStyle_Call{Call: _e.mock.On("GetS3ForcePathStyle")}
+}
+
+func (_c *MockCredentialsInterface_GetS3ForcePathStyle_Call) Run(run func()) *MockCredentialsInterface_GetS3ForcePathStyle_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetS3ForcePathStyle_Call) Return(_a0 bool) *MockCredentialsInterface_GetS3ForcePathStyle_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCredentialsInterface_GetS3ForcePathStyle_Call) RunAndReturn(run func() bool) *MockCredentialsInterface_GetS3ForcePathStyle_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSecretAccessKey provides a mock function with no fields
 func (_m *MockCredentialsInterface) GetSecretAccessKey() string {
 	ret := _m.Called()

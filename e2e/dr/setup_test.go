@@ -39,9 +39,11 @@ var (
 	testenv env.Environment
 
 	// These values are set during various setup stages, and will cause panic if used too early
-	registryName string
-	imageName    string
-	chartPath    string
+	registryName      string
+	imageName         string
+	chartPath         string
+	s3AccessKeyId     string
+	s3SecretAccessKey string
 )
 
 func TestMain(m *testing.M) {
@@ -297,6 +299,14 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 		if ctx, err := helmSetup(ctx, cfg); err != nil {
 			return ctx, trace.Wrap(err, "failed to deploy dependent services")
 		}
+
+		// Set the S3 credentials
+		s3Secret := &corev1.Secret{}
+		if err := cfg.Client().Resources().Get(ctx, "seaweedfs-s3-secret", "default", s3Secret); err != nil {
+			return ctx, trace.Wrap(err, "failed to get S3 secret")
+		}
+		s3AccessKeyId = string(s3Secret.Data["admin_access_key_id"])
+		s3SecretAccessKey = string(s3Secret.Data["admin_secret_access_key"])
 
 		return ctx, nil
 	}

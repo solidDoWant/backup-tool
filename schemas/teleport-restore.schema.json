@@ -189,6 +189,34 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "Credentials": {
+      "properties": {
+        "accessKeyId": {
+          "type": "string"
+        },
+        "secretAccessKey": {
+          "type": "string"
+        },
+        "sessionToken": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "s3ForcePathStyle": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "accessKeyId",
+        "secretAccessKey"
+      ]
+    },
     "DownwardAPIProjection": {
       "properties": {
         "Items": {
@@ -984,6 +1012,18 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "TeleportConfigAuditSessionLogs": {
+      "properties": {
+        "s3Path": {
+          "type": "string"
+        },
+        "credentials": {
+          "$ref": "#/$defs/Credentials"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "TeleportConfigBTI": {
       "properties": {
         "namePrefix": {
@@ -1059,6 +1099,9 @@
         },
         "cnpgClusters": {
           "$ref": "#/$defs/TeleportRestoreClustersConfig"
+        },
+        "auditSessionLogs": {
+          "$ref": "#/$defs/TeleportConfigAuditSessionLogs"
         },
         "backupToolInstance": {
           "$ref": "#/$defs/TeleportConfigBTI"

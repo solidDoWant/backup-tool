@@ -23,6 +23,7 @@ packages:
     <<: *baseline_config
     interfaces:
       CNPGRestoreInterface:
+      S3SyncInterface:
   github.com/solidDoWant/backup-tool/pkg/files:
     <<: *baseline_config
     interfaces:

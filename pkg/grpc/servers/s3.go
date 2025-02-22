@@ -24,7 +24,8 @@ func decodeS3Credentials(encodedCredentials *s3_v1.Credentials) *s3.Credentials 
 	return s3.NewCredentials(encodedCredentials.GetAccessKeyId(), encodedCredentials.GetSecretAccessKey()).
 		WithSessionToken(encodedCredentials.GetSessionToken()).
 		WithRegion(encodedCredentials.GetRegion()).
-		WithEndpoint(encodedCredentials.GetEndpoint())
+		WithEndpoint(encodedCredentials.GetEndpoint()).
+		WithS3ForcePathStyle(encodedCredentials.GetS3ForcePathStyle())
 }
 
 func (s3s *S3Server) Sync(ctx context.Context, req *s3_v1.SyncRequest) (*s3_v1.SyncResponse, error) {

@@ -13,15 +13,17 @@ type CredentialsInterface interface {
 	GetSessionToken() string
 	GetRegion() string
 	GetEndpoint() string
+	GetS3ForcePathStyle() bool
 	AWSConfig() *aws.Config
 }
 
 type Credentials struct {
-	AccessKeyID     string
-	SecretAccessKey string
-	SessionToken    string
-	Endpoint        string
-	Region          string
+	AccessKeyID      string `yaml:"accessKeyId" jsonschema:"required"`
+	SecretAccessKey  string `yaml:"secretAccessKey" jsonschema:"required"`
+	SessionToken     string `yaml:"sessionToken,omitempty"`
+	Endpoint         string `yaml:"endpoint,omitempty"`
+	Region           string `yaml:"region,omitempty"`
+	S3ForcePathStyle bool   `yaml:"s3ForcePathStyle,omitempty"`
 }
 
 func NewCredentials(accessKeyID, secretAccessKey string) *Credentials {
@@ -38,7 +40,8 @@ func NewCredentialsFromEnv() *Credentials {
 	return NewCredentials(accessKeyID, secretAccessKey).
 		WithSessionToken(os.Getenv("AWS_SESSION_TOKEN")).
 		WithEndpoint(os.Getenv("AWS_ENDPOINT")).
-		WithRegion(os.Getenv("AWS_REGION"))
+		WithRegion(os.Getenv("AWS_REGION")).
+		WithS3ForcePathStyle(os.Getenv("AWS_S3_FORCE_PATH_STYLE") == "true")
 }
 
 func (c *Credentials) WithAccessKeyID(id string) *Credentials {
@@ -66,6 +69,11 @@ func (c *Credentials) WithRegion(region string) *Credentials {
 	return c
 }
 
+func (c *Credentials) WithS3ForcePathStyle(forcePathStyle bool) *Credentials {
+	c.S3ForcePathStyle = forcePathStyle
+	return c
+}
+
 func (c *Credentials) GetAccessKeyID() string {
 	return c.AccessKeyID
 }
@@ -86,6 +94,10 @@ func (c *Credentials) GetEndpoint() string {
 	return c.Endpoint
 }
 
+func (c *Credentials) GetS3ForcePathStyle() bool {
+	return c.S3ForcePathStyle
+}
+
 func (c *Credentials) AWSConfig() *aws.Config {
 	config := &aws.Config{
 		Credentials: credentials.NewStaticCredentials(
@@ -93,6 +105,7 @@ func (c *Credentials) AWSConfig() *aws.Config {
 			c.SecretAccessKey,
 			c.SessionToken,
 		),
+		S3ForcePathStyle: aws.Bool(c.S3ForcePathStyle),
 	}
 
 	if c.Endpoint != "" {

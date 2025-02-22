@@ -103,12 +103,17 @@ func TestTeleport(t *testing.T) {
 	teleportSetup, teleportFinish := DeployTeleport()
 	teleportRestoreSetup, teleportRestoreFinish := DeployTeleportRestore()
 
+	extraInstallValues := []string{
+		"jobConfig.configFile.auditSessionLogs.credentials.accessKeyId=" + s3AccessKeyId,
+		"jobConfig.configFile.auditSessionLogs.credentials.secretAccessKey=" + s3SecretAccessKey,
+	}
+
 	f1 := features.New("Successfull teleport backup and recovery").
 		WithLabel("service", "teleport").
 		WithLabel("type", "dr").
 		Setup(teleportSetup).
 		Setup(teleportRestoreSetup).
-		Setup(installBTHelmChart(backupReleaseName, namespace, "teleport", "backup", "config/teleport/tests/backup.values.yaml")).
+		Setup(installBTHelmChart(backupReleaseName, namespace, "teleport", "backup", "config/teleport/tests/backup.values.yaml", extraInstallValues...)).
 		Assess("backup resources are deployed", verifyCronJobIsDeployed(backupCronJobName, namespace)).
 		Assess("backup job succeeds", verifyJobSucceeds(backupCronJobName, namespace)).
 		Assess("backup files are created", func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
@@ -122,7 +127,7 @@ func TestTeleport(t *testing.T) {
 			return ctx
 		}).
 		Teardown(uninstallBTHelmChart(backupReleaseName, namespace)).
-		Setup(installBTHelmChart(restoreReleasename, namespace, "teleport", "restore", "config/teleport/tests/restore.values.yaml")).
+		Setup(installBTHelmChart(restoreReleasename, namespace, "teleport", "restore", "config/teleport/tests/restore.values.yaml", extraInstallValues...)).
 		Assess("restore resources are deployed", verifyCronJobIsDeployed(restoreCronJobName, namespace)).
 		Assess("restore job succeeds", verifyJobSucceeds(restoreCronJobName, namespace)).
 		Assess("new teleport instance successfully deploys", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {

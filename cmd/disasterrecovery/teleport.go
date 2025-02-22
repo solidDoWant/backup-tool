@@ -7,11 +7,17 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	"github.com/solidDoWant/backup-tool/pkg/s3"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 type TeleportConfigBTI struct {
 	CreationOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:",inline"`
+}
+
+type TeleportConfigAuditSessionLogs struct {
+	S3Path      string         `yaml:"s3Path,omitempty"`
+	Credentials s3.Credentials `yaml:"credentials,omitempty"`
 }
 
 type TeleportBackupConfigBackupVolume struct {
@@ -34,6 +40,7 @@ type TeleportBackupConfig struct {
 	CNPGClusters           TeleportBackupConfigClustersConfig     `yaml:"cnpgClusters" jsonschema:"required"`
 	ServingCertIssuerName  string                                 `yaml:"servingCertIssuerName" jsonschema:"required"`
 	ClientCACertIssuerName string                                 `yaml:"clientCACertIssuerName" jsonschema:"required"`
+	AuditSessionLogs       TeleportConfigAuditSessionLogs         `yaml:"auditSessionLogs,omitempty"`
 	BackupVolume           TeleportBackupConfigBackupVolume       `yaml:"backupVolume" jsonschema:"omitempty"`
 	BackupSnapshot         disasterrecovery.OptionsBackupSnapshot `yaml:"backupSnapshot" jsonschema:"omitempty"`
 	CloneClusterOptions    clonedcluster.CloneClusterOptions      `yaml:"clusterCloning,omitempty"`
@@ -55,12 +62,13 @@ type TeleportRestoreClustersConfig struct {
 }
 
 type TeleportRestoreConfig struct {
-	Namespace            string                        `yaml:"namespace" jsonschema:"required"`
-	BackupName           string                        `yaml:"backupName" jsonschema:"required"`
-	CNPGClusters         TeleportRestoreClustersConfig `yaml:"cnpgClusters" jsonschema:"required"`
-	BackupToolInstance   TeleportConfigBTI             `yaml:"backupToolInstance,omitempty"`
-	ServiceSearchDomains []string                      `yaml:"serviceSearchDomains,omitempty"`
-	CleanupTimeout       helpers.MaxWaitTime           `yaml:"cleanupTimeout,omitempty"`
+	Namespace            string                         `yaml:"namespace" jsonschema:"required"`
+	BackupName           string                         `yaml:"backupName" jsonschema:"required"`
+	CNPGClusters         TeleportRestoreClustersConfig  `yaml:"cnpgClusters" jsonschema:"required"`
+	AuditSessionLogs     TeleportConfigAuditSessionLogs `yaml:"auditSessionLogs,omitempty"`
+	BackupToolInstance   TeleportConfigBTI              `yaml:"backupToolInstance,omitempty"`
+	ServiceSearchDomains []string                       `yaml:"serviceSearchDomains,omitempty"`
+	CleanupTimeout       helpers.MaxWaitTime            `yaml:"cleanupTimeout,omitempty"`
 }
 
 type TeleportDRCommand struct {
@@ -81,6 +89,11 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 					Enabled: config.CNPGClusters.Audit.CNPGClusterName != "",
 					Name:    config.CNPGClusters.Audit.CNPGClusterName,
 				},
+			},
+			AuditSessionLogs: disasterrecovery.TeleportOptionsS3Sync{
+				Enabled:     config.AuditSessionLogs.S3Path != "",
+				S3Path:      config.AuditSessionLogs.S3Path,
+				Credentials: config.AuditSessionLogs.Credentials,
 			},
 			RemoteBackupToolOptions:     config.BackupToolInstance.CreationOptions,
 			ClusterServiceSearchDomains: config.ServiceSearchDomains,
@@ -107,6 +120,11 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 					ServingCertName:      config.CNPGClusters.Audit.ServingCertName,
 					ClientCertIssuerName: config.CNPGClusters.Audit.ClientCertIssuerName,
 					PostgresUserCert:     config.CNPGClusters.Audit.ClusterUserCert,
+				},
+				AuditSessionLogs: disasterrecovery.TeleportOptionsS3Sync{
+					Enabled:     config.AuditSessionLogs.S3Path != "",
+					S3Path:      config.AuditSessionLogs.S3Path,
+					Credentials: config.AuditSessionLogs.Credentials,
 				},
 				PostgresUserCert:            config.CNPGClusters.Core.ClusterUserCert,
 				RemoteBackupToolOptions:     config.BackupToolInstance.CreationOptions,

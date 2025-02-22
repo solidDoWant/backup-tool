@@ -18,15 +18,25 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
+	"github.com/solidDoWant/backup-tool/pkg/s3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
-	teleportBaseMountPath    = string(os.PathSeparator) + "mnt"
-	teleportCoreSQLFileName  = "backup-core.sql"
-	teleportAuditSQLFileName = "backup-audit.sql"
+	teleportBaseMountPath                 = string(os.PathSeparator) + "mnt"
+	teleportCoreSQLFileName               = "backup-core.sql"
+	teleportAuditSQLFileName              = "backup-audit.sql"
+	teleportAuditSessionLogsDirectoryName = "audit-session-logs"
 )
+
+type TeleportOptionsS3Sync struct {
+	Enabled bool   `yaml:"enabled,omitempty"`
+	S3Path  string `yaml:"s3Path,omitempty"`
+	// TODO accept values from env, file, or k8s secret
+	// TODO if I switch to COSI, remove this and generate a BucketAccess resource instead
+	Credentials s3.Credentials `yaml:"credentials,omitempty"`
+}
 
 type TeleportOptionsAudit struct {
 	Enabled bool   `yaml:"enabled,omitempty"`
@@ -42,6 +52,7 @@ type TeleportBackupOptions struct {
 	VolumeStorageClass          string                                             `yaml:"volumeStorageClass,omitempty"`
 	CloneClusterOptions         clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
 	AuditCluster                TeleportBackupOptionsAudit                         `yaml:"auditCluster,omitempty"`
+	AuditSessionLogs            TeleportOptionsS3Sync                              `yaml:"auditSessionLogs,omitempty"`
 	RemoteBackupToolOptions     backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	ClusterServiceSearchDomains []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
 	BackupSnapshot              OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
@@ -52,12 +63,14 @@ type Teleport struct {
 	kubeClusterClient kubecluster.ClientInterface
 	// Testing injection
 	newCNPGRestore func() CNPGRestoreInterface
+	newS3Sync      func() S3SyncInterface
 }
 
 func NewTeleport(kubeClusterClient kubecluster.ClientInterface) *Teleport {
 	return &Teleport{
 		kubeClusterClient: kubeClusterClient,
 		newCNPGRestore:    NewCNPGRestore,
+		newS3Sync:         NewS3Sync,
 	}
 }
 
@@ -68,7 +81,8 @@ func NewTeleport(kubeClusterClient kubecluster.ClientInterface) *Teleport {
 // 4. Deploy a backup-tool instance with access to both the Core and Audit cloned clusters
 // 5. Perform a logical backup of the Core cluster
 // 6. Perform a logical backup of the Audit cluster (if enabled)
-// 7. Snapshot the backup PVC
+// 7. Sync the audit session logs from object storage (if enabled)
+// 8. Snapshot the backup PVC
 func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClusterName, servingCertIssuerName, clientCertIssuerName string, opts TeleportBackupOptions) (backup *DREvent, err error) {
 	backup = NewDREventNow(backupName)
 	ctx.Log.With("backupName", backup.GetFullName(), "namespace", namespace).Info("Starting backup process")
@@ -207,7 +221,20 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 		}
 	}
 
-	// 7. Snapshot the backup PVC
+	// 7. Sync the audit session logs from object storage (if enabled)
+	// It is okay if this is not synced with the bucket's state when the postgres backups were taken. Teleport only appends to the audit
+	// session log bucket, so as long as this occurs _after_ the postgres backups, the bucket state when the postgres backups were taken
+	// will be a subset of the bucket state when this is synced.
+	if opts.AuditSessionLogs.Enabled {
+		ctx.Log.Step().Info("Syncing audit session logs from object storage")
+		auditSessionLogsPath := filepath.Join(drVolumeMountPath, teleportAuditSessionLogsDirectoryName)
+		err = backupToolClient.S3().Sync(ctx.Child(), &opts.AuditSessionLogs.Credentials, opts.AuditSessionLogs.S3Path, auditSessionLogsPath)
+		if err != nil {
+			return backup, trace.Wrap(err, "failed to sync audit session logs from %q", opts.AuditSessionLogs.S3Path)
+		}
+	}
+
+	// 8. Snapshot the backup PVC
 	ctx.Log.Step().Info("Snapshotting the DR volume")
 	snapshot, err := t.kubeClusterClient.ES().SnapshotVolume(ctx.Child(), namespace, drPVC.Name, externalsnapshotter.SnapshotVolumeOptions{Name: helpers.CleanName(backup.GetFullName()), SnapshotClass: opts.BackupSnapshot.SnapshotClass})
 	if err != nil {
@@ -282,6 +309,7 @@ type TeleportRestoreOptionsAudit struct {
 type TeleportRestoreOptions struct {
 	AuditCluster                TeleportRestoreOptionsAudit                        `yaml:"auditCluster,omitempty"`
 	PostgresUserCert            OptionsClusterUserCert                             `yaml:"postgresUserCert,omitempty"`
+	AuditSessionLogs            TeleportOptionsS3Sync                              `yaml:"auditSessionLogs,omitempty"`
 	RemoteBackupToolOptions     backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	ClusterServiceSearchDomains []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
 	CleanupTimeout              helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
@@ -304,6 +332,7 @@ type TeleportRestoreOptions struct {
 // 3. 1. Create postgres user cert
 // 3. 2. Spawn a new backup-tool pod with postgres auth and serving certs, and DR mount attached
 // 3. 3. Perform a Postgres logical recovery of the cluster
+// 4. Restore the audit session logs (if enabled)
 func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreClusterName, coreServingCertName, coreClientCertIssuerName string, opts TeleportRestoreOptions) (restore *DREvent, err error) {
 	restore = NewDREventNow(restoreName)
 	ctx.Log.With("restoreName", restore.GetFullName(), "namespace", namespace).Info("Starting restore process")
@@ -334,6 +363,15 @@ func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreCl
 		})
 	}
 
+	auditSessionLogsRestore := t.newS3Sync()
+	if opts.AuditSessionLogs.Enabled {
+		auditSessionLogsRestore.Configure(t.kubeClusterClient, namespace, restoreName, teleportAuditSessionLogsDirectoryName, opts.AuditSessionLogs.S3Path, restore.GetFullName(), &opts.AuditSessionLogs.Credentials, s3SyncOpts{
+			RemoteBackupToolOptions:     opts.RemoteBackupToolOptions,
+			ClusterServiceSearchDomains: opts.ClusterServiceSearchDomains,
+			CleanupTimeout:              opts.CleanupTimeout,
+		})
+	}
+
 	// 1. Ensure the require resources already exist
 	ctx.Log.Step().Info("Ensuring required resources exist")
 	_, err = t.kubeClusterClient.Core().GetPVC(ctx.Child(), namespace, restoreName)
@@ -361,14 +399,21 @@ func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreCl
 	}
 
 	// 3. Restore the audit CNPG cluster (if enabled)
-	if !opts.AuditCluster.Enabled {
-		return restore, nil
+	if opts.AuditCluster.Enabled {
+		ctx.Log.Step().Info("Restoring the audit cluster")
+		err = auditRestore.Restore(ctx.Child())
+		if err != nil {
+			return restore, trace.Wrap(err, "failed to restore audit cluster")
+		}
 	}
 
-	ctx.Log.Step().Info("Restoring the audit cluster")
-	err = auditRestore.Restore(ctx.Child())
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to restore audit cluster")
+	// 4. Restore the audit session logs (if enabled)
+	if opts.AuditSessionLogs.Enabled {
+		ctx.Log.Step().Info("Restoring audit session logs")
+		err = auditSessionLogsRestore.Sync(ctx.Child())
+		if err != nil {
+			return restore, trace.Wrap(err, "failed to restore audit session logs")
+		}
 	}
 
 	return restore, nil
