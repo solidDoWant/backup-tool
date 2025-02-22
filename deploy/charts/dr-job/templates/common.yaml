@@ -13,8 +13,26 @@
 {{- end -}}
 {{- $_ := set $container "args" $templatedArgs -}}
 
-{{- $configMapData := .Values.resources.configMaps.config.data -}}
-{{- $_ := set $configMapData "config.yaml" (tpl (index $configMapData "config.yaml") .) -}}
+{{- if eq .Values.jobConfig.configType "ConfigMap" -}}
+    {{/* Setup the resources */}}
+    {{- $configMap := dict "config" (dict "data" (dict "config.yaml" (.Values.jobConfig.configFile | toYaml))) -}}
+    {{- $persistence := dict "backup-tool" (dict "type" "configMap") -}}
+
+    {{/* Merge and load the values */}}
+    {{- $mergedResources := mustMergeOverwrite (dict "configMaps" $configMap "persistence" $persistence) .Values.resources -}}
+    {{- $_ := set .Values "resources" $mergedResources -}}
+{{- else if eq .Values.jobConfig.configType "Secret" -}}
+    {{/* Setup the resources */}}
+    {{- $secret := dict "config" (dict "stringData" (dict "config.yaml" (.Values.jobConfig.configFile | toYaml))) -}}
+    {{- $persistence := dict "backup-tool" (dict "type" "secret") -}}
+
+    {{/* Merge and load the values */}}
+    {{- $mergedResources := mustMergeOverwrite (dict "secrets" $secret "persistence" $persistence) .Values.resources -}}
+    {{- $_ := set .Values "resources" $mergedResources -}}
+{{- else if .Values.jobConfig.configFile -}}
+    {{/* If any other value is set, fail. A null value (~) will cause no failure, but no config. */}}
+    {{- fail (printf "Invalid config type %s" .Values.jobConfig.configType) -}}
+{{- end -}}
 
 {{/* Merge all the values into the format that the common library expects */}}
 {{- $mergedValues := mustDeepCopy .Values -}}

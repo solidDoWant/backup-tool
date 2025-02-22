@@ -4,6 +4,7 @@ jobConfig:
   drType: vaultwarden
   drAction: backup
   configFile: {}
+  configType: ConfigMap
   type: cronjob
   cronjob:
     schedule: "@daily"
@@ -47,13 +48,8 @@ resources:
                 - ALL
             seccompProfile:
               type: RuntimeDefault
-  configMaps:
-    config:
-      data:
-        config.yaml: "{{- .Values.jobConfig.configFile | toYaml }}"
   persistence:
     backup-tool:
-      type: configMap
       identifier: config
       defaultMode: 0444
       items:
