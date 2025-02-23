@@ -8,6 +8,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/utils/ptr"
 )
 
@@ -76,7 +77,7 @@ type SingleContainerVolume struct {
 
 func NewSingleContainerPVC(pvcName, mountPath string) SingleContainerVolume {
 	return SingleContainerVolume{
-		Name:      pvcName,
+		Name:      names.SimpleNameGenerator.GenerateName(pvcName + "-"),
 		MountPath: mountPath,
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
@@ -88,7 +89,7 @@ func NewSingleContainerPVC(pvcName, mountPath string) SingleContainerVolume {
 
 func NewSingleContainerSecret(secretName, mountPath string, items ...corev1.KeyToPath) SingleContainerVolume {
 	return SingleContainerVolume{
-		Name:      secretName,
+		Name:      names.SimpleNameGenerator.GenerateName(secretName + "-"),
 		MountPath: mountPath,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -253,6 +254,10 @@ func TestNewSingleContainerPVC(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := NewSingleContainerPVC(tt.pvcName, tt.mountPath)
+
+			assert.Regexp(t, fmt.Sprintf(`^%s-[[:alnum:]]{5}$`, tt.pvcName), got.Name)
+			tt.want.Name = got.Name
+
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -315,6 +320,10 @@ func TestNewSingleContainerSecret(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := NewSingleContainerSecret(tt.secretName, tt.mountPath, tt.items...)
+
+			assert.Regexp(t, fmt.Sprintf(`^%s-[[:alnum:]]{5}$`, tt.secretName), got.Name)
+			tt.want.Name = got.Name
+
 			assert.Equal(t, tt.want, got)
 		})
 	}
