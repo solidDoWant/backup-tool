@@ -11,6 +11,9 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpgrestore"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
@@ -62,15 +65,17 @@ type TeleportBackupOptions struct {
 type Teleport struct {
 	kubeClusterClient kubecluster.ClientInterface
 	// Testing injection
-	newCNPGRestore func() CNPGRestoreInterface
-	newS3Sync      func() S3SyncInterface
+	newCNPGRestore func() cnpgrestore.CNPGRestoreInterface
+	newS3Sync      func() s3sync.S3SyncInterface
+	newRemoteStage func(kubeClusterClient kubecluster.ClientInterface, namespace, eventName string, opts remote.RemoteStageOptions) remote.RemoteStageInterface
 }
 
 func NewTeleport(kubeClusterClient kubecluster.ClientInterface) *Teleport {
 	return &Teleport{
 		kubeClusterClient: kubeClusterClient,
-		newCNPGRestore:    NewCNPGRestore,
-		newS3Sync:         NewS3Sync,
+		newCNPGRestore:    cnpgrestore.NewCNPGRestore,
+		newS3Sync:         s3sync.NewS3Sync,
+		newRemoteStage:    remote.NewRemoteStage,
 	}
 }
 
@@ -301,14 +306,14 @@ func (t *Teleport) cloneCluster(ctx *contexts.Context, namespace, clusterName, s
 
 type TeleportRestoreOptionsAudit struct {
 	TeleportOptionsAudit
-	ServingCertName      string                 `yaml:"servingCertName,omitempty"`
-	ClientCertIssuerName string                 `yaml:"clientCertIssuerName,omitempty"`
-	PostgresUserCert     OptionsClusterUserCert `yaml:"postgresUserCert,omitempty"`
+	ServingCertName      string                             `yaml:"servingCertName,omitempty"`
+	ClientCertIssuerName string                             `yaml:"clientCertIssuerName,omitempty"`
+	PostgresUserCert     cnpgrestore.CNPGRestoreOptionsCert `yaml:"postgresUserCert,omitempty"`
 }
 
 type TeleportRestoreOptions struct {
 	AuditCluster                TeleportRestoreOptionsAudit                        `yaml:"auditCluster,omitempty"`
-	PostgresUserCert            OptionsClusterUserCert                             `yaml:"postgresUserCert,omitempty"`
+	PostgresUserCert            cnpgrestore.CNPGRestoreOptionsCert                 `yaml:"postgresUserCert,omitempty"`
 	AuditSessionLogs            TeleportOptionsS3Sync                              `yaml:"auditSessionLogs,omitempty"`
 	RemoteBackupToolOptions     backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	ClusterServiceSearchDomains []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
@@ -319,9 +324,9 @@ type TeleportRestoreOptions struct {
 // * The DR PVC must exist
 // * Replacement clusters must be already deployed
 // * The enabled CNPG cluster must already exist, but not be in use
-// * The enabled  CNPG client CA issuer must already exist
-// * The enabled  CNPG cluster must support TLS auth for the postgres user
-// * The enabled  CNPG cluster serving cert must already exist
+// * The enabled CNPG client CA issuer must already exist
+// * The enabled CNPG cluster must support TLS auth for the postgres user
+// * The enabled CNPG cluster serving cert must already exist
 // Restore process:
 // 1. Ensure that the provided resources exist and are ready
 // 2. Restore the core CNPG cluster
@@ -346,75 +351,43 @@ func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreCl
 		}
 	}()
 
-	coreRestore := t.newCNPGRestore()
-	coreRestore.Configure(t.kubeClusterClient, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, restore.GetFullName(), teleportCoreSQLFileName, CNPGRestoreOpts{
-		PostgresUserCert:        opts.PostgresUserCert,
-		RemoteBackupToolOptions: opts.RemoteBackupToolOptions,
-		CleanupTimeout:          opts.CleanupTimeout,
+	// 1. Configuration
+	ctx.Log.Step().Info("Configuring restoration actions")
+	stage := t.newRemoteStage(t.kubeClusterClient, namespace, restore.GetFullName(), remote.RemoteStageOptions{
+		ClusterServiceSearchDomains: opts.ClusterServiceSearchDomains,
+		CleanupTimeout:              opts.CleanupTimeout,
 	})
+
+	coreRestore := t.newCNPGRestore()
+	if err := coreRestore.Configure(t.kubeClusterClient, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, teleportCoreSQLFileName, cnpgrestore.CNPGRestoreOptions{
+		PostgresUserCert: opts.PostgresUserCert,
+		CleanupTimeout:   opts.CleanupTimeout,
+	}); err != nil {
+		return restore, trace.Wrap(err, "failed to configure core cluster restoration")
+	}
+	stage.WithAction("Teleport core CNPG restore", coreRestore)
 
 	auditRestore := t.newCNPGRestore()
 	if opts.AuditCluster.Enabled {
-		auditRestore.Configure(t.kubeClusterClient, namespace, opts.AuditCluster.Name, opts.AuditCluster.ServingCertName, opts.AuditCluster.ClientCertIssuerName, restoreName, restore.GetFullName(), teleportAuditSQLFileName, CNPGRestoreOpts{
-			PostgresUserCert:            opts.AuditCluster.PostgresUserCert,
-			RemoteBackupToolOptions:     opts.RemoteBackupToolOptions,
-			CleanupTimeout:              opts.CleanupTimeout,
-			ClusterServiceSearchDomains: opts.ClusterServiceSearchDomains,
-		})
+		if err := auditRestore.Configure(t.kubeClusterClient, namespace, opts.AuditCluster.Name, opts.AuditCluster.ServingCertName, opts.AuditCluster.ClientCertIssuerName, restoreName, teleportAuditSQLFileName, cnpgrestore.CNPGRestoreOptions{
+			PostgresUserCert: opts.AuditCluster.PostgresUserCert,
+			CleanupTimeout:   opts.CleanupTimeout,
+		}); err != nil {
+			return restore, trace.Wrap(err, "failed to configure audit cluster restoration")
+		}
+		stage.WithAction("Teleport audit CNPG restore", auditRestore)
 	}
 
 	auditSessionLogsRestore := t.newS3Sync()
 	if opts.AuditSessionLogs.Enabled {
-		auditSessionLogsRestore.Configure(t.kubeClusterClient, namespace, restoreName, teleportAuditSessionLogsDirectoryName, opts.AuditSessionLogs.S3Path, restore.GetFullName(), &opts.AuditSessionLogs.Credentials, s3SyncOpts{
-			RemoteBackupToolOptions:     opts.RemoteBackupToolOptions,
-			ClusterServiceSearchDomains: opts.ClusterServiceSearchDomains,
-			CleanupTimeout:              opts.CleanupTimeout,
-		})
-	}
-
-	// 1. Ensure the require resources already exist
-	ctx.Log.Step().Info("Ensuring required resources exist")
-	_, err = t.kubeClusterClient.Core().GetPVC(ctx.Child(), namespace, restoreName)
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to get DR PVC %q", restoreName)
-	}
-
-	err = coreRestore.CheckResourcesReady(ctx.Child())
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to verify that resources for core cluster restoration are ready")
-	}
-
-	if opts.AuditCluster.Enabled {
-		err = auditRestore.CheckResourcesReady(ctx.Child())
-		if err != nil {
-			return restore, trace.Wrap(err, "failed to verify that resources for audit cluster restoration are ready")
+		if err := auditSessionLogsRestore.Configure(t.kubeClusterClient, namespace, restoreName, teleportAuditSessionLogsDirectoryName, opts.AuditSessionLogs.S3Path, &opts.AuditSessionLogs.Credentials, s3sync.DirectionUpload, s3sync.S3SyncOptions{}); err != nil {
+			return restore, trace.Wrap(err, "failed to configure audit session logs restoration")
 		}
+		stage.WithAction("Teleport audit session logs S3 sync", auditSessionLogsRestore)
 	}
 
-	// 2. Restore the core CNPG cluster
-	ctx.Log.Step().Info("Restoring the core cluster")
-	err = coreRestore.Restore(ctx.Child())
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to restore the core cluster")
-	}
-
-	// 3. Restore the audit CNPG cluster (if enabled)
-	if opts.AuditCluster.Enabled {
-		ctx.Log.Step().Info("Restoring the audit cluster")
-		err = auditRestore.Restore(ctx.Child())
-		if err != nil {
-			return restore, trace.Wrap(err, "failed to restore audit cluster")
-		}
-	}
-
-	// 4. Restore the audit session logs (if enabled)
-	if opts.AuditSessionLogs.Enabled {
-		ctx.Log.Step().Info("Restoring audit session logs")
-		err = auditSessionLogsRestore.Sync(ctx.Child())
-		if err != nil {
-			return restore, trace.Wrap(err, "failed to restore audit session logs")
-		}
-	}
-
-	return restore, nil
+	// 2. Run
+	ctx.Log.Step().Info("Running restoration actions")
+	err = stage.Run(ctx)
+	return restore, trace.Wrap(err, "failed to run restoration actions")
 }

@@ -11,6 +11,9 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpgrestore"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
@@ -538,14 +541,12 @@ func TestTeleportRestore(t *testing.T) {
 	}
 
 	tests := []struct {
-		desc                                  string
-		opts                                  TeleportRestoreOptions
-		simulateGetDRPVCError                 bool
-		simulateCoreCheckResourcesReadyError  bool
-		simulateAuditCheckResourcesReadyError bool
-		simulateCoreRestoreError              bool
-		simulateAuditRestoreError             bool
-		simulateAuditSessionLogsS3SyncError   bool
+		desc                                string
+		opts                                TeleportRestoreOptions
+		simulateCoreConfigError             bool
+		simulateAuditConfigError            bool
+		simulateAuditSessionLogsConfigError bool
+		simulateRunError                    bool
 	}{
 		{
 			desc: "success - no options set",
@@ -558,54 +559,28 @@ func TestTeleportRestore(t *testing.T) {
 				CleanupTimeout:   helpers.MaxWaitTime(3 * time.Second),
 			},
 		},
-		{
-			desc:                  "error getting DR PVC",
-			simulateGetDRPVCError: true,
-		},
-		{
-			desc:                                 "error checking core cluster resources",
-			simulateCoreCheckResourcesReadyError: true,
-		},
-		{
-			desc:                                  "error checking audit cluster resources",
-			opts:                                  TeleportRestoreOptions{AuditCluster: auditClusterOptions},
-			simulateAuditCheckResourcesReadyError: true,
-		},
-		{
-			desc:                     "error restoring core cluster",
-			simulateCoreRestoreError: true,
-		},
-		{
-			desc:                      "error restoring audit cluster",
-			opts:                      TeleportRestoreOptions{AuditCluster: auditClusterOptions},
-			simulateAuditRestoreError: true,
-		},
-		{
-			desc:                                "error syncing audit session logs to S3",
-			opts:                                TeleportRestoreOptions{AuditSessionLogs: auditSessionLogsOptions},
-			simulateAuditSessionLogsS3SyncError: true,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			mockClient := kubecluster.NewMockClientInterface(t)
-			mockCoreClient := core.NewMockClientInterface(t)
-			mockCNPGClient := cnpg.NewMockClientInterface(t)
-			mockESClient := externalsnapshotter.NewMockClientInterface(t)
-			mockClient.EXPECT().Core().Return(mockCoreClient).Maybe()
-			mockClient.EXPECT().CNPG().Return(mockCNPGClient).Maybe()
-			mockClient.EXPECT().ES().Return(mockESClient).Maybe()
+			// mockCoreClient := core.NewMockClientInterface(t)
+			// mockCNPGClient := cnpg.NewMockClientInterface(t)
+			// mockESClient := externalsnapshotter.NewMockClientInterface(t)
+			// mockClient.EXPECT().Core().Return(mockCoreClient).Maybe()
+			// mockClient.EXPECT().CNPG().Return(mockCNPGClient).Maybe()
+			// mockClient.EXPECT().ES().Return(mockESClient).Maybe()
 
-			mockCoreCNPGRestore := NewMockCNPGRestoreInterface(t)
-			mockAuditCNPGRestore := NewMockCNPGRestoreInterface(t)
-			mockAuditSessionLogsS3Sync := NewMockS3SyncInterface(t)
+			mockRemoteStage := remote.NewMockRemoteStageInterface(t)
+			mockCoreCNPGRestore := cnpgrestore.NewMockCNPGRestoreInterface(t)
+			mockAuditCNPGRestore := cnpgrestore.NewMockCNPGRestoreInterface(t)
+			mockAuditSessionLogsS3Sync := s3sync.NewMockS3SyncInterface(t)
 
 			restoreCount := 0
 
 			teleport := &Teleport{
 				kubeClusterClient: mockClient,
-				newCNPGRestore: func() CNPGRestoreInterface {
+				newCNPGRestore: func() cnpgrestore.CNPGRestoreInterface {
 					restoreCount++
 					switch restoreCount {
 					case 1:
@@ -617,112 +592,60 @@ func TestTeleportRestore(t *testing.T) {
 						return nil
 					}
 				},
-				newS3Sync: func() S3SyncInterface {
+				newS3Sync: func() s3sync.S3SyncInterface {
 					return mockAuditSessionLogsS3Sync
+				},
+				newRemoteStage: func(kubeClusterClient kubecluster.ClientInterface, calledNamespace, calledEventName string, calledOpts remote.RemoteStageOptions) remote.RemoteStageInterface {
+					assert.Equal(t, mockClient, kubeClusterClient)
+					assert.Equal(t, namespace, calledNamespace)
+					assert.True(t, strings.Contains(calledEventName, restoreName))
+					assert.Equal(t, tt.opts.ClusterServiceSearchDomains, calledOpts.ClusterServiceSearchDomains)
+					assert.Equal(t, tt.opts.CleanupTimeout, calledOpts.CleanupTimeout)
+
+					return mockRemoteStage
 				},
 			}
 
 			rootCtx := th.NewTestContext()
 
 			wantErr := th.ErrExpected(
-				tt.simulateGetDRPVCError,
-				tt.simulateCoreCheckResourcesReadyError,
-				tt.simulateAuditCheckResourcesReadyError,
-				tt.simulateCoreRestoreError,
-				tt.simulateAuditRestoreError,
-				tt.simulateAuditSessionLogsS3SyncError,
+				tt.simulateCoreConfigError,
+				tt.simulateAuditConfigError,
+				tt.simulateAuditSessionLogsConfigError,
+				tt.simulateRunError,
 			)
 
 			func() {
-				mockCoreCNPGRestore.EXPECT().Configure(mockClient, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, mock.Anything, "backup-core.sql", CNPGRestoreOpts{
-					PostgresUserCert:            tt.opts.PostgresUserCert,
-					RemoteBackupToolOptions:     tt.opts.RemoteBackupToolOptions,
-					ClusterServiceSearchDomains: tt.opts.ClusterServiceSearchDomains,
-					CleanupTimeout:              tt.opts.CleanupTimeout,
-				})
-
-				if tt.opts.AuditCluster.Enabled {
-					mockAuditCNPGRestore.EXPECT().Configure(mockClient, namespace, auditClusterName, auditServingCertName, auditClientCertIssuerName, restoreName, mock.Anything, "backup-audit.sql", CNPGRestoreOpts{
-						PostgresUserCert:            tt.opts.AuditCluster.PostgresUserCert,
-						RemoteBackupToolOptions:     tt.opts.RemoteBackupToolOptions,
-						ClusterServiceSearchDomains: tt.opts.ClusterServiceSearchDomains,
-						CleanupTimeout:              tt.opts.CleanupTimeout,
-					})
-				}
-
-				if tt.opts.AuditSessionLogs.Enabled {
-					mockAuditSessionLogsS3Sync.EXPECT().Configure(mockClient, namespace, restoreName, "audit-session-logs", auditSessionLogsS3Path, mock.Anything, auditSessionLogsS3Credentials, s3SyncOpts{
-						RemoteBackupToolOptions:     tt.opts.RemoteBackupToolOptions,
-						CleanupTimeout:              tt.opts.CleanupTimeout,
-						ClusterServiceSearchDomains: tt.opts.ClusterServiceSearchDomains,
-					})
-				}
-
-				// 1. Ensure the require resources already exist
-				mockCoreClient.EXPECT().GetPVC(mock.Anything, namespace, restoreName).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, pvcName string) (*corev1.PersistentVolumeClaim, error) {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-
-						return th.ErrOr1Val(&corev1.PersistentVolumeClaim{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      restoreName,
-								Namespace: namespace,
-							},
-						}, tt.simulateGetDRPVCError)
-					})
-				if tt.simulateGetDRPVCError {
+				mockCoreCNPGRestore.EXPECT().Configure(mockClient, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, "backup-core.sql", cnpgrestore.CNPGRestoreOptions{
+					PostgresUserCert: tt.opts.PostgresUserCert,
+					CleanupTimeout:   tt.opts.CleanupTimeout,
+				}).Return(th.ErrIfTrue(tt.simulateCoreConfigError))
+				if tt.simulateCoreConfigError {
 					return
 				}
-
-				mockCoreCNPGRestore.EXPECT().CheckResourcesReady(mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context) error {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-
-						return th.ErrIfTrue(tt.simulateCoreCheckResourcesReadyError)
-					})
-				if tt.simulateCoreCheckResourcesReadyError {
-					return
-				}
+				mockRemoteStage.EXPECT().WithAction(mock.Anything, mockCoreCNPGRestore).Return(mockRemoteStage)
 
 				if tt.opts.AuditCluster.Enabled {
-					mockAuditCNPGRestore.EXPECT().CheckResourcesReady(mock.Anything).
-						RunAndReturn(func(calledCtx *contexts.Context) error {
-							assert.True(t, calledCtx.IsChildOf(rootCtx))
-
-							return th.ErrIfTrue(tt.simulateAuditCheckResourcesReadyError)
-						})
-					if tt.simulateAuditCheckResourcesReadyError {
+					mockAuditCNPGRestore.EXPECT().Configure(mockClient, namespace, auditClusterName, auditServingCertName, auditClientCertIssuerName, restoreName, "backup-audit.sql", cnpgrestore.CNPGRestoreOptions{
+						PostgresUserCert: tt.opts.AuditCluster.PostgresUserCert,
+						CleanupTimeout:   tt.opts.CleanupTimeout,
+					}).Return(th.ErrIfTrue(tt.simulateAuditConfigError))
+					if tt.simulateAuditConfigError {
 						return
 					}
+					mockRemoteStage.EXPECT().WithAction(mock.Anything, mockAuditCNPGRestore).Return(mockRemoteStage)
 				}
 
-				// 2. Restore the core CNPG cluster
-				mockCoreCNPGRestore.EXPECT().Restore(mock.Anything).RunAndReturn(func(calledCtx *contexts.Context) error {
-					assert.True(t, calledCtx.IsChildOf(rootCtx))
-
-					return th.ErrIfTrue(tt.simulateCoreRestoreError)
-				})
-				if tt.simulateCoreRestoreError {
-					return
-				}
-
-				// 3. Restore the audit CNPG cluster if enabled
-				if tt.opts.AuditCluster.Enabled {
-					mockAuditCNPGRestore.EXPECT().Restore(mock.Anything).RunAndReturn(func(calledCtx *contexts.Context) error {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-
-						return th.ErrIfTrue(tt.simulateAuditRestoreError)
-					})
-				}
-
-				// 4. Sync audit session logs if enabled
 				if tt.opts.AuditSessionLogs.Enabled {
-					mockAuditSessionLogsS3Sync.EXPECT().Sync(mock.Anything).RunAndReturn(func(calledCtx *contexts.Context) error {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-
-						return th.ErrIfTrue(tt.simulateAuditSessionLogsS3SyncError)
-					})
+					mockAuditSessionLogsS3Sync.EXPECT().Configure(mockClient, namespace, restoreName, "audit-session-logs", auditSessionLogsS3Path, auditSessionLogsS3Credentials, s3sync.DirectionUpload, s3sync.S3SyncOptions{}).
+						Return(th.ErrIfTrue(tt.simulateAuditSessionLogsConfigError))
+					if tt.simulateAuditSessionLogsConfigError {
+						return
+					}
+					mockRemoteStage.EXPECT().WithAction(mock.Anything, mockAuditSessionLogsS3Sync).Return(mockRemoteStage)
 				}
+
+				mockRemoteStage.EXPECT().Run(mock.Anything).Return(th.ErrIfTrue(tt.simulateRunError))
 			}()
 
 			restore, err := teleport.Restore(rootCtx, namespace, restoreName, coreClusterName, coreServingCertName, coreClientCertIssuerName, tt.opts)

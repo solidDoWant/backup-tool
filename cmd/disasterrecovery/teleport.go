@@ -3,6 +3,7 @@ package disasterrecovery
 import (
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpgrestore"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
@@ -50,10 +51,10 @@ type TeleportBackupConfig struct {
 }
 
 type TeleportRestoreClusterConfig struct {
-	Name                 string                                  `yaml:"name" jsonschema:"required"`
-	ServingCertName      string                                  `yaml:"servingCertName" jsonschema:"required"`
-	ClientCertIssuerName string                                  `yaml:"clientCertIssuerName" jsonschema:"required"`
-	ClusterUserCert      disasterrecovery.OptionsClusterUserCert `yaml:"clusterUserCert,omitempty"`
+	Name                 string                             `yaml:"name" jsonschema:"required"`
+	ServingCertName      string                             `yaml:"servingCertName" jsonschema:"required"`
+	ClientCertIssuerName string                             `yaml:"clientCertIssuerName" jsonschema:"required"`
+	ClusterUserCert      cnpgrestore.CNPGRestoreOptionsCert `yaml:"clusterUserCert,omitempty"`
 }
 
 type TeleportRestoreClustersConfig struct {

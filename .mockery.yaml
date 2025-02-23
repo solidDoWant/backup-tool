@@ -19,10 +19,19 @@ packages:
       ContextCommandInterface:
       KubeClusterCommandInterface:
       KubernetesCommandInterface:
-  github.com/solidDoWant/backup-tool/pkg/disasterrecovery:
+  github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote:
     <<: *baseline_config
     interfaces:
+      RemoteStageInterface:
+      RemoteAction:
+      CleanupAction:
+  ? github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpgrestore
+  : <<: *baseline_config
+    interfaces:
       CNPGRestoreInterface:
+  github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync:
+    <<: *baseline_config
+    interfaces:
       S3SyncInterface:
   github.com/solidDoWant/backup-tool/pkg/files:
     <<: *baseline_config
