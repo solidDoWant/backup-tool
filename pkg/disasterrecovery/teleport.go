@@ -12,7 +12,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
-	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpgrestore"
+	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"

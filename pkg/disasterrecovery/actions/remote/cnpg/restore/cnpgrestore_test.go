@@ -1,4 +1,4 @@
-package cnpgrestore
+package restore
 
 import (
 	"path/filepath"

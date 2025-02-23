@@ -3,7 +3,7 @@ package disasterrecovery
 import (
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery"
-	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpgrestore"
+	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
