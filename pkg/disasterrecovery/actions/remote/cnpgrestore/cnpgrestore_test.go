@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -151,6 +152,7 @@ func TestValidate(t *testing.T) {
 		simulateGetServingCert         bool
 		simulateGetClientCertIssuer    bool
 		returnClientCertIssuerNotReady bool
+		simulateGetPVCErr              bool
 	}{
 		{
 			desc: "succeeds",
@@ -183,6 +185,10 @@ func TestValidate(t *testing.T) {
 			desc:                           "fails because client cert issuer is not ready",
 			returnClientCertIssuerNotReady: true,
 		},
+		{
+			desc:              "fails to get DR PVC",
+			simulateGetPVCErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -214,6 +220,7 @@ func TestValidate(t *testing.T) {
 				tt.simulateGetServingCert,
 				tt.simulateGetClientCertIssuer,
 				tt.returnClientCertIssuerNotReady,
+				tt.simulateGetPVCErr,
 			)
 
 			func() {
@@ -256,6 +263,16 @@ func TestValidate(t *testing.T) {
 						}
 
 						return th.ErrOr1Val(retIssuer, tt.simulateGetClientCertIssuer)
+					})
+				if tt.simulateGetClientCertIssuer || tt.returnClientCertIssuerNotReady {
+					return
+				}
+
+				mockCoreClient.EXPECT().GetPVC(mock.Anything, currentState.namespace, currentState.drVolName).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*corev1.PersistentVolumeClaim, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+
+						return nil, th.ErrIfTrue(tt.simulateGetPVCErr)
 					})
 			}()
 

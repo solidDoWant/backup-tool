@@ -11,11 +11,13 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/s3"
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func TestS3SyncOpts(t *testing.T) {
@@ -83,7 +85,7 @@ func TestValidate(t *testing.T) {
 	notConfiguredState := &configureState{}
 	configuredState := &configureState{}
 	err := configuredState.Configure(
-		kubecluster.NewMockClientInterface(t),
+		nil,
 		"namespace",
 		"drVolName",
 		"backupPath",
@@ -99,6 +101,7 @@ func TestValidate(t *testing.T) {
 		configState        *configureState
 		isAlreadyValidated bool
 		invalidDirection   bool
+		simulateGetPVCErr  bool
 	}{
 		{
 			desc: "succeeds",
@@ -115,27 +118,50 @@ func TestValidate(t *testing.T) {
 			desc:             "fails with invalid direction",
 			invalidDirection: true,
 		},
+		{
+			desc:              "fails to get DR PVC",
+			simulateGetPVCErr: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
+			mockCoreClient := core.NewMockClientInterface(t)
+			mockClient := kubecluster.NewMockClientInterface(t)
+			mockClient.EXPECT().Core().Return(mockCoreClient).Maybe()
+
 			if tt.configState == nil {
 				tt.configState = configuredState
 			}
+			tt.configState.kubeClusterClient = mockClient
 
 			currentState := &validateState{
 				configureState: *tt.configState,
 				isValidated:    tt.isAlreadyValidated,
 			}
-
-			if tt.invalidDirection {
-				currentState.direction = Direction(999)
-			}
-
 			ctx := th.NewTestContext()
+
+			func() {
+				if !currentState.isConfigured {
+					return
+				}
+
+				if tt.invalidDirection {
+					currentState.direction = Direction(999)
+					return
+				}
+
+				mockCoreClient.EXPECT().GetPVC(mock.Anything, "namespace", "drVolName").
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*corev1.PersistentVolumeClaim, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+
+						return nil, th.ErrIfTrue(tt.simulateGetPVCErr)
+					})
+			}()
+
 			err := currentState.Validate(ctx)
 
-			if !currentState.isConfigured || tt.invalidDirection {
+			if th.ErrExpected(!currentState.isConfigured, tt.invalidDirection, tt.simulateGetPVCErr) {
 				assert.Error(t, err)
 				return
 			}

@@ -129,6 +129,10 @@ func (vs *validateState) Validate(ctx *contexts.Context) (err error) {
 	}
 	vs.clientCertIssuer = clientCertIssuer
 
+	if _, err := vs.kubeClusterClient.Core().GetPVC(ctx.Child(), vs.namespace, vs.drVolName); err != nil {
+		return trace.Wrap(err, "failed to get DR PVC %q", vs.drVolName)
+	}
+
 	vs.isValidated = true
 	return nil
 }
