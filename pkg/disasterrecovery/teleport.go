@@ -1,17 +1,13 @@
 package disasterrecovery
 
 import (
-	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
-	"dario.cat/mergo"
 	"github.com/gravitational/trace"
-	"github.com/solidDoWant/backup-tool/pkg/cleanup"
-	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
+	cnpgbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/backup"
 	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
@@ -20,9 +16,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
-	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	"github.com/solidDoWant/backup-tool/pkg/s3"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -65,6 +59,7 @@ type TeleportBackupOptions struct {
 type Teleport struct {
 	kubeClusterClient kubecluster.ClientInterface
 	// Testing injection
+	newCNPGBackup  func() cnpgbackup.CNPGBackupInterface
 	newCNPGRestore func() cnpgrestore.CNPGRestoreInterface
 	newS3Sync      func() s3sync.S3SyncInterface
 	newRemoteStage func(kubeClusterClient kubecluster.ClientInterface, namespace, eventName string, opts remote.RemoteStageOptions) remote.RemoteStageInterface
@@ -73,6 +68,7 @@ type Teleport struct {
 func NewTeleport(kubeClusterClient kubecluster.ClientInterface) *Teleport {
 	return &Teleport{
 		kubeClusterClient: kubeClusterClient,
+		newCNPGBackup:     cnpgbackup.NewCNPGBackup,
 		newCNPGRestore:    cnpgrestore.NewCNPGRestore,
 		newS3Sync:         s3sync.NewS3Sync,
 		newRemoteStage:    remote.NewRemoteStage,
@@ -137,109 +133,53 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 		return backup, trace.Wrap(err, "failed to ensure backup volume exists")
 	}
 
-	// 2. Clone the Core cluster
-	ctx.Log.Step().Info("Cloning CNPG cluster", "clusterName", coreClusterName)
-	clonedCoreCluster, cleanupClonedCoreCluster, err := t.cloneCluster(ctx, namespace, coreClusterName, "core", backup.Name,
-		servingCertIssuerName, clientCertIssuerName, backup.StartTime, opts.CleanupTimeout, &err, opts.CloneClusterOptions)
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to clone the %q cluster", coreClusterName)
-	}
-	defer cleanupClonedCoreCluster()
+	// Configuration
+	ctx.Log.Step().Info("Configuring backup actions")
+	stage := t.newRemoteStage(t.kubeClusterClient, namespace, backup.GetFullName(), remote.RemoteStageOptions{
+		ClusterServiceSearchDomains: opts.ClusterServiceSearchDomains,
+		CleanupTimeout:              opts.CleanupTimeout,
+	})
 
-	// 3. Clone the Audit cluster (if enabled) with PITR set to the same time as the Core cluster clone
-	var clonedAuditCluster clonedcluster.ClonedClusterInterface
-	if opts.AuditCluster.Enabled {
-		ctx.Log.Step().Info("Cloning CNPG cluster", "clusterName", opts.AuditCluster.Name)
-		var cleanupClonedAuditCluster func()
-		clonedAuditCluster, cleanupClonedAuditCluster, err = t.cloneCluster(ctx, namespace, opts.AuditCluster.Name, "audit", backup.Name,
-			servingCertIssuerName, clientCertIssuerName, backup.StartTime, opts.CleanupTimeout, &err, opts.CloneClusterOptions)
-		if err != nil {
-			return backup, trace.Wrap(err, "failed to clone the %q cluster", opts.AuditCluster.Name)
-		}
-
-		defer cleanupClonedAuditCluster()
+	if opts.CloneClusterOptions.RecoveryTargetTime == "" {
+		// Backup postgres clusters with their states at the same point in time
+		opts.CloneClusterOptions.RecoveryTargetTime = backup.StartTime.Format(time.RFC3339)
 	}
 
-	// 4. Deploy a backup-tool instance with access to both the Core and Audit cloned clusters
-	ctx.Log.Step().Info("Creating backup tool instance")
-
-	drVolumeMountPath := filepath.Join(teleportBaseMountPath, "dr")
-	secretsDirectoryPath := filepath.Join(teleportBaseMountPath, "secrets")
-
-	coreClusterSecretsDirectoryPath := filepath.Join(secretsDirectoryPath, "core")
-	coreClusterServingCertVolumeMountPath := filepath.Join(coreClusterSecretsDirectoryPath, "serving-cert")
-	coreClusterClientCertVolumeMountPath := filepath.Join(coreClusterSecretsDirectoryPath, "client-cert")
-
-	btOpts := backuptoolinstance.CreateBackupToolInstanceOptions{
-		NamePrefix: fmt.Sprintf("%s-%s", constants.ToolName, backup.GetFullName()),
-		Volumes: []core.SingleContainerVolume{
-			core.NewSingleContainerPVC(drPVC.Name, drVolumeMountPath),
-			core.NewSingleContainerSecret(clonedCoreCluster.GetServingCert().Name, coreClusterServingCertVolumeMountPath, corev1.KeyToPath{Key: "tls.crt", Path: "tls.crt"}),
-			core.NewSingleContainerSecret(clonedCoreCluster.GetPostgresUserCert().GetCertificate().Name, coreClusterClientCertVolumeMountPath),
-		},
+	backupOpts := cnpgbackup.CNPGBackupOptions{
+		CloningOpts:    opts.CloneClusterOptions,
 		CleanupTimeout: opts.CleanupTimeout,
 	}
 
-	var auditClusterServingCertVolumeMountPath string
-	var auditClusterClientCertVolumeMountPath string
+	coreBackup := t.newCNPGBackup()
+	if err := coreBackup.Configure(t.kubeClusterClient, namespace, coreClusterName, servingCertIssuerName, clientCertIssuerName, backupName, teleportCoreSQLFileName, backupOpts); err != nil {
+		return backup, trace.Wrap(err, "failed to configure core cluster backup")
+	}
+	stage.WithAction("Teleport core CNPG backup", coreBackup)
+
+	auditBackup := t.newCNPGBackup()
 	if opts.AuditCluster.Enabled {
-		auditClusterSecretsDirectoryPath := filepath.Join(secretsDirectoryPath, "audit")
-		auditClusterServingCertVolumeMountPath = filepath.Join(auditClusterSecretsDirectoryPath, "serving-cert")
-		auditClusterClientCertVolumeMountPath = filepath.Join(auditClusterSecretsDirectoryPath, "client-cert")
-
-		btOpts.Volumes = append(btOpts.Volumes,
-			core.NewSingleContainerSecret(clonedAuditCluster.GetServingCert().Name, auditClusterServingCertVolumeMountPath, corev1.KeyToPath{Key: "tls.crt", Path: "tls.crt"}),
-			core.NewSingleContainerSecret(clonedAuditCluster.GetPostgresUserCert().GetCertificate().Name, auditClusterClientCertVolumeMountPath),
-		)
-	}
-
-	mergo.MergeWithOverwrite(&btOpts, opts.RemoteBackupToolOptions)
-	btInstance, err := t.kubeClusterClient.CreateBackupToolInstance(ctx.Child(), namespace, backup.GetFullName(), btOpts)
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to create %s instance", constants.ToolName)
-	}
-	defer cleanup.To(btInstance.Delete).WithErrMessage("failed to cleanup backup tool instance %q resources", backup.GetFullName()).
-		WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(time.Minute)).Run()
-
-	backupToolClient, err := btInstance.GetGRPCClient(ctx.Child(), opts.ClusterServiceSearchDomains...)
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to create client for backup tool GRPC server")
-	}
-
-	// 5. Perform a logical backup of the Core cluster
-	ctx.Log.Step().Info("Performing Core cluster Postgres logical backup")
-	podSQLFilePath := filepath.Join(drVolumeMountPath, teleportCoreSQLFileName)
-	clusterCredentials := clonedCoreCluster.GetCredentials(coreClusterServingCertVolumeMountPath, coreClusterClientCertVolumeMountPath)
-	err = backupToolClient.Postgres().DumpAll(ctx.Child(), clusterCredentials, podSQLFilePath, postgres.DumpAllOptions{CleanupTimeout: opts.CleanupTimeout})
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to dump logical backup for core postgres server at %q", postgres.GetServerAddress(clusterCredentials))
-	}
-
-	// 6. Perform a logical backup of the Audit cluster (if enabled)
-	if opts.AuditCluster.Enabled {
-		ctx.Log.Step().Info("Performing Audit cluster Postgres logical backup")
-		podSQLFilePath = filepath.Join(drVolumeMountPath, teleportAuditSQLFileName)
-		clusterCredentials = clonedAuditCluster.GetCredentials(auditClusterServingCertVolumeMountPath, auditClusterClientCertVolumeMountPath)
-		err = backupToolClient.Postgres().DumpAll(ctx.Child(), clusterCredentials, podSQLFilePath, postgres.DumpAllOptions{CleanupTimeout: opts.CleanupTimeout})
-		if err != nil {
-			return backup, trace.Wrap(err, "failed to dump logical backup for audit postgres server at %q", postgres.GetServerAddress(clusterCredentials))
+		if err := auditBackup.Configure(t.kubeClusterClient, namespace, opts.AuditCluster.Name, servingCertIssuerName, clientCertIssuerName, backupName, teleportAuditSQLFileName, backupOpts); err != nil {
+			return backup, trace.Wrap(err, "failed to configure audit cluster backup")
 		}
+		stage.WithAction("Teleport audit CNPG backup", auditBackup)
 	}
 
-	// 7. Sync the audit session logs from object storage (if enabled)
-	// It is okay if this is not synced with the bucket's state when the postgres backups were taken. Teleport only appends to the audit
-	// session log bucket, so as long as this occurs _after_ the postgres backups, the bucket state when the postgres backups were taken
-	// will be a subset of the bucket state when this is synced.
+	auditSessionLogsBackup := t.newS3Sync()
 	if opts.AuditSessionLogs.Enabled {
-		ctx.Log.Step().Info("Syncing audit session logs from object storage")
-		auditSessionLogsPath := filepath.Join(drVolumeMountPath, teleportAuditSessionLogsDirectoryName)
-		err = backupToolClient.S3().Sync(ctx.Child(), &opts.AuditSessionLogs.Credentials, opts.AuditSessionLogs.S3Path, auditSessionLogsPath)
-		if err != nil {
-			return backup, trace.Wrap(err, "failed to sync audit session logs from %q", opts.AuditSessionLogs.S3Path)
+		if err := auditSessionLogsBackup.Configure(t.kubeClusterClient, namespace, backupName, teleportAuditSessionLogsDirectoryName, opts.AuditSessionLogs.S3Path, &opts.AuditSessionLogs.Credentials, s3sync.DirectionDownload, s3sync.S3SyncOptions{}); err != nil {
+			return backup, trace.Wrap(err, "failed to configure audit session logs backup")
 		}
+		stage.WithAction("Teleport audit session logs S3 sync", auditSessionLogsBackup)
 	}
 
-	// 8. Snapshot the backup PVC
+	// Run
+	ctx.Log.Step().Info("Running backup actions")
+	err = stage.Run(ctx)
+	if err != nil {
+		return backup, trace.Wrap(err, "failed to run backup actions")
+	}
+
+	// Snapshot the backup PVC
 	ctx.Log.Step().Info("Snapshotting the DR volume")
 	snapshot, err := t.kubeClusterClient.ES().SnapshotVolume(ctx.Child(), namespace, drPVC.Name, externalsnapshotter.SnapshotVolumeOptions{Name: helpers.CleanName(backup.GetFullName()), SnapshotClass: opts.BackupSnapshot.SnapshotClass})
 	if err != nil {
@@ -270,38 +210,6 @@ func (t *Teleport) getClusterSize(ctx *contexts.Context, namespace, clusterName 
 	}
 
 	return clusterSize, nil
-}
-
-func (t *Teleport) cloneCluster(ctx *contexts.Context, namespace, clusterName, shortClusterName, backupName, servingCertIssuerName, clientCertIssuerName string,
-	recoveryTime time.Time, finalCleanupTimeout helpers.MaxWaitTime, outerErr *error, cloningOpts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, func(), error) {
-	clonedClusterName := helpers.CleanName(fmt.Sprintf("%s-%s", clusterName, backupName))
-	if len(clonedClusterName) > 50 {
-		clonedClusterName = helpers.CleanName(helpers.TruncateString(fmt.Sprintf("%s-%s", shortClusterName, backupName), 50, ""))
-	}
-
-	if cloningOpts.CleanupTimeout == 0 {
-		cloningOpts.CleanupTimeout = finalCleanupTimeout
-	}
-
-	if cloningOpts.RecoveryTargetTime == "" {
-		cloningOpts.RecoveryTargetTime = recoveryTime.Format(time.RFC3339)
-	}
-
-	clonedCluster, err := t.kubeClusterClient.CloneCluster(ctx.Child(), namespace, clusterName,
-		clonedClusterName, servingCertIssuerName, clientCertIssuerName, cloningOpts)
-	if err != nil {
-		return nil, nil, trace.Wrap(err, "failed to clone cluster %q", clusterName)
-	}
-
-	cleanupFunc := func() {
-		// This is just the normal cleanup func with the error discarded
-		_ = cleanup.To(clonedCluster.Delete).
-			WithErrMessage("failed to cleanup cloned cluster %q resources", clonedClusterName).WithOriginalErr(outerErr).
-			WithParentCtx(ctx).WithTimeout(finalCleanupTimeout.MaxWait(10 * time.Minute)).
-			Run()
-	}
-
-	return clonedCluster, cleanupFunc, nil
 }
 
 type TeleportRestoreOptionsAudit struct {
