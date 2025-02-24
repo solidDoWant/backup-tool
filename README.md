@@ -21,6 +21,11 @@ See [the design decision doc](docs/design%20decisions.md) for additional details
     * Backup to an in-cluster PVC, which is then snapshotted
     * Restore from an in-cluster PVC
     * Only Postgres backend supported (SQLite not supported)
+* Teleport
+    * Backup to an in-cluster PVC, which is then snapshotted
+    * Restore from an in-cluster PVC
+    * Only Postgres supported for "core" backend and audit events
+    * Only S3-compatible object storage supported for audit session logs
 
 ## Upcoming support:
 * ZFS snapshot to tape drive/library
