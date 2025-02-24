@@ -31,4 +31,5 @@ func TestNewClient(t *testing.T) {
 	assert.NotNil(t, client.clonePVCProvider)
 	assert.NotNil(t, client.clusterUserCertProvider)
 	assert.NotNil(t, client.createCRPForProfileProvider)
+	assert.NotNil(t, client.drVolumeProvider)
 }

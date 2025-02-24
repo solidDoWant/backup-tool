@@ -6,6 +6,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonepvc"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
@@ -19,6 +20,7 @@ type clonedClusterProvider clonedcluster.ProviderInterface
 type clonePVCProvider clonepvc.ProviderInterface
 type clusterUserCertProvider clusterusercert.ProviderInterface
 type createCRPForProfileProvider createcrpforcertificate.ProviderInterface
+type drVolumeProvider drvolume.ProviderInterface
 
 type ClientInterface interface {
 	CM() certmanager.ClientInterface
@@ -31,6 +33,7 @@ type ClientInterface interface {
 	clonePVCProvider
 	clusterUserCertProvider
 	createCRPForProfileProvider
+	drVolumeProvider
 }
 
 type Client struct {
@@ -44,6 +47,7 @@ type Client struct {
 	clonePVCProvider
 	clusterUserCertProvider
 	createCRPForProfileProvider
+	drVolumeProvider
 }
 
 func (c *Client) CM() certmanager.ClientInterface {
@@ -80,6 +84,7 @@ func NewClient(cm certmanager.ClientInterface, cnpg cnpg.ClientInterface, esClie
 	c.createCRPForProfileProvider = createcrpforcertificate.NewProvider(apClient)
 	c.clusterUserCertProvider = clusterusercert.NewProvider(c.createCRPForProfileProvider, apClient, cm)
 	c.clonedClusterProvider = clonedcluster.NewProvider(c.clusterUserCertProvider, cm, cnpg)
+	c.drVolumeProvider = drvolume.NewProvider(c.coreClient, c.esClient, c.cnpgClient)
 
 	return c
 }

@@ -60,15 +60,20 @@ packages:
     interfaces:
       ProviderInterface:
       BackupToolInstanceInterface:
-  ? github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate
-  : <<: *baseline_config
-    interfaces:
-      ProviderInterface:
   github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert:
     <<: *baseline_config
     interfaces:
       ProviderInterface:
       ClusterUserCertInterface:
+  ? github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate
+  : <<: *baseline_config
+    interfaces:
+      ProviderInterface:
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume:
+    <<: *baseline_config
+    interfaces:
+      ProviderInterface:
+      DRVolumeInterface:
   github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonepvc: *kube_composite_config
   github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster:
     <<: *baseline_config
