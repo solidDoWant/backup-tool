@@ -25,6 +25,10 @@ packages:
       RemoteStageInterface:
       RemoteAction:
       CleanupAction:
+  ? github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/backup
+  : <<: *baseline_config
+    interfaces:
+      CNPGBackupInterface:
   ? github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore
   : <<: *baseline_config
     interfaces:
