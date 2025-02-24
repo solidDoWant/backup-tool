@@ -62,8 +62,8 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				NamePrefix: "test-prefix-",
 				Volumes: []core.SingleContainerVolume{
 					{
-						Name:      "vol1",
-						MountPath: "/data1",
+						Name:       "vol1",
+						MountPaths: []string{"/data1"},
 						VolumeSource: corev1.VolumeSource{
 							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 								ClaimName: "pvc1",
@@ -71,8 +71,8 @@ func TestCreateBackupToolInstance(t *testing.T) {
 						},
 					},
 					{
-						Name:      "vol2",
-						MountPath: "/data2",
+						Name:       "vol2",
+						MountPaths: []string{"/data2"},
 						VolumeSource: corev1.VolumeSource{
 							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 								ClaimName: "pvc2",
@@ -81,8 +81,8 @@ func TestCreateBackupToolInstance(t *testing.T) {
 					},
 
 					{
-						Name:      "vol3",
-						MountPath: "/secret1",
+						Name:       "vol3",
+						MountPaths: []string{"/secret1"},
 						VolumeSource: corev1.VolumeSource{
 							Secret: &corev1.SecretVolumeSource{
 								SecretName:  "secret1",

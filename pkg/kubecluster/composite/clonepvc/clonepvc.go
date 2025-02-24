@@ -116,7 +116,7 @@ func (p *Provider) ClonePVC(ctx *contexts.Context, namespace, pvcName string, op
 					{
 						Name:            "force-bind",
 						Image:           "registry.k8s.io/pause", // TODO pin
-						VolumeMounts:    []corev1.VolumeMount{podVol.ToVolumeMount()},
+						VolumeMounts:    podVol.ToVolumeMounts(),
 						SecurityContext: core.RestrictedContainerSecurityContext(1000, 1000),
 					},
 				},

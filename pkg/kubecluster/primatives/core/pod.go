@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gravitational/trace"
+	"github.com/samber/lo"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	corev1 "k8s.io/api/core/v1"
@@ -71,14 +72,35 @@ func (c *Client) DeletePod(ctx *contexts.Context, namespace, name string) error 
 // Represents a volume that is mounted in a single container.
 type SingleContainerVolume struct {
 	Name         string              `yaml:"name" jsonschema:"required"`
-	MountPath    string              `yaml:"mountPath" jsonschema:"required"`
+	MountPaths   []string            `yaml:"mountPaths" jsonschema:"required"`
 	VolumeSource corev1.VolumeSource `yaml:"volumeSource" jsonschema:"required"`
+}
+
+func (scv *SingleContainerVolume) WithMountPath(mountPath string) *SingleContainerVolume {
+	scv.MountPaths = append(scv.MountPaths, mountPath)
+	return scv
+}
+
+func (scv *SingleContainerVolume) ToVolume() corev1.Volume {
+	return corev1.Volume{
+		Name:         scv.Name,
+		VolumeSource: scv.VolumeSource,
+	}
+}
+
+func (svc *SingleContainerVolume) ToVolumeMounts() []corev1.VolumeMount {
+	return lo.Map(svc.MountPaths, func(mountPath string, _ int) corev1.VolumeMount {
+		return corev1.VolumeMount{
+			Name:      svc.Name,
+			MountPath: mountPath,
+		}
+	})
 }
 
 func NewSingleContainerPVC(pvcName, mountPath string) SingleContainerVolume {
 	return SingleContainerVolume{
-		Name:      names.SimpleNameGenerator.GenerateName(pvcName + "-"),
-		MountPath: mountPath,
+		Name:       pvcName,
+		MountPaths: []string{mountPath},
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 				ClaimName: pvcName,
@@ -89,8 +111,8 @@ func NewSingleContainerPVC(pvcName, mountPath string) SingleContainerVolume {
 
 func NewSingleContainerSecret(secretName, mountPath string, items ...corev1.KeyToPath) SingleContainerVolume {
 	return SingleContainerVolume{
-		Name:      names.SimpleNameGenerator.GenerateName(secretName + "-"),
-		MountPath: mountPath,
+		Name:       secretName,
+		MountPaths: []string{mountPath},
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
 				SecretName:  secretName,
@@ -101,18 +123,64 @@ func NewSingleContainerSecret(secretName, mountPath string, items ...corev1.KeyT
 	}
 }
 
-func (scv *SingleContainerVolume) ToVolume() corev1.Volume {
-	return corev1.Volume{
-		Name:         scv.Name,
-		VolumeSource: scv.VolumeSource,
-	}
-}
+// TODO replace this with a new, more generic approach
+// Converts SCVs into k8s volumes and volume mounts. If multiple SCVs have the same name, they are merged.
+// This prevents issues with certain CSIs that don't support the same volume being listed multiple times under
+// different names.
+func ConvertSingleContainerVolumes(scvs []SingleContainerVolume) ([]corev1.Volume, []corev1.VolumeMount) {
+	reducedSCVs := make(map[string]SingleContainerVolume, len(scvs))
+	for _, incomingSVC := range scvs {
+		if reducedSCV, ok := reducedSCVs[incomingSVC.Name]; ok {
+			// case: both are PVCs
+			if reducedSCV.VolumeSource.PersistentVolumeClaim != nil && incomingSVC.VolumeSource.PersistentVolumeClaim != nil {
+				if reducedSCV.VolumeSource.PersistentVolumeClaim.ClaimName != incomingSVC.VolumeSource.PersistentVolumeClaim.ClaimName {
+					// Names for each volume must be unique, so generate a new one for the new svc
+					incomingSVC.Name = names.SimpleNameGenerator.GenerateName(incomingSVC.Name + "-")
+					reducedSCVs[incomingSVC.Name] = incomingSVC
+					continue
+				}
 
-func (svc *SingleContainerVolume) ToVolumeMount() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      svc.Name,
-		MountPath: svc.MountPath,
+				// Merge the mount paths
+				reducedSCV.MountPaths = lo.Uniq(append(reducedSCV.MountPaths, incomingSVC.MountPaths...))
+				reducedSCVs[reducedSCV.Name] = reducedSCV
+				continue
+			}
+
+			// case: both are secrets
+			if reducedSCV.VolumeSource.Secret != nil && incomingSVC.VolumeSource.Secret != nil {
+				if reducedSCV.VolumeSource.Secret.SecretName != incomingSVC.VolumeSource.Secret.SecretName {
+					// Names for each volume must be unique, so generate a new one for the new svc
+					incomingSVC.Name = names.SimpleNameGenerator.GenerateName(incomingSVC.Name + "-")
+					reducedSCVs[incomingSVC.Name] = incomingSVC
+					continue
+				}
+
+				// Merge the mount paths and the items
+				reducedSCV.MountPaths = lo.Uniq(append(reducedSCV.MountPaths, incomingSVC.MountPaths...))
+				mergedItems := lo.Uniq(append(reducedSCV.VolumeSource.Secret.Items, incomingSVC.VolumeSource.Secret.Items...))
+				if len(mergedItems) > 0 {
+					reducedSCV.VolumeSource.Secret.Items = mergedItems
+				}
+				reducedSCVs[reducedSCV.Name] = reducedSCV
+				continue
+			}
+
+			// case: unsupported, TODO
+			continue
+		}
+		reducedSCVs[incomingSVC.Name] = incomingSVC
 	}
+
+	volumes := lo.MapToSlice(reducedSCVs, func(_ string, svc SingleContainerVolume) corev1.Volume {
+		return svc.ToVolume()
+	})
+	volumeMounts := lo.Flatten(
+		lo.MapToSlice(reducedSCVs, func(_ string, svc SingleContainerVolume) []corev1.VolumeMount {
+			return svc.ToVolumeMounts()
+		}),
+	)
+
+	return volumes, volumeMounts
 }
 
 func RestrictedPodSecurityContext(uid, gid int64) *corev1.PodSecurityContext {

@@ -226,7 +226,7 @@ func TestSetup(t *testing.T) {
 
 			drVol := btiOpts.Volumes[0]
 			assert.True(t, strings.HasPrefix(drVol.Name, currentState.drVolName))
-			assert.Equal(t, currentState.mountPaths.drVolume, drVol.MountPath)
+			assert.Equal(t, []string{currentState.mountPaths.drVolume}, drVol.MountPaths)
 			require.NotNil(t, drVol.VolumeSource.PersistentVolumeClaim)
 			assert.Equal(t, currentState.drVolName, drVol.VolumeSource.PersistentVolumeClaim.ClaimName)
 		})

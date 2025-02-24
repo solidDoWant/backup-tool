@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -221,46 +220,14 @@ func TestDeletePod(t *testing.T) {
 }
 
 func TestNewSingleContainerPVC(t *testing.T) {
-	tests := []struct {
-		name      string
-		pvcName   string
-		mountPath string
-		want      SingleContainerVolume
-	}{
-		{
-			name:      "basic pvc volume",
-			pvcName:   "test-pvc",
-			mountPath: "/data",
-			want: SingleContainerVolume{
-				Name:      "test-pvc",
-				MountPath: "/data",
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: "test-pvc",
-					},
-				},
-			},
+	scv := NewSingleContainerPVC("test-pvc", "/data")
+	assert.Equal(t, "test-pvc", scv.Name)
+	assert.Equal(t, []string{"/data"}, scv.MountPaths)
+	assert.Equal(t, corev1.VolumeSource{
+		PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+			ClaimName: "test-pvc",
 		},
-		{
-			name: "empty paths",
-			want: SingleContainerVolume{
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{},
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := NewSingleContainerPVC(tt.pvcName, tt.mountPath)
-
-			assert.Regexp(t, fmt.Sprintf(`^%s-[[:alnum:]]{5}$`, tt.pvcName), got.Name)
-			tt.want.Name = got.Name
-
-			assert.Equal(t, tt.want, got)
-		})
-	}
+	}, scv.VolumeSource)
 }
 
 func TestNewSingleContainerSecret(t *testing.T) {
@@ -276,8 +243,8 @@ func TestNewSingleContainerSecret(t *testing.T) {
 			secretName: "test-secret",
 			mountPath:  "/secrets",
 			want: SingleContainerVolume{
-				Name:      "test-secret",
-				MountPath: "/secrets",
+				Name:       "test-secret",
+				MountPaths: []string{"/secrets"},
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
 						SecretName:  "test-secret",
@@ -298,8 +265,8 @@ func TestNewSingleContainerSecret(t *testing.T) {
 				},
 			},
 			want: SingleContainerVolume{
-				Name:      "test-secret",
-				MountPath: "/secrets",
+				Name:       "test-secret",
+				MountPaths: []string{"/secrets"},
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
 						SecretName:  "test-secret",
@@ -320,10 +287,6 @@ func TestNewSingleContainerSecret(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := NewSingleContainerSecret(tt.secretName, tt.mountPath, tt.items...)
-
-			assert.Regexp(t, fmt.Sprintf(`^%s-[[:alnum:]]{5}$`, tt.secretName), got.Name)
-			tt.want.Name = got.Name
-
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -399,34 +362,226 @@ func TestSingleContainerVolumeToVolume(t *testing.T) {
 	}
 }
 
-func TestSingleContainerVolumeToVolumeMount(t *testing.T) {
+func TestSingleContainerVolumeToVolumeMounts(t *testing.T) {
 	tests := []struct {
 		name string
 		scv  SingleContainerVolume
-		want corev1.VolumeMount
+		want []corev1.VolumeMount
 	}{
 		{
 			name: "basic volume mount",
 			scv: SingleContainerVolume{
-				Name:      "test-volume",
-				MountPath: "/mnt/data",
+				Name:       "test-volume",
+				MountPaths: []string{"/mnt/data"},
 			},
-			want: corev1.VolumeMount{
-				Name:      "test-volume",
-				MountPath: "/mnt/data",
+			want: []corev1.VolumeMount{
+				{
+					Name:      "test-volume",
+					MountPath: "/mnt/data",
+				},
+			},
+		},
+		{
+			name: "multiple volume mounts",
+			scv: SingleContainerVolume{
+				Name:       "test-volume",
+				MountPaths: []string{"/mnt/data", "/mnt/data2"},
+			},
+			want: []corev1.VolumeMount{
+				{
+					Name:      "test-volume",
+					MountPath: "/mnt/data",
+				},
+				{
+					Name:      "test-volume",
+					MountPath: "/mnt/data2",
+				},
 			},
 		},
 		{
 			name: "empty paths",
 			scv:  SingleContainerVolume{},
-			want: corev1.VolumeMount{},
+			want: []corev1.VolumeMount{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.scv.ToVolumeMount()
+			got := tt.scv.ToVolumeMounts()
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestConvertSingleContainerVolumes(t *testing.T) {
+	tests := []struct {
+		desc            string
+		scvs            []SingleContainerVolume
+		expectedVolumes []corev1.Volume
+		expectedMounts  []corev1.VolumeMount
+	}{
+		{
+			desc: "basic conversion of a PVC",
+			scvs: []SingleContainerVolume{
+				{
+					Name:       "test-pvc",
+					MountPaths: []string{"/mnt/data"},
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-pvc",
+						},
+					},
+				},
+			},
+			expectedVolumes: []corev1.Volume{
+				{
+					Name: "test-pvc",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-pvc",
+						},
+					},
+				},
+			},
+			expectedMounts: []corev1.VolumeMount{
+				{
+					Name:      "test-pvc",
+					MountPath: "/mnt/data",
+				},
+			},
+		},
+		{
+			desc: "basic conversion of a secret",
+			scvs: []SingleContainerVolume{
+				{
+					Name:       "test-secret",
+					MountPaths: []string{"/secrets"},
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName:  "test-secret",
+							DefaultMode: ptr.To(int32(0400)),
+						},
+					},
+				},
+			},
+			expectedVolumes: []corev1.Volume{
+				{
+					Name: "test-secret",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName:  "test-secret",
+							DefaultMode: ptr.To(int32(0400)),
+						},
+					},
+				},
+			},
+			expectedMounts: []corev1.VolumeMount{
+				{
+					Name:      "test-secret",
+					MountPath: "/secrets",
+				},
+			},
+		},
+		{
+			desc: "multiple PVC SCVs with the same name",
+			scvs: []SingleContainerVolume{
+				{
+					Name:       "test-pvc",
+					MountPaths: []string{"/mnt/data1"},
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-pvc",
+						},
+					},
+				},
+				{
+					Name:       "test-pvc",
+					MountPaths: []string{"/mnt/data2"},
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-pvc",
+						},
+					},
+				},
+			},
+			expectedVolumes: []corev1.Volume{
+				{
+					Name: "test-pvc",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-pvc",
+						},
+					},
+				},
+			},
+			expectedMounts: []corev1.VolumeMount{
+				{
+					Name:      "test-pvc",
+					MountPath: "/mnt/data1",
+				},
+				{
+					Name:      "test-pvc",
+					MountPath: "/mnt/data2",
+				},
+			},
+		},
+		{
+			desc: "multiple secret SCVs with the same name",
+			scvs: []SingleContainerVolume{
+				{
+					Name:       "test-secret",
+					MountPaths: []string{"/secrets1"},
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName:  "test-secret",
+							DefaultMode: ptr.To(int32(0400)),
+						},
+					},
+				},
+				{
+					Name:       "test-secret",
+					MountPaths: []string{"/secrets2", "/secrets3"},
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName:  "test-secret",
+							DefaultMode: ptr.To(int32(0400)),
+						},
+					},
+				},
+			},
+			expectedVolumes: []corev1.Volume{
+				{
+					Name: "test-secret",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName:  "test-secret",
+							DefaultMode: ptr.To(int32(0400)),
+						},
+					},
+				},
+			},
+			expectedMounts: []corev1.VolumeMount{
+				{
+					Name:      "test-secret",
+					MountPath: "/secrets1",
+				},
+				{
+					Name:      "test-secret",
+					MountPath: "/secrets2",
+				},
+				{
+					Name:      "test-secret",
+					MountPath: "/secrets3",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			volumes, mounts := ConvertSingleContainerVolumes(tt.scvs)
+			assert.Equal(t, tt.expectedVolumes, volumes)
+			assert.Equal(t, tt.expectedMounts, mounts)
 		})
 	}
 }

@@ -118,12 +118,14 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 		FailureThreshold: 2, // TODO maybe set this to 1. If the probe fails three seconds apart, then it's probably not going to succeed on the next try.
 	}
 
+	volumes, mounts := core.ConvertSingleContainerVolumes(opts.Volumes)
+
 	container := corev1.Container{
 		Name:         constants.ToolName,
 		Image:        constants.FullImageName,
 		Command:      []string{constants.ToolName},
 		Args:         []string{"grpc"},
-		VolumeMounts: lo.Map(opts.Volumes, func(vol core.SingleContainerVolume, _ int) corev1.VolumeMount { return vol.ToVolumeMount() }),
+		VolumeMounts: mounts,
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "grpc",
@@ -153,7 +155,7 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 			HostUsers:       ptr.To(false), // Don't run as node root
 			Containers:      []corev1.Container{container},
 			RestartPolicy:   corev1.RestartPolicyNever,
-			Volumes:         lo.Map(opts.Volumes, func(vol core.SingleContainerVolume, _ int) corev1.Volume { return vol.ToVolume() }),
+			Volumes:         volumes,
 			SecurityContext: core.PrivilegedPodSecurityContext(),
 		},
 	}
