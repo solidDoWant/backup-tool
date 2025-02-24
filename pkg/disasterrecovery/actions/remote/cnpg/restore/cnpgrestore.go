@@ -10,6 +10,7 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
@@ -42,11 +43,8 @@ type CNPGRestoreOptions struct {
 // restore multiple clusters to perform each step for all clusters before moving on
 // to the next one.
 type CNPGRestoreInterface interface {
+	remote.CleanupAction
 	Configure(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertName, clientCertIssuerName, drVolName, backupFileRelPath string, opts CNPGRestoreOptions) error
-	Validate(ctx *contexts.Context) error
-	Setup(ctx *contexts.Context, btiOpts *backuptoolinstance.CreateBackupToolInstanceOptions) error
-	Execute(ctx *contexts.Context, backupToolClient clients.ClientInterface) error
-	Cleanup(ctx *contexts.Context) error
 }
 
 type configureState struct {

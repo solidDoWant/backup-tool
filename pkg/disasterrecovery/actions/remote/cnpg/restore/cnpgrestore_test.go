@@ -295,10 +295,10 @@ func TestValidate(t *testing.T) {
 
 func TestSetup(t *testing.T) {
 	tests := []struct {
-		desc                    string
-		hasBeenNotBeenValidated bool
-		isAlreadySetup          bool
-		simulateCreateBTIError  bool
+		desc                            string
+		hasBeenNotBeenValidated         bool
+		isAlreadySetup                  bool
+		simulateCreatePostgresCertError bool
 	}{
 		{
 			desc: "succeeds",
@@ -312,8 +312,8 @@ func TestSetup(t *testing.T) {
 			isAlreadySetup: true,
 		},
 		{
-			desc:                   "fails to create backup-tool instance",
-			simulateCreateBTIError: true,
+			desc:                            "fails to create postgres certificate",
+			simulateCreatePostgresCertError: true,
 		},
 	}
 
@@ -379,9 +379,9 @@ func TestSetup(t *testing.T) {
 				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, username, clientCertIssuerName, clusterName string, opts clusterusercert.NewClusterUserCertOpts) (clusterusercert.ClusterUserCertInterface, error) {
 					assert.True(t, calledCtx.IsChildOf(ctx))
 
-					return th.ErrOr1Val(mockCUC, tt.simulateCreateBTIError)
+					return th.ErrOr1Val(mockCUC, tt.simulateCreatePostgresCertError)
 				})
-				if tt.simulateCreateBTIError {
+				if tt.simulateCreatePostgresCertError {
 					return
 				}
 
@@ -390,7 +390,7 @@ func TestSetup(t *testing.T) {
 
 			btiOpts := &backuptoolinstance.CreateBackupToolInstanceOptions{}
 			err := currentState.Setup(ctx, btiOpts)
-			if th.ErrExpected(tt.hasBeenNotBeenValidated, tt.isAlreadySetup, tt.simulateCreateBTIError) {
+			if th.ErrExpected(tt.hasBeenNotBeenValidated, tt.isAlreadySetup, tt.simulateCreatePostgresCertError) {
 				assert.Error(t, err)
 				return
 			}
@@ -458,7 +458,6 @@ func TestCleanup(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			mockClient := kubecluster.NewMockClientInterface(t)
 			mockCUC := clusterusercert.NewMockClusterUserCertInterface(t)
-			mockCUC.EXPECT().Delete(mock.Anything).Return(th.ErrIfTrue(tt.simulateClusterUserErr)).Maybe()
 
 			currentState := &setupState{
 				validateState: validateState{
@@ -500,6 +499,10 @@ func TestCleanup(t *testing.T) {
 				},
 				postgresUserCert: mockCUC,
 				isSetup:          !tt.hasNotBeenSetup,
+			}
+
+			if !tt.hasNotBeenSetup {
+				mockCUC.EXPECT().Delete(mock.Anything).Return(th.ErrIfTrue(tt.simulateClusterUserErr)).Maybe()
 			}
 
 			err := currentState.Cleanup(th.NewTestContext())
