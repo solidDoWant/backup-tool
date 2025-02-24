@@ -302,7 +302,12 @@ func TestTeleportBackup(t *testing.T) {
 					mockRemoteStage.EXPECT().WithAction(mock.Anything, mockAuditSessionLogsS3Sync).Return(mockRemoteStage)
 				}
 
-				mockRemoteStage.EXPECT().Run(mock.Anything).Return(th.ErrIfTrue(tt.simulateRunError))
+				mockRemoteStage.EXPECT().Run(mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context) error {
+						assert.True(t, calledCtx.IsChildOf(rootCtx))
+
+						return th.ErrIfTrue(tt.simulateRunError)
+					})
 				if tt.simulateRunError {
 					return
 				}
@@ -485,7 +490,12 @@ func TestTeleportRestore(t *testing.T) {
 					mockRemoteStage.EXPECT().WithAction(mock.Anything, mockAuditSessionLogsS3Sync).Return(mockRemoteStage)
 				}
 
-				mockRemoteStage.EXPECT().Run(mock.Anything).Return(th.ErrIfTrue(tt.simulateRunError))
+				mockRemoteStage.EXPECT().Run(mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context) error {
+						assert.True(t, calledCtx.IsChildOf(rootCtx))
+
+						return th.ErrIfTrue(tt.simulateRunError)
+					})
 			}()
 
 			restore, err := teleport.Restore(rootCtx, namespace, restoreName, coreClusterName, coreServingCertName, coreClientCertIssuerName, tt.opts)

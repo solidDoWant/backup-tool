@@ -174,7 +174,7 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 
 	// Run
 	ctx.Log.Step().Info("Running backup actions")
-	err = stage.Run(ctx)
+	err = stage.Run(ctx.Child())
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to run backup actions")
 	}
@@ -296,6 +296,6 @@ func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreCl
 
 	// 2. Run
 	ctx.Log.Step().Info("Running restoration actions")
-	err = stage.Run(ctx)
+	err = stage.Run(ctx.Child())
 	return restore, trace.Wrap(err, "failed to run restoration actions")
 }
