@@ -142,7 +142,7 @@ func (ss *setupState) Setup(ctx *contexts.Context, btiOpts *backuptoolinstance.C
 		return trace.Errorf("attempted to setup multiple times")
 	}
 
-	clonedClusterName := helpers.CleanName(helpers.TruncateString(fmt.Sprintf("%s-%s-cloned-%s", constants.ToolName, ss.uid, ss.clusterName), 50, ""))
+	clonedClusterName := helpers.CleanName(helpers.TruncateString(fmt.Sprintf("%s-%s-cloned-%s", constants.ToolShortName, ss.uid, ss.clusterName), 40, ""))
 	if ss.opts.CloningOpts.CleanupTimeout == 0 {
 		ss.opts.CloningOpts.CleanupTimeout = ss.opts.CleanupTimeout
 	}

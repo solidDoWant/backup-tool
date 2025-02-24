@@ -237,7 +237,7 @@ func TestVaultWardenBackup(t *testing.T) {
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
 						assert.True(t, strings.Contains(newClusterName, helpers.CleanName(fullBackupName)))
-						assert.LessOrEqual(t, len(newClusterName), 50)
+						assert.LessOrEqual(t, len(newClusterName), 40)
 
 						return th.ErrOr1Val(clonedCluster, tt.simulateCloneClusterErr)
 					})
