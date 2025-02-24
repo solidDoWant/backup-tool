@@ -188,5 +188,15 @@ func CleanName(generateName string) string {
 		replacerStrings = append(replacerStrings, string(char), "-")
 	}
 
-	return strings.NewReplacer(replacerStrings...).Replace(strings.ToLower(generateName))
+	cleanedName := strings.NewReplacer(replacerStrings...).Replace(strings.ToLower(generateName))
+	for i := len(cleanedName) - 1; i >= 0; i-- {
+		if cleanedName[i] != '-' {
+			break
+		}
+
+		// Trim the last character if it is a `-`
+		cleanedName = cleanedName[:i]
+	}
+
+	return cleanedName
 }

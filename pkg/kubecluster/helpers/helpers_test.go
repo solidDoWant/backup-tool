@@ -396,6 +396,11 @@ func TestCleanName(t *testing.T) {
 			input: "",
 			want:  "",
 		},
+		{
+			desc:  "should remove trailing hyphens",
+			input: "test-name---",
+			want:  "test-name",
+		},
 	}
 
 	for _, tt := range tests {
