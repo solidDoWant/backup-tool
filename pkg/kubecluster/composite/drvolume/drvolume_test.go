@@ -130,11 +130,11 @@ func TestEnsureExists(t *testing.T) {
 		vol := &corev1.PersistentVolumeClaim{}
 
 		p.coreClient.EXPECT().EnsurePVCExists(mock.Anything, namespace, pvcName, configuredSize, createOpts).Return(vol, nil)
+		p.drv.EXPECT().setPVC(vol)
 
 		drv, err := p.NewDRVolume(ctx, namespace, pvcName, configuredSize, existsOpts)
 		assert.NoError(t, err)
 		require.NotNil(t, drv)
-		assert.Equal(t, vol, drv.(*DRVolume).pvc)
 	})
 
 	t.Run("uses cluster size when configured size is not set", func(t *testing.T) {
@@ -156,11 +156,11 @@ func TestEnsureExists(t *testing.T) {
 
 				return vol, nil
 			})
+		p.drv.EXPECT().setPVC(vol)
 
 		drv, err := p.NewDRVolume(ctx, namespace, pvcName, resource.Quantity{}, existsOpts)
 		assert.NoError(t, err)
 		require.NotNil(t, drv)
-		assert.Equal(t, vol, drv.(*DRVolume).pvc)
 	})
 }
 
