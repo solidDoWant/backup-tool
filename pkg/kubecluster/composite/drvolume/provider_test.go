@@ -15,7 +15,7 @@ type mockProvider struct {
 	coreClient *core.MockClientInterface
 	esClient   *externalsnapshotter.MockClientInterface
 	cnpgClient *cnpg.MockClientInterface
-	drv        DRVolumeInterface
+	drv        *MockDRVolumeInterface
 }
 
 func newMockProvider(t *testing.T) *mockProvider {

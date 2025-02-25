@@ -975,8 +975,11 @@
         "name": {
           "type": "string"
         },
-        "mountPath": {
-          "type": "string"
+        "mountPaths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "volumeSource": {
           "$ref": "#/$defs/VolumeSource"
@@ -986,7 +989,7 @@
       "type": "object",
       "required": [
         "name",
-        "mountPath",
+        "mountPaths",
         "volumeSource"
       ]
     },

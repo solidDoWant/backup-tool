@@ -232,6 +232,51 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "ConfigBTI": {
+      "properties": {
+        "namePrefix": {
+          "type": "string"
+        },
+        "volumes": {
+          "items": {
+            "$ref": "#/$defs/SingleContainerVolume"
+          },
+          "type": "array"
+        },
+        "cleanupTimeout": {
+          "type": "integer"
+        },
+        "serviceType": {
+          "type": "string"
+        },
+        "podWaitTimeout": {
+          "type": "integer"
+        },
+        "serviceWaitTimeout": {
+          "type": "integer"
+        },
+        "serviceSearchDomains": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ConfigBackupVolume": {
+      "properties": {
+        "size": {
+          "$ref": "#/$defs/Quantity"
+        },
+        "storageClass": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "ConfigMapProjection": {
       "properties": {
         "Name": {
@@ -1055,8 +1100,11 @@
         "name": {
           "type": "string"
         },
-        "mountPath": {
-          "type": "string"
+        "mountPaths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "volumeSource": {
           "$ref": "#/$defs/VolumeSource"
@@ -1066,7 +1114,7 @@
       "type": "object",
       "required": [
         "name",
-        "mountPath",
+        "mountPaths",
         "volumeSource"
       ]
     },
@@ -1112,7 +1160,7 @@
           "$ref": "#/$defs/TeleportConfigAuditSessionLogs"
         },
         "backupVolume": {
-          "$ref": "#/$defs/TeleportBackupConfigBackupVolume"
+          "$ref": "#/$defs/ConfigBackupVolume"
         },
         "backupSnapshot": {
           "$ref": "#/$defs/OptionsBackupSnapshot"
@@ -1121,13 +1169,7 @@
           "$ref": "#/$defs/CloneClusterOptions"
         },
         "backupToolInstance": {
-          "$ref": "#/$defs/TeleportConfigBTI"
-        },
-        "serviceSearchDomains": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "$ref": "#/$defs/ConfigBTI"
         },
         "cleanupTimeout": {
           "type": "integer"
@@ -1142,18 +1184,6 @@
         "servingCertIssuerName",
         "clientCACertIssuerName"
       ]
-    },
-    "TeleportBackupConfigBackupVolume": {
-      "properties": {
-        "size": {
-          "$ref": "#/$defs/Quantity"
-        },
-        "storageClass": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
     },
     "TeleportBackupConfigClusterConfig": {
       "properties": {
@@ -1189,33 +1219,6 @@
         },
         "credentials": {
           "$ref": "#/$defs/Credentials"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "TeleportConfigBTI": {
-      "properties": {
-        "namePrefix": {
-          "type": "string"
-        },
-        "volumes": {
-          "items": {
-            "$ref": "#/$defs/SingleContainerVolume"
-          },
-          "type": "array"
-        },
-        "cleanupTimeout": {
-          "type": "integer"
-        },
-        "serviceType": {
-          "type": "string"
-        },
-        "podWaitTimeout": {
-          "type": "integer"
-        },
-        "serviceWaitTimeout": {
-          "type": "integer"
         }
       },
       "additionalProperties": false,

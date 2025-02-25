@@ -5,25 +5,14 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery"
 	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/s3"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
-
-type TeleportConfigBTI struct {
-	CreationOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:",inline"`
-}
 
 type TeleportConfigAuditSessionLogs struct {
 	S3Path      string         `yaml:"s3Path,omitempty"`
 	Credentials s3.Credentials `yaml:"credentials,omitempty"`
-}
-
-type TeleportBackupConfigBackupVolume struct {
-	Size         resource.Quantity `yaml:"size, omitempty"`
-	StorageClass string            `yaml:"storageClass, omitempty"`
 }
 
 type TeleportBackupConfigClusterConfig struct {
@@ -42,11 +31,10 @@ type TeleportBackupConfig struct {
 	ServingCertIssuerName  string                                 `yaml:"servingCertIssuerName" jsonschema:"required"`
 	ClientCACertIssuerName string                                 `yaml:"clientCACertIssuerName" jsonschema:"required"`
 	AuditSessionLogs       TeleportConfigAuditSessionLogs         `yaml:"auditSessionLogs,omitempty"`
-	BackupVolume           TeleportBackupConfigBackupVolume       `yaml:"backupVolume" jsonschema:"omitempty"`
+	BackupVolume           ConfigBackupVolume                     `yaml:"backupVolume" jsonschema:"omitempty"`
 	BackupSnapshot         disasterrecovery.OptionsBackupSnapshot `yaml:"backupSnapshot" jsonschema:"omitempty"`
 	CloneClusterOptions    clonedcluster.CloneClusterOptions      `yaml:"clusterCloning,omitempty"`
-	BackupToolInstance     TeleportConfigBTI                      `yaml:"backupToolInstance,omitempty"`
-	ServiceSearchDomains   []string                               `yaml:"serviceSearchDomains,omitempty"`
+	BackupToolInstance     ConfigBTI                              `yaml:"backupToolInstance,omitempty"`
 	CleanupTimeout         helpers.MaxWaitTime                    `yaml:"cleanupTimeout,omitempty"`
 }
 
@@ -63,13 +51,12 @@ type TeleportRestoreClustersConfig struct {
 }
 
 type TeleportRestoreConfig struct {
-	Namespace            string                         `yaml:"namespace" jsonschema:"required"`
-	BackupName           string                         `yaml:"backupName" jsonschema:"required"`
-	CNPGClusters         TeleportRestoreClustersConfig  `yaml:"cnpgClusters" jsonschema:"required"`
-	AuditSessionLogs     TeleportConfigAuditSessionLogs `yaml:"auditSessionLogs,omitempty"`
-	BackupToolInstance   TeleportConfigBTI              `yaml:"backupToolInstance,omitempty"`
-	ServiceSearchDomains []string                       `yaml:"serviceSearchDomains,omitempty"`
-	CleanupTimeout       helpers.MaxWaitTime            `yaml:"cleanupTimeout,omitempty"`
+	Namespace          string                         `yaml:"namespace" jsonschema:"required"`
+	BackupName         string                         `yaml:"backupName" jsonschema:"required"`
+	CNPGClusters       TeleportRestoreClustersConfig  `yaml:"cnpgClusters" jsonschema:"required"`
+	AuditSessionLogs   TeleportConfigAuditSessionLogs `yaml:"auditSessionLogs,omitempty"`
+	BackupToolInstance ConfigBTI                      `yaml:"backupToolInstance,omitempty"`
+	CleanupTimeout     helpers.MaxWaitTime            `yaml:"cleanupTimeout,omitempty"`
 }
 
 type TeleportDRCommand struct {
@@ -97,7 +84,7 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 				Credentials: config.AuditSessionLogs.Credentials,
 			},
 			RemoteBackupToolOptions:     config.BackupToolInstance.CreationOptions,
-			ClusterServiceSearchDomains: config.ServiceSearchDomains,
+			ClusterServiceSearchDomains: config.BackupToolInstance.ServiceSearchDomains,
 			BackupSnapshot:              config.BackupSnapshot,
 			CleanupTimeout:              config.CleanupTimeout,
 		}
@@ -129,7 +116,7 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 				},
 				PostgresUserCert:            config.CNPGClusters.Core.ClusterUserCert,
 				RemoteBackupToolOptions:     config.BackupToolInstance.CreationOptions,
-				ClusterServiceSearchDomains: config.ServiceSearchDomains,
+				ClusterServiceSearchDomains: config.BackupToolInstance.ServiceSearchDomains,
 				CleanupTimeout:              config.CleanupTimeout,
 			})
 
