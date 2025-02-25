@@ -109,7 +109,7 @@ BINARY_PLATFORMS = linux/amd64 linux/arm64
 BINARY_NAME = backup-tool
 GO_SOURCE_FILES := $(shell find . \( -name '*.go' ! -name '*_test.go' ! -name '*_mock*.go' ! -path './pkg/testhelpers/*' ! -path '*/fake/*' \))
 GO_CONSTANTS := Version=$(VERSION) ImageRegistry=$(CONTAINER_REGISTRY)
-GO_LDFLAGS := $(GO_CONSTANTS:%=-X $(MODULE_NAME)/pkg/constants.%)
+GO_LDFLAGS := $(GO_CONSTANTS:%=-X $(MODULE_NAME)/pkg/constants.%) -s -w
 
 LOCALOS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 LOCALARCH := $(shell uname -m | sed 's/x86_64/amd64/')
