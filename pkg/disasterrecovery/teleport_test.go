@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
 	cnpgbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/backup"
@@ -14,6 +12,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
@@ -23,9 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestNewTeleport(t *testing.T) {
@@ -54,15 +51,12 @@ func TestTeleportBackup(t *testing.T) {
 	tests := []struct {
 		desc                                         string
 		opts                                         TeleportBackupOptions
-		simulateGetCoreClusterSizeError              bool
-		simulateGetAuditClusterSizeError             bool
 		simulateEnsurePVCError                       bool
 		simulateConfigureCoreBackupError             bool
 		simulateConfigureAuditBackupError            bool
 		simulateConfigureAuditSessionLogsBackupError bool
 		simulateRunError                             bool
 		simulateSnapshotError                        bool
-		simulateWaitSnapError                        bool
 	}{
 		{
 			desc: "success - no options set",
@@ -94,16 +88,8 @@ func TestTeleportBackup(t *testing.T) {
 			},
 		},
 		{
-			desc:                            "error getting core cluster size",
-			simulateGetCoreClusterSizeError: true,
-		},
-		{
-			desc:                             "error getting audit cluster size",
-			opts:                             TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{TeleportOptionsAudit{Name: auditClusterName, Enabled: true}}},
-			simulateGetAuditClusterSizeError: true,
-		},
-		{
 			desc:                   "error ensuring backup volume exists",
+			opts:                   TeleportBackupOptions{AuditCluster: TeleportBackupOptionsAudit{TeleportOptionsAudit{Name: auditClusterName, Enabled: true}}},
 			simulateEnsurePVCError: true,
 		},
 		{
@@ -128,21 +114,10 @@ func TestTeleportBackup(t *testing.T) {
 			desc:                  "error creating snapshot",
 			simulateSnapshotError: true,
 		},
-		{
-			desc:                  "error waiting for snapshot",
-			simulateWaitSnapError: true,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			drPVC := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "backup-pvc",
-					Namespace: namespace,
-				},
-			}
-
 			mockClient := kubecluster.NewMockClientInterface(t)
 			mockCoreClient := core.NewMockClientInterface(t)
 			mockCNPGClient := cnpg.NewMockClientInterface(t)
@@ -150,6 +125,8 @@ func TestTeleportBackup(t *testing.T) {
 			mockClient.EXPECT().Core().Return(mockCoreClient).Maybe()
 			mockClient.EXPECT().CNPG().Return(mockCNPGClient).Maybe()
 			mockClient.EXPECT().ES().Return(mockESClient).Maybe()
+
+			mockDRVolume := drvolume.NewMockDRVolumeInterface(t)
 
 			mockRemoteStage := remote.NewMockRemoteStageInterface(t)
 			mockCoreCNPGBackup := cnpgbackup.NewMockCNPGBackupInterface(t)
@@ -189,69 +166,28 @@ func TestTeleportBackup(t *testing.T) {
 			rootCtx := th.NewTestContext()
 
 			wantErr := th.ErrExpected(
-				tt.simulateGetCoreClusterSizeError,
-				tt.simulateGetAuditClusterSizeError,
 				tt.simulateEnsurePVCError,
 				tt.simulateConfigureCoreBackupError,
 				tt.simulateConfigureAuditBackupError,
 				tt.simulateConfigureAuditSessionLogsBackupError,
 				tt.simulateRunError,
 				tt.simulateSnapshotError,
-				tt.simulateWaitSnapError,
 			)
 
 			// Setup mocks
 			func() {
-				// Get cluster sizes
-				expectedPVCSize := tt.opts.VolumeSize
-				if tt.opts.VolumeSize.IsZero() {
-					mockCNPGClient.EXPECT().GetCluster(mock.Anything, namespace, coreClusterName).
-						RunAndReturn(func(calledCtx *contexts.Context, namespace, coreClusterName string) (*apiv1.Cluster, error) {
-							assert.True(t, calledCtx.IsChildOf(rootCtx))
-
-							return th.ErrOr1Val(&apiv1.Cluster{
-								Spec: apiv1.ClusterSpec{
-									StorageConfiguration: apiv1.StorageConfiguration{
-										Size: "1Gi",
-									},
-								},
-							}, tt.simulateGetCoreClusterSizeError)
-						})
-					if tt.simulateGetCoreClusterSizeError {
-						return
-					}
-					// 2x sum of cluster allocated size
-					expectedPVCSize = resource.MustParse("2Gi")
-
-					if tt.opts.AuditCluster.Enabled {
-						mockCNPGClient.EXPECT().GetCluster(mock.Anything, namespace, auditClusterName).
-							RunAndReturn(func(calledCtx *contexts.Context, namespace, auditClusterName string) (*apiv1.Cluster, error) {
-								assert.True(t, calledCtx.IsChildOf(rootCtx))
-
-								return th.ErrOr1Val(&apiv1.Cluster{
-									Spec: apiv1.ClusterSpec{
-										StorageConfiguration: apiv1.StorageConfiguration{
-											Size: "1Gi",
-										},
-									},
-								}, tt.simulateGetAuditClusterSizeError)
-							})
-						if tt.simulateGetAuditClusterSizeError {
-							return
-						}
-						// 2x sum of cluster allocated size
-						expectedPVCSize = resource.MustParse("4Gi")
-					}
-
-				}
-
-				// Ensure PVC exists
-				mockCoreClient.EXPECT().EnsurePVCExists(mock.Anything, namespace, backupName, mock.Anything, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts core.CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
+				// DR PVC
+				mockClient.EXPECT().NewDRVolume(mock.Anything, namespace, backupName, tt.opts.VolumeSize, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.True(t, expectedPVCSize.Equal(size))
+						assert.Equal(t, tt.opts.VolumeStorageClass, opts.VolumeStorageClass)
+						expectedClusterNames := []string{coreClusterName}
+						if tt.opts.AuditCluster.Enabled {
+							expectedClusterNames = append(expectedClusterNames, auditClusterName)
+						}
+						assert.ElementsMatch(t, expectedClusterNames, opts.CNPGClusterNames)
 
-						return th.ErrOr1Val(drPVC, tt.simulateEnsurePVCError)
+						return th.ErrOr1Val(mockDRVolume, tt.simulateEnsurePVCError)
 					})
 				if tt.simulateEnsurePVCError {
 					return
@@ -313,35 +249,19 @@ func TestTeleportBackup(t *testing.T) {
 				}
 
 				// Snapshot volume
-				var createdSnapshotName string
-				mockESClient.EXPECT().SnapshotVolume(mock.Anything, namespace, drPVC.Name, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, pvcName string, opts externalsnapshotter.SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error) {
+				mockDRVolume.EXPECT().SnapshotAndWaitReady(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, snapshotName string, opts drvolume.DRVolumeSnapshotAndWaitOptions) error {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.Contains(t, opts.Name, helpers.CleanName(backupName))
-						assert.NotEqual(t, opts.Name, helpers.CleanName(backupName))
+						assert.Contains(t, snapshotName, helpers.CleanName(backupName))
+						assert.NotEqual(t, snapshotName, helpers.CleanName(backupName))
 						assert.Equal(t, tt.opts.BackupSnapshot.SnapshotClass, opts.SnapshotClass)
+						assert.Equal(t, tt.opts.BackupSnapshot.ReadyTimeout, opts.ReadyTimeout)
 
-						createdSnapshotName = opts.Name
-
-						return th.ErrOr1Val(&volumesnapshotv1.VolumeSnapshot{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      opts.Name,
-								Namespace: namespace,
-							},
-						}, tt.simulateSnapshotError)
+						return th.ErrIfTrue(tt.simulateSnapshotError)
 					})
 				if tt.simulateSnapshotError {
 					return
 				}
-
-				// Wait for snapshot
-				mockESClient.EXPECT().WaitForReadySnapshot(mock.Anything, namespace, mock.Anything, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: tt.opts.BackupSnapshot.ReadyTimeout}).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, snapsnotName string, wfrso externalsnapshotter.WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error) {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.Equal(t, createdSnapshotName, snapsnotName)
-
-						return th.ErrOr1Val(&volumesnapshotv1.VolumeSnapshot{}, tt.simulateWaitSnapError)
-					})
 			}()
 
 			backup, err := teleport.Backup(rootCtx, namespace, backupName, coreClusterName,

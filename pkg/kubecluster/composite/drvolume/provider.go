@@ -1,13 +1,15 @@
 package drvolume
 
 import (
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 type ProviderInterface interface {
-	// NewClusterUserCert(ctx *contexts.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error)
+	NewDRVolume(ctx *contexts.Context, namespace, name string, configuredSize resource.Quantity, opts DRVolumeCreateOptions) (DRVolumeInterface, error)
 }
 
 type providerInterfaceInternal interface {

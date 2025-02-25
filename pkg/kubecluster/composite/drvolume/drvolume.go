@@ -11,8 +11,8 @@ import (
 )
 
 type DRVolumeInterface interface {
-	EnsureExists(ctx *contexts.Context, namespace, name string, configuredSize resource.Quantity, opts DRVolumeCreateOptions) error
 	SnapshotAndWaitReady(ctx *contexts.Context, snapshotName string, opts DRVolumeSnapshotAndWaitOptions) error
+	setPVC(pvc *corev1.PersistentVolumeClaim)
 }
 
 type DRVolumeCreateOptions struct {
@@ -31,11 +31,15 @@ func newDRVolume(p providerInterfaceInternal) DRVolumeInterface {
 	}
 }
 
-func (drv *DRVolume) lookupCNPGClusterSize(ctx *contexts.Context, namespace, clusterName string) (resource.Quantity, error) {
+func (drv *DRVolume) setPVC(pvc *corev1.PersistentVolumeClaim) {
+	drv.pvc = pvc
+}
+
+func (p *Provider) lookupCNPGClusterSize(ctx *contexts.Context, namespace, clusterName string) (resource.Quantity, error) {
 	var defaultQuantityVal resource.Quantity
 
 	ctx.Log.With("clusterName", clusterName).Debug("Getting the cluster size")
-	cluster, err := drv.p.cnpg().GetCluster(ctx.Child(), namespace, clusterName)
+	cluster, err := p.cnpg().GetCluster(ctx.Child(), namespace, clusterName)
 	if err != nil {
 		return defaultQuantityVal, trace.Wrap(err, "failed to get the %q cluster", helpers.FullNameStr(namespace, clusterName))
 	}
@@ -49,14 +53,14 @@ func (drv *DRVolume) lookupCNPGClusterSize(ctx *contexts.Context, namespace, clu
 	return clusterSize, nil
 }
 
-func (drv *DRVolume) lookupCNPGClustersSize(ctx *contexts.Context, namespace string, clusterNames []string) (resource.Quantity, error) {
+func (p *Provider) lookupCNPGClustersSize(ctx *contexts.Context, namespace string, clusterNames []string) (resource.Quantity, error) {
 	var defaultQuantityVal resource.Quantity
 	ctx.Log.Info("Looking up the core CNPG cluster sizes")
 
 	storageSum := resource.NewQuantity(0, resource.BinarySI)
 	for _, clusterName := range clusterNames {
 		ctx.Log.Step()
-		clusterSize, err := drv.lookupCNPGClusterSize(ctx.Child(), namespace, clusterName)
+		clusterSize, err := p.lookupCNPGClusterSize(ctx.Child(), namespace, clusterName)
 		if err != nil {
 			return defaultQuantityVal, trace.Wrap(err, "failed to get the cluster size")
 		}
@@ -66,13 +70,13 @@ func (drv *DRVolume) lookupCNPGClustersSize(ctx *contexts.Context, namespace str
 	return *storageSum, nil
 }
 
-func (drv *DRVolume) lookupDRVolumeSize(ctx *contexts.Context, namespace string, clusterNames []string) (resource.Quantity, error) {
+func (p *Provider) lookupDRVolumeSize(ctx *contexts.Context, namespace string, clusterNames []string) (resource.Quantity, error) {
 	var defaultQuantityVal resource.Quantity
 	ctx.Log.Info("Calculating the volume size based on the CNPG cluster sizes")
 
 	storageSum := resource.NewQuantity(0, resource.BinarySI)
 	if len(clusterNames) > 0 {
-		clustersSize, err := drv.lookupCNPGClustersSize(ctx.Child(), namespace, clusterNames)
+		clustersSize, err := p.lookupCNPGClustersSize(ctx.Child(), namespace, clusterNames)
 		if err != nil {
 			return defaultQuantityVal, trace.Wrap(err, "failed to get the CNPG cluster sizes")
 		}
@@ -88,15 +92,17 @@ func (drv *DRVolume) lookupDRVolumeSize(ctx *contexts.Context, namespace string,
 }
 
 // TODO handle expansion?
-func (drv *DRVolume) EnsureExists(ctx *contexts.Context, namespace, name string, configuredSize resource.Quantity, opts DRVolumeCreateOptions) error {
+func (p *Provider) NewDRVolume(ctx *contexts.Context, namespace, name string, configuredSize resource.Quantity, opts DRVolumeCreateOptions) (DRVolumeInterface, error) {
 	ctx.Log.Info("Ensuring the DR volume exists")
+
+	drv := p.newDRVolume()
 
 	drVolumeSize := configuredSize
 	if drVolumeSize.IsZero() {
 		var err error
-		drVolumeSize, err = drv.lookupDRVolumeSize(ctx.Child(), namespace, opts.CNPGClusterNames)
+		drVolumeSize, err = p.lookupDRVolumeSize(ctx.Child(), namespace, opts.CNPGClusterNames)
 		if err != nil {
-			return trace.Wrap(err, "failed to calculate the volume size")
+			return nil, trace.Wrap(err, "failed to calculate the volume size")
 		}
 
 		// Default to roughly twice the sum of the CNPG cluster sizes. This may still be too small. If it is, the user
@@ -104,13 +110,13 @@ func (drv *DRVolume) EnsureExists(ctx *contexts.Context, namespace, name string,
 		drVolumeSize.Mul(2)
 	}
 
-	drPVC, err := drv.p.core().EnsurePVCExists(ctx.Child(), namespace, name, drVolumeSize, core.CreatePVCOptions{StorageClassName: opts.VolumeStorageClass})
+	drPVC, err := p.core().EnsurePVCExists(ctx.Child(), namespace, name, drVolumeSize, core.CreatePVCOptions{StorageClassName: opts.VolumeStorageClass})
 	if err != nil {
-		return trace.Wrap(err, "failed to ensure backup volume exists")
+		return nil, trace.Wrap(err, "failed to ensure backup volume exists")
 	}
 
-	drv.pvc = drPVC
-	return nil
+	drv.setPVC(drPVC)
+	return drv, nil
 }
 
 type DRVolumeSnapshotAndWaitOptions struct {

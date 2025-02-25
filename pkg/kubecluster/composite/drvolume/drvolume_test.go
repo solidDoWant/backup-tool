@@ -13,6 +13,7 @@ import (
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,8 +52,6 @@ func TestLookupCNPGClusterSize(t *testing.T) {
 			ctx := th.NewTestContext()
 			p := newMockProvider(t)
 
-			drv := &DRVolume{p: p}
-
 			p.cnpgClient.EXPECT().GetCluster(mock.Anything, namespace, clusterName).
 				RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*apiv1.Cluster, error) {
 					assert.True(t, calledCtx.IsChildOf(ctx))
@@ -67,7 +66,7 @@ func TestLookupCNPGClusterSize(t *testing.T) {
 					return th.ErrOr1Val(cluster, tt.simulateGetClusterError)
 				})
 
-			actualSize, err := drv.lookupCNPGClusterSize(ctx, namespace, clusterName)
+			actualSize, err := p.lookupCNPGClusterSize(ctx, namespace, clusterName)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.True(t, actualSize.IsZero())
@@ -104,8 +103,7 @@ func TestLookupCNPGClustersSize(t *testing.T) {
 	p.cnpgClient.EXPECT().GetCluster(mock.Anything, namespace, "cluster-1").Return(clusters["cluster-1"], nil)
 	p.cnpgClient.EXPECT().GetCluster(mock.Anything, namespace, "cluster-2").Return(clusters["cluster-2"], nil)
 
-	drv := &DRVolume{p: p}
-	actualSize, err := drv.lookupCNPGClustersSize(ctx, namespace, lo.Keys(clusters))
+	actualSize, err := p.lookupCNPGClustersSize(ctx, namespace, lo.Keys(clusters))
 	assert.NoError(t, err)
 	assert.Equal(t, "3Gi", actualSize.String())
 }
@@ -128,21 +126,20 @@ func TestEnsureExists(t *testing.T) {
 	t.Run("uses configured size when set", func(t *testing.T) {
 		ctx := th.NewTestContext()
 		p := newMockProvider(t)
-		drv := &DRVolume{p: p}
 
 		vol := &corev1.PersistentVolumeClaim{}
 
 		p.coreClient.EXPECT().EnsurePVCExists(mock.Anything, namespace, pvcName, configuredSize, createOpts).Return(vol, nil)
 
-		err := drv.EnsureExists(ctx, namespace, pvcName, configuredSize, existsOpts)
+		drv, err := p.NewDRVolume(ctx, namespace, pvcName, configuredSize, existsOpts)
 		assert.NoError(t, err)
-		assert.Equal(t, vol, drv.pvc)
+		require.NotNil(t, drv)
+		assert.Equal(t, vol, drv.(*DRVolume).pvc)
 	})
 
 	t.Run("uses cluster size when configured size is not set", func(t *testing.T) {
 		ctx := th.NewTestContext()
 		p := newMockProvider(t)
-		drv := &DRVolume{p: p}
 
 		vol := &corev1.PersistentVolumeClaim{}
 
@@ -160,9 +157,10 @@ func TestEnsureExists(t *testing.T) {
 				return vol, nil
 			})
 
-		err := drv.EnsureExists(ctx, namespace, pvcName, resource.Quantity{}, existsOpts)
+		drv, err := p.NewDRVolume(ctx, namespace, pvcName, resource.Quantity{}, existsOpts)
 		assert.NoError(t, err)
-		assert.Equal(t, vol, drv.pvc)
+		require.NotNil(t, drv)
+		assert.Equal(t, vol, drv.(*DRVolume).pvc)
 	})
 }
 

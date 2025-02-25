@@ -24,9 +24,13 @@ import (
 
 	createcrpforcertificate "github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 
+	drvolume "github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume"
+
 	externalsnapshotter "github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 
 	mock "github.com/stretchr/testify/mock"
+
+	resource "k8s.io/apimachinery/pkg/api/resource"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -586,6 +590,68 @@ func (_c *MockClientInterface_NewClusterUserCert_Call) Return(_a0 clusterusercer
 }
 
 func (_c *MockClientInterface_NewClusterUserCert_Call) RunAndReturn(run func(*contexts.Context, string, string, string, string, clusterusercert.NewClusterUserCertOpts) (clusterusercert.ClusterUserCertInterface, error)) *MockClientInterface_NewClusterUserCert_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewDRVolume provides a mock function with given fields: ctx, namespace, name, configuredSize, opts
+func (_m *MockClientInterface) NewDRVolume(ctx *contexts.Context, namespace string, name string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
+	ret := _m.Called(ctx, namespace, name, configuredSize, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for NewDRVolume")
+	}
+
+	var r0 drvolume.DRVolumeInterface
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error)); ok {
+		return rf(ctx, namespace, name, configuredSize, opts)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) drvolume.DRVolumeInterface); ok {
+		r0 = rf(ctx, namespace, name, configuredSize, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(drvolume.DRVolumeInterface)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) error); ok {
+		r1 = rf(ctx, namespace, name, configuredSize, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_NewDRVolume_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NewDRVolume'
+type MockClientInterface_NewDRVolume_Call struct {
+	*mock.Call
+}
+
+// NewDRVolume is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - name string
+//   - configuredSize resource.Quantity
+//   - opts drvolume.DRVolumeCreateOptions
+func (_e *MockClientInterface_Expecter) NewDRVolume(ctx interface{}, namespace interface{}, name interface{}, configuredSize interface{}, opts interface{}) *MockClientInterface_NewDRVolume_Call {
+	return &MockClientInterface_NewDRVolume_Call{Call: _e.mock.On("NewDRVolume", ctx, namespace, name, configuredSize, opts)}
+}
+
+func (_c *MockClientInterface_NewDRVolume_Call) Run(run func(ctx *contexts.Context, namespace string, name string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions)) *MockClientInterface_NewDRVolume_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(resource.Quantity), args[4].(drvolume.DRVolumeCreateOptions))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_NewDRVolume_Call) Return(_a0 drvolume.DRVolumeInterface, _a1 error) *MockClientInterface_NewDRVolume_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_NewDRVolume_Call) RunAndReturn(run func(*contexts.Context, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error)) *MockClientInterface_NewDRVolume_Call {
 	_c.Call.Return(run)
 	return _c
 }
