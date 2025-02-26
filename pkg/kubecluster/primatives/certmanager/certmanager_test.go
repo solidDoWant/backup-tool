@@ -720,13 +720,13 @@ func TestGetIssuer(t *testing.T) {
 	issuerName := "test-issuer"
 
 	tests := []struct {
-		desc            string
-		shouldSetupCert bool
-		wantErr         bool
+		desc              string
+		shouldSetupIssuer bool
+		wantErr           bool
 	}{
 		{
-			desc:            "get existing issuer",
-			shouldSetupCert: true,
+			desc:              "get existing issuer",
+			shouldSetupIssuer: true,
 		},
 		{
 			desc:    "get non-existent issuer",
@@ -740,7 +740,7 @@ func TestGetIssuer(t *testing.T) {
 			ctx := th.NewTestContext()
 
 			var existingIssuer *certmanagerv1.Issuer
-			if tt.shouldSetupCert {
+			if tt.shouldSetupIssuer {
 				existingIssuer = &certmanagerv1.Issuer{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      issuerName,
@@ -813,6 +813,54 @@ func TestDeleteIssuer(t *testing.T) {
 			issuerList, err := client.client.CertmanagerV1().Issuers(namespace).List(ctx, metav1.SingleObject(metav1.ObjectMeta{Name: issuerName, Namespace: namespace}))
 			assert.NoError(t, err)
 			assert.Empty(t, issuerList.Items)
+		})
+	}
+}
+
+func TestGetClusterIssuer(t *testing.T) {
+	clusterIssuerName := "test-cluster-issuer"
+
+	tests := []struct {
+		desc              string
+		shouldSetupIssuer bool
+		wantErr           bool
+	}{
+		{
+			desc:              "get existing issuer",
+			shouldSetupIssuer: true,
+		},
+		{
+			desc:    "get non-existent issuer",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			client, _ := createTestClient()
+			ctx := th.NewTestContext()
+
+			var existingIssuer *certmanagerv1.ClusterIssuer
+			if tt.shouldSetupIssuer {
+				existingIssuer = &certmanagerv1.ClusterIssuer{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: clusterIssuerName,
+					},
+				}
+				_, err := client.client.CertmanagerV1().ClusterIssuers().Create(ctx, existingIssuer, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
+
+			issuer, err := client.GetClusterIssuer(ctx, clusterIssuerName)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, issuer)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, issuer)
+			assert.Equal(t, existingIssuer, issuer)
 		})
 	}
 }

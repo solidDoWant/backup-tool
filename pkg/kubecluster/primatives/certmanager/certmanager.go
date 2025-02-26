@@ -254,3 +254,15 @@ func (cmc *Client) DeleteIssuer(ctx *contexts.Context, namespace, name string) e
 	err := cmc.client.CertmanagerV1().Issuers(namespace).Delete(ctx.Child(), name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete issuer %q", helpers.FullNameStr(namespace, name))
 }
+
+func (cmc *Client) GetClusterIssuer(ctx *contexts.Context, name string) (*certmanagerv1.ClusterIssuer, error) {
+	ctx.Log.With("name", name).Info("Getting cluster issuer")
+
+	issuer, err := cmc.client.CertmanagerV1().ClusterIssuers().Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to get cluster issuer %q", name)
+	}
+
+	ctx.Log.Debug("Retrieved cluster issuer", "issuer", issuer)
+	return issuer, nil
+}
