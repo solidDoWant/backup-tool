@@ -258,7 +258,7 @@ func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, da
 	if err != nil {
 		return restore, trace.Wrap(err, "failed to get CNPG cluster client cert issuer %q", clientCertIssuerName)
 	}
-	if !certmanager.IsIssuerReady(clientCertIssuer) {
+	if !certmanager.IsIssuerReady(&clientCertIssuer.Status) {
 		return restore, trace.Errorf("CNPG cluster client cert issuer %q is not ready", clientCertIssuerName)
 	}
 

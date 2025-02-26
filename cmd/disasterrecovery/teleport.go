@@ -39,10 +39,10 @@ type TeleportBackupConfig struct {
 }
 
 type TeleportRestoreClusterConfig struct {
-	Name                 string                             `yaml:"name" jsonschema:"required"`
-	ServingCertName      string                             `yaml:"servingCertName" jsonschema:"required"`
-	ClientCertIssuerName string                             `yaml:"clientCertIssuerName" jsonschema:"required"`
-	ClusterUserCert      cnpgrestore.CNPGRestoreOptionsCert `yaml:"clusterUserCert,omitempty"`
+	Name             string                             `yaml:"name" jsonschema:"required"`
+	ServingCertName  string                             `yaml:"servingCertName" jsonschema:"required"`
+	ClientCertIssuer ConfigIssuer                       `yaml:"clientCertIssuer" jsonschema:"required"`
+	ClusterUserCert  cnpgrestore.CNPGRestoreOptionsCert `yaml:"clusterUserCert,omitempty"`
 }
 
 type TeleportRestoreClustersConfig struct {
@@ -99,15 +99,16 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 		t := disasterrecovery.NewTeleport(kubeCluster)
 
 		_, err := t.Restore(ctx, config.Namespace, config.BackupName, config.CNPGClusters.Core.Name, config.CNPGClusters.Core.ServingCertName,
-			config.CNPGClusters.Core.ClientCertIssuerName, disasterrecovery.TeleportRestoreOptions{
+			config.CNPGClusters.Core.ClientCertIssuer.Name, disasterrecovery.TeleportRestoreOptions{
 				AuditCluster: disasterrecovery.TeleportRestoreOptionsAudit{
 					TeleportOptionsAudit: disasterrecovery.TeleportOptionsAudit{
 						Enabled: config.CNPGClusters.Audit.Name != "",
 						Name:    config.CNPGClusters.Audit.Name,
 					},
 					ServingCertName:      config.CNPGClusters.Audit.ServingCertName,
-					ClientCertIssuerName: config.CNPGClusters.Audit.ClientCertIssuerName,
+					ClientCertIssuerName: config.CNPGClusters.Audit.ClientCertIssuer.Name,
 					PostgresUserCert:     config.CNPGClusters.Audit.ClusterUserCert,
+					IssuerKind:           config.CNPGClusters.Audit.ClientCertIssuer.Kind,
 				},
 				AuditSessionLogs: disasterrecovery.TeleportOptionsS3Sync{
 					Enabled:     config.AuditSessionLogs.S3Path != "",
@@ -115,6 +116,7 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 					Credentials: config.AuditSessionLogs.Credentials,
 				},
 				PostgresUserCert:            config.CNPGClusters.Core.ClusterUserCert,
+				IssuerKind:                  config.CNPGClusters.Core.ClientCertIssuer.Kind,
 				RemoteBackupToolOptions:     config.BackupToolInstance.CreationOptions,
 				ClusterServiceSearchDomains: config.BackupToolInstance.ServiceSearchDomains,
 				CleanupTimeout:              config.CleanupTimeout,

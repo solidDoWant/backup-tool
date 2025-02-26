@@ -174,11 +174,13 @@ type TeleportRestoreOptionsAudit struct {
 	ServingCertName      string                             `yaml:"servingCertName,omitempty"`
 	ClientCertIssuerName string                             `yaml:"clientCertIssuerName,omitempty"`
 	PostgresUserCert     cnpgrestore.CNPGRestoreOptionsCert `yaml:"postgresUserCert,omitempty"`
+	IssuerKind           string                             `yaml:"issuerKind,omitempty"`
 }
 
 type TeleportRestoreOptions struct {
 	AuditCluster                TeleportRestoreOptionsAudit                        `yaml:"auditCluster,omitempty"`
 	PostgresUserCert            cnpgrestore.CNPGRestoreOptionsCert                 `yaml:"postgresUserCert,omitempty"`
+	IssuerKind                  string                                             `yaml:"issuerKind,omitempty"`
 	AuditSessionLogs            TeleportOptionsS3Sync                              `yaml:"auditSessionLogs,omitempty"`
 	RemoteBackupToolOptions     backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	ClusterServiceSearchDomains []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
@@ -225,6 +227,7 @@ func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreCl
 
 	coreRestore := t.newCNPGRestore()
 	if err := coreRestore.Configure(t.kubeClusterClient, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, teleportCoreSQLFileName, cnpgrestore.CNPGRestoreOptions{
+		IssuerKind:       opts.IssuerKind,
 		PostgresUserCert: opts.PostgresUserCert,
 		CleanupTimeout:   opts.CleanupTimeout,
 	}); err != nil {
@@ -235,6 +238,7 @@ func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreCl
 	auditRestore := t.newCNPGRestore()
 	if opts.AuditCluster.Enabled {
 		if err := auditRestore.Configure(t.kubeClusterClient, namespace, opts.AuditCluster.Name, opts.AuditCluster.ServingCertName, opts.AuditCluster.ClientCertIssuerName, restoreName, teleportAuditSQLFileName, cnpgrestore.CNPGRestoreOptions{
+			IssuerKind:       opts.AuditCluster.IssuerKind,
 			PostgresUserCert: opts.AuditCluster.PostgresUserCert,
 			CleanupTimeout:   opts.CleanupTimeout,
 		}); err != nil {

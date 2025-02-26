@@ -201,8 +201,8 @@ func (cmc *Client) CreateIssuer(ctx *contexts.Context, namespace, name, caCertSe
 	return issuer, nil
 }
 
-func IsIssuerReady(issuer *certmanagerv1.Issuer) bool {
-	for _, condition := range issuer.Status.Conditions {
+func IsIssuerReady(issuerStatus *certmanagerv1.IssuerStatus) bool {
+	for _, condition := range issuerStatus.Conditions {
 		if condition.Type != certmanagerv1.IssuerConditionReady {
 			continue
 		}
@@ -223,7 +223,7 @@ func (cmc *Client) WaitForReadyIssuer(ctx *contexts.Context, namespace, name str
 
 	precondition := func(ctx *contexts.Context, issuer *certmanagerv1.Issuer) (*certmanagerv1.Issuer, bool, error) {
 		ctx.Log.Debug("Issuer conditions", "conditions", issuer.Status.Conditions)
-		if IsIssuerReady(issuer) {
+		if IsIssuerReady(&issuer.Status) {
 			return issuer, true, nil
 		}
 		return nil, false, nil

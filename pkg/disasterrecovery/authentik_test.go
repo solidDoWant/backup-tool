@@ -64,6 +64,14 @@ func TestAuthentikBackup(t *testing.T) {
 				VolumeSize:         resource.MustParse("10Gi"),
 				VolumeStorageClass: "custom-storage-class",
 				CloneClusterOptions: clonedcluster.CloneClusterOptions{
+					Certificates: clonedcluster.CloneClusterOptionsCertificates{
+						ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
+							IssuerKind: "ClusterIssuer",
+						},
+						ClientCACert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
+							IssuerKind: "Issuer",
+						},
+					},
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
 				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{
@@ -243,6 +251,7 @@ func TestAuthentikRestore(t *testing.T) {
 						Organizations: []string{"test-org"},
 					},
 				},
+				IssuerKind: "ClusterIssuer",
 				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{
 					ServiceWaitTimeout: helpers.ShortWaitTime,
 				},
@@ -291,6 +300,7 @@ func TestAuthentikRestore(t *testing.T) {
 				mockCNPGRestore.EXPECT().Configure(mockClient, namespace, clusterName, servingCertName, clientCertIssuerName, restoreName, "dump.sql", cnpgrestore.CNPGRestoreOptions{
 					PostgresUserCert: tt.opts.PostgresUserCert,
 					CleanupTimeout:   tt.opts.CleanupTimeout,
+					IssuerKind:       tt.opts.IssuerKind,
 				}).Return(th.ErrIfTrue(tt.simulateCNPGRestoreError))
 				if tt.simulateCNPGRestoreError {
 					return

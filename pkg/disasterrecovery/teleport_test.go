@@ -290,9 +290,11 @@ func TestTeleportRestore(t *testing.T) {
 	coreClusterName := "test-core-cluster"
 	coreServingCertName := "test-core-serving-cert"
 	coreClientCertIssuerName := "test-core-client-cert-issuer"
+	coreClientCertIssuerKind := "ClusterIssuer"
 	auditClusterName := "test-audit-cluster"
 	auditServingCertName := "test-audit-serving-cert"
 	auditClientCertIssuerName := "test-audit-client-cert-issuer"
+	auditClientCertIssuerKind := "ClusterIssuer"
 	auditSessionLogsS3Path := "s3://audit-session-logs"
 	auditSessionLogsS3Credentials := s3.NewCredentials("accessKeyID", "secretAccessKey")
 
@@ -303,6 +305,7 @@ func TestTeleportRestore(t *testing.T) {
 		},
 		ServingCertName:      auditServingCertName,
 		ClientCertIssuerName: auditClientCertIssuerName,
+		IssuerKind:           auditClientCertIssuerKind,
 	}
 
 	auditSessionLogsOptions := TeleportOptionsS3Sync{
@@ -328,6 +331,7 @@ func TestTeleportRestore(t *testing.T) {
 				AuditCluster:     auditClusterOptions,
 				AuditSessionLogs: auditSessionLogsOptions,
 				CleanupTimeout:   helpers.MaxWaitTime(3 * time.Second),
+				IssuerKind:       coreClientCertIssuerKind,
 			},
 		},
 	}
@@ -383,6 +387,7 @@ func TestTeleportRestore(t *testing.T) {
 			func() {
 				mockCoreCNPGRestore.EXPECT().Configure(mockClient, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, "backup-core.sql", cnpgrestore.CNPGRestoreOptions{
 					PostgresUserCert: tt.opts.PostgresUserCert,
+					IssuerKind:       tt.opts.IssuerKind,
 					CleanupTimeout:   tt.opts.CleanupTimeout,
 				}).Return(th.ErrIfTrue(tt.simulateCoreConfigError))
 				if tt.simulateCoreConfigError {
@@ -393,6 +398,7 @@ func TestTeleportRestore(t *testing.T) {
 				if tt.opts.AuditCluster.Enabled {
 					mockAuditCNPGRestore.EXPECT().Configure(mockClient, namespace, auditClusterName, auditServingCertName, auditClientCertIssuerName, restoreName, "backup-audit.sql", cnpgrestore.CNPGRestoreOptions{
 						PostgresUserCert: tt.opts.AuditCluster.PostgresUserCert,
+						IssuerKind:       tt.opts.AuditCluster.IssuerKind,
 						CleanupTimeout:   tt.opts.CleanupTimeout,
 					}).Return(th.ErrIfTrue(tt.simulateAuditConfigError))
 					if tt.simulateAuditConfigError {

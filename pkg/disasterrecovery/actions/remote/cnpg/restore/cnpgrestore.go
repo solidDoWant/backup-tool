@@ -11,12 +11,12 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/common"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
@@ -30,6 +30,7 @@ type CNPGRestoreOptionsCert struct {
 }
 
 type CNPGRestoreOptions struct {
+	IssuerKind       string                 `yaml:"issuerKind,omitempty"`
 	PostgresUserCert CNPGRestoreOptionsCert `yaml:"postgresUserCert,omitempty"`
 	CleanupTimeout   helpers.MaxWaitTime    `yaml:"cleanupTimeout,omitempty"`
 }
@@ -87,10 +88,9 @@ func (cs *configureState) ctxLogWith(ctx *contexts.Context) *contexts.LoggerCont
 
 type validateState struct {
 	configureState
-	isValidated      bool
-	cluster          *apiv1.Cluster
-	servingCert      *certmanagerv1.Certificate
-	clientCertIssuer *certmanagerv1.Issuer
+	isValidated bool
+	cluster     *apiv1.Cluster
+	servingCert *certmanagerv1.Certificate
 }
 
 // Validates that the required resources are ready. This should be called after `Configure`
@@ -118,14 +118,9 @@ func (vs *validateState) Validate(ctx *contexts.Context) (err error) {
 	}
 	vs.servingCert = servingCert
 
-	clientCertIssuer, err := vs.kubeClusterClient.CM().GetIssuer(ctx.Child(), vs.namespace, vs.clientCertIssuerName)
-	if err != nil {
-		return trace.Wrap(err, "failed to get CNPG cluster client cert issuer %q", vs.clientCertIssuerName)
+	if err := common.ValidateIssuer(ctx.Child(), vs.kubeClusterClient, vs.namespace, vs.opts.IssuerKind, vs.clientCertIssuerName); err != nil {
+		return trace.Wrap(err, "failed to validate CNPG cluster client cert issuer %q", vs.clientCertIssuerName)
 	}
-	if !certmanager.IsIssuerReady(clientCertIssuer) {
-		return trace.Errorf("CNPG cluster client cert issuer %q is not ready", vs.clientCertIssuerName)
-	}
-	vs.clientCertIssuer = clientCertIssuer
 
 	if _, err := vs.kubeClusterClient.Core().GetPVC(ctx.Child(), vs.namespace, vs.drVolName); err != nil {
 		return trace.Wrap(err, "failed to get DR PVC %q", vs.drVolName)

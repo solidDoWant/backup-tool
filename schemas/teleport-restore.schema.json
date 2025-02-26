@@ -198,6 +198,21 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "ConfigIssuer": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
     "ConfigMapProjection": {
       "properties": {
         "Name": {
@@ -1068,8 +1083,8 @@
         "servingCertName": {
           "type": "string"
         },
-        "clientCertIssuerName": {
-          "type": "string"
+        "clientCertIssuer": {
+          "$ref": "#/$defs/ConfigIssuer"
         },
         "clusterUserCert": {
           "$ref": "#/$defs/CNPGRestoreOptionsCert"
@@ -1080,7 +1095,7 @@
       "required": [
         "name",
         "servingCertName",
-        "clientCertIssuerName"
+        "clientCertIssuer"
       ]
     },
     "TeleportRestoreClustersConfig": {

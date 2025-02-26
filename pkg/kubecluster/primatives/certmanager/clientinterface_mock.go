@@ -302,6 +302,65 @@ func (_c *MockClientInterface_GetCertificate_Call) RunAndReturn(run func(*contex
 	return _c
 }
 
+// GetClusterIssuer provides a mock function with given fields: ctx, name
+func (_m *MockClientInterface) GetClusterIssuer(ctx *contexts.Context, name string) (*v1.ClusterIssuer, error) {
+	ret := _m.Called(ctx, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClusterIssuer")
+	}
+
+	var r0 *v1.ClusterIssuer
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string) (*v1.ClusterIssuer, error)); ok {
+		return rf(ctx, name)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string) *v1.ClusterIssuer); ok {
+		r0 = rf(ctx, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.ClusterIssuer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string) error); ok {
+		r1 = rf(ctx, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_GetClusterIssuer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterIssuer'
+type MockClientInterface_GetClusterIssuer_Call struct {
+	*mock.Call
+}
+
+// GetClusterIssuer is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - name string
+func (_e *MockClientInterface_Expecter) GetClusterIssuer(ctx interface{}, name interface{}) *MockClientInterface_GetClusterIssuer_Call {
+	return &MockClientInterface_GetClusterIssuer_Call{Call: _e.mock.On("GetClusterIssuer", ctx, name)}
+}
+
+func (_c *MockClientInterface_GetClusterIssuer_Call) Run(run func(ctx *contexts.Context, name string)) *MockClientInterface_GetClusterIssuer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_GetClusterIssuer_Call) Return(_a0 *v1.ClusterIssuer, _a1 error) *MockClientInterface_GetClusterIssuer_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_GetClusterIssuer_Call) RunAndReturn(run func(*contexts.Context, string) (*v1.ClusterIssuer, error)) *MockClientInterface_GetClusterIssuer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetIssuer provides a mock function with given fields: ctx, namespace, name
 func (_m *MockClientInterface) GetIssuer(ctx *contexts.Context, namespace string, name string) (*v1.Issuer, error) {
 	ret := _m.Called(ctx, namespace, name)

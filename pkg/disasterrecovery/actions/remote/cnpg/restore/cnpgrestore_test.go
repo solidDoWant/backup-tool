@@ -287,7 +287,6 @@ func TestValidate(t *testing.T) {
 			expectedState := *currentState
 			expectedState.cluster = readyCluster
 			expectedState.servingCert = cert
-			expectedState.clientCertIssuer = readyIssuer
 			assert.Equal(t, &expectedState, currentState)
 		})
 	}
@@ -359,7 +358,6 @@ func TestSetup(t *testing.T) {
 							SecretName: "serving-cert-secret",
 						},
 					},
-					clientCertIssuer: &certmanagerv1.Issuer{},
 				},
 				isSetup: tt.isAlreadySetup,
 			}
@@ -495,7 +493,6 @@ func TestCleanup(t *testing.T) {
 							SecretName: "serving-cert-secret",
 						},
 					},
-					clientCertIssuer: &certmanagerv1.Issuer{},
 				},
 				postgresUserCert: mockCUC,
 				isSetup:          !tt.hasNotBeenSetup,
@@ -610,7 +607,6 @@ func TestExecute(t *testing.T) {
 								SecretName: "serving-cert-secret",
 							},
 						},
-						clientCertIssuer: &certmanagerv1.Issuer{},
 					},
 					mountPaths: setupStateMountPaths{
 						drVolume:    "/dr-volume",

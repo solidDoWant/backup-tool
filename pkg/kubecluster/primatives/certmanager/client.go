@@ -14,6 +14,8 @@ type ClientInterface interface {
 	WaitForReadyIssuer(ctx *contexts.Context, namespace, name string, opts WaitForReadyIssuerOpts) (*certmanagerv1.Issuer, error)
 	GetIssuer(ctx *contexts.Context, namespace, name string) (*certmanagerv1.Issuer, error)
 	DeleteIssuer(ctx *contexts.Context, namespace, name string) error
+	// Cluster issuers
+	GetClusterIssuer(ctx *contexts.Context, name string) (*certmanagerv1.ClusterIssuer, error)
 	// Certificates
 	CreateCertificate(ctx *contexts.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error)
 	WaitForReadyCertificate(ctx *contexts.Context, namespace, name string, opts WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error)

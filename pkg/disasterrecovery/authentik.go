@@ -118,6 +118,7 @@ func (a *Authentik) Backup(ctx *contexts.Context, namespace, backupName, cluster
 
 type AuthentikRestoreOptions struct {
 	PostgresUserCert            cnpgrestore.CNPGRestoreOptionsCert                 `yaml:"postgresUserCert,omitempty"`
+	IssuerKind                  string                                             `yaml:"issuerKind,omitempty"`
 	RemoteBackupToolOptions     backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	ClusterServiceSearchDomains []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
 	CleanupTimeout              helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
@@ -146,6 +147,7 @@ func (a *Authentik) Restore(ctx *contexts.Context, namespace, restoreName, clust
 	cnpgRestore := a.newCNPGRestore()
 	if err := cnpgRestore.Configure(a.kubeClusterClient, namespace, clusterName, servingCertName, clientCertIssuerName, restoreName, authentikSQLFileName, cnpgrestore.CNPGRestoreOptions{
 		PostgresUserCert: opts.PostgresUserCert,
+		IssuerKind:       opts.IssuerKind,
 		CleanupTimeout:   opts.CleanupTimeout,
 	}); err != nil {
 		return restore, trace.Wrap(err, "failed to configure CNPG cluster restoration")

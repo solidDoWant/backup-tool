@@ -36,7 +36,7 @@ type AuthentikBackupConfig struct {
 type AuthentikRestoreConfigCNPG struct {
 	Name                    string                             `yaml:"name" jsonschema:"required"`
 	ServingCertName         string                             `yaml:"servingCertName" jsonschema:"required"`
-	ClientCertIssuerName    string                             `yaml:"clientCertIssuerName" jsonschema:"required"`
+	ClientCertIssuer        ConfigIssuer                       `yaml:"clientCertIssuer" jsonschema:"required"`
 	PostgresUserCertOptions cnpgrestore.CNPGRestoreOptionsCert `yaml:"postgresUserCert,omitempty"`
 }
 
@@ -78,13 +78,14 @@ func NewAuthentikDRCommand() *AuthentikDRCommand {
 
 		opts := disasterrecovery.AuthentikRestoreOptions{
 			PostgresUserCert:            config.Cluster.PostgresUserCertOptions,
+			IssuerKind:                  config.Cluster.ClientCertIssuer.Kind,
 			RemoteBackupToolOptions:     config.BackupToolInstance.CreationOptions,
 			ClusterServiceSearchDomains: config.BackupToolInstance.ServiceSearchDomains,
 			CleanupTimeout:              config.CleanupTimeout,
 		}
 
 		_, err := a.Restore(ctx, config.Namespace, config.BackupName, config.Cluster.Name, config.Cluster.ServingCertName,
-			config.Cluster.ClientCertIssuerName, config.S3.S3Path, &config.S3.Credentials, opts)
+			config.Cluster.ClientCertIssuer.Name, config.S3.S3Path, &config.S3.Credentials, opts)
 
 		return err
 	}
