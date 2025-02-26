@@ -1,0 +1,159 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+controllers:
+  authentik-postgres-wal-bucket:
+    type: job
+    nameOverride: authentik-postgres-wal-bucket
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://authentik-postgres-wal/
+        env:
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+  authentik-media-bucket:
+    type: job
+    nameOverride: authentik-media-bucket
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://authentik-media/
+        env:
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+rawResources:
+  authentik-postgres-serving-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: authentik-postgres-serving-cert
+    spec:
+      spec:
+        commonName: Teleport Core Postgres serving
+        dnsNames:
+          - authentik-postgres-rw
+          - authentik-postgres-rw.default.svc
+        usages:
+          - server auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: authentik-postgres-serving-cert
+  authentik-postgres-streaming-replica-user-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: authentik-postgres-streaming-replica-user-cert
+    spec:
+      spec:
+        commonName: streaming_replica
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: authentik-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: authentik-postgres-streaming-replica-user-cert
+  authentik-postgres-authentik-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: authentik-postgres-authentik-user-cert
+    spec:
+      spec:
+        commonName: authentik
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: authentik-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: authentik-postgres-authentik-user-cert
+  authentik-postgres-cluster:
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    forceRename: authentik-postgres
+    spec:
+      spec:
+        instances: 2 # One replica, one primary
+        bootstrap:
+          initdb:
+            database: authentik
+            owner: authentik
+            postInitSQL:
+              - ALTER USER "authentik" WITH PASSWORD NULL;
+        postgresql:
+          pg_hba:
+            - hostssl authentik all all cert
+        storage:
+          size: 5Gi
+          storageClass: openebs-zfs
+        backup:
+          target: prefer-standby
+          volumeSnapshot:
+            className: openebs-zfs
+            online: true
+            onlineConfiguration:
+              immediateCheckpoint: false
+              waitForArchive: true
+            snapshotOwnerReference: backup
+          barmanObjectStore:
+            destinationPath: s3://authentik-postgres-wal/
+            endpointURL: http://seaweedfs-s3:8333
+            s3Credentials:
+              accessKeyId:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+              secretAccessKey:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+        certificates:
+          serverTLSSecret: authentik-postgres-serving-cert
+          serverCASecret: authentik-postgres-serving-cert
+          clientCASecret: authentik-postgres-client-ca-cert
+          replicationTLSSecret: authentik-postgres-streaming-replica-user-cert

@@ -1,0 +1,17 @@
+---
+jobConfig:
+  configFile:
+    backupName: at-e2e
+    cluster:
+      name: ar-postgres
+      servingCertName: ar-postgres-serving-cert
+      clientCertIssuerName: ar-postgres-auth-ca-issuer
+      postgresUserCert:
+        certificateRequestPolicy:
+          enabled: true
+    s3:
+      s3Path: s3://ar-media/
+      credentials:
+        endpoint: http://seaweedfs-s3:8333
+        region: dummy-value
+        s3ForcePathStyle: true

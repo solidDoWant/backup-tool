@@ -1,0 +1,48 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+rawResources:
+  ar-postgres-client-ca-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: ar-postgres-client-ca-cert
+    spec:
+      spec:
+        commonName: Authentik Postgres client CA
+        isCA: true
+        usages:
+          - cert sign
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: ar-postgres-client-ca-cert
+  ar-postgres-auth-ca-issuer:
+    apiVersion: cert-manager.io/v1
+    kind: Issuer
+    forceRename: ar-postgres-auth-ca-issuer
+    spec:
+      spec:
+        ca:
+          secretName: ar-postgres-client-ca-cert
+  # This must be deployed prior to any certs, or whether cert requests
+  # get approved or denied is racey
+  ar-postgres-auth-ca-request-policy:
+    apiVersion: policy.cert-manager.io/v1alpha1
+    kind: CertificateRequestPolicy
+    forceRename: ar-postgres-auth-ca-request-policy
+    spec:
+      spec:
+        selector:
+          issuerRef:
+            group: cert-manager.io
+            kind: Issuer
+            name: ar-postgres-auth-ca-issuer
+        allowed:
+          commonName:
+            required: true
+            value: "*"
+          usages:
+            - client auth

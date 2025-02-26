@@ -1,0 +1,80 @@
+---
+global:
+  env:
+    # Postgres
+    ## RW endpoint
+    - name: AUTHENTIK_POSTGRESQL__HOST
+      value: authentik-postgres-rw.default.svc
+    - name: AUTHENTIK_POSTGRESQL__NAME
+      value: authentik
+    - name: AUTHENTIK_POSTGRESQL__USER
+      value: authentik
+    - name: AUTHENTIK_POSTGRESQL__PORT
+      value: "5432"
+    - name: AUTHENTIK_POSTGRESQL__SSLMODE
+      value: verify-full
+    - name: AUTHENTIK_POSTGRESQL__SSLROOTCERT
+      value: /etc/authentik/secrets/postgres-serving/tls.crt
+    - name: AUTHENTIK_POSTGRESQL__SSLCERT
+      value: /etc/authentik/secrets/postgres-authentik-user/tls.crt
+    - name: AUTHENTIK_POSTGRESQL__SSLKEY
+      value: /etc/authentik/secrets/postgres-authentik-user/tls.key
+    # Media file storage
+    - name: AUTHENTIK_STORAGE__MEDIA__BACKEND
+      value: s3
+    - name: AUTHENTIK_STORAGE__MEDIA__S3__USE_SSL
+      value: "true"
+    - name: AUTHENTIK_STORAGE__MEDIA__S3__SECURE_URLS
+      value: "true"
+    - name: AUTHENTIK_STORAGE__MEDIA__S3__ENDPOINT
+      value: http://seaweedfs-s3:8333
+    - name: AUTHENTIK_STORAGE__MEDIA__S3__ACCESS_KEY
+      value: $(admin_access_key_id)
+    - name: AUTHENTIK_STORAGE__MEDIA__S3__SECRET_KEY
+      value: $(admin_secret_access_key)
+    - name: AUTHENTIK_STORAGE__MEDIA__S3__BUCKET_NAME
+      value: authentik-media
+    - name: AUTHENTIK_STORAGE__MEDIA__S3__CUSTOM_DOMAIN
+      value: http://seaweedfs-s3:8333/authentik-media
+    # Authentik
+    - name: AUTHENTIK_DISABLE_UPDATE_CHECK
+      value: "true"
+    ## Dummy values for testing purposes only
+    - name: AUTHENTIK_SECRET_KEY
+      value: secret-key
+    - name: AUTHENTIK_BOOTSTRAP_PASSWORD
+      value: bootstrap-password
+    - name: AUTHENTIK_BOOTSTRAP_TOKEN
+      value: bootstrap-token
+    - name: AUTHENTIK_BOOTSTRAP_EMAIL
+      value: authentik@cluster.local
+  envFrom:
+    - secretRef:
+        name: seaweedfs-s3-secret
+  volumes:
+    - name: postgres-authentik-serving
+      secret:
+        secretName: authentik-postgres-serving-cert
+        defaultMode: 0440
+        items:
+          - key: tls.crt
+            path: tls.crt
+    - name: postgres-authentik-user
+      secret:
+        secretName: authentik-postgres-authentik-user-cert
+        defaultMode: 0440
+        items:
+          - key: tls.crt
+            path: tls.crt
+          - key: tls.key
+            path: tls.key
+  volumeMounts:
+    - name: postgres-authentik-serving
+      mountPath: /etc/authentik/secrets/postgres-serving
+    - name: postgres-authentik-user
+      mountPath: /etc/authentik/secrets/postgres-authentik-user
+  securityContext:
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+redis:
+  enabled: true

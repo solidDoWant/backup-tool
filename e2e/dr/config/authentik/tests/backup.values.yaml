@@ -1,0 +1,28 @@
+---
+jobConfig:
+  configFile:
+    backupName: at-e2e
+    cluster:
+      name: authentik-postgres
+      servingCertIssuerName: self-signed
+      clientCACertIssuerName: self-signed
+      clusterCloning:
+        certificates:
+          servingCert:
+            issuerKind: Issuer
+          clientCACert:
+            issuerKind: Issuer
+          postgresUserCert:
+            certificateRequestPolicy:
+              enabled: true
+          streamingReplicaUserCert:
+            certificateRequestPolicy:
+              enabled: true
+    s3:
+      s3Path: s3://authentik-media/
+      credentials:
+        endpoint: http://seaweedfs-s3:8333
+        region: dummy-value
+        s3ForcePathStyle: true
+    backupSnapshot:
+      snapshotClass: openebs-zfs

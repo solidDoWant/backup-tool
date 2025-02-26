@@ -1,0 +1,159 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+controllers:
+  ar-postgres-wal-bucket:
+    type: job
+    nameOverride: ar-postgres-wal-bucket
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://ar-postgres-wal/
+        env:
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+  ar-media-bucket:
+    type: job
+    nameOverride: ar-media-bucket
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://ar-media/
+        env:
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+rawResources:
+  ar-postgres-serving-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: ar-postgres-serving-cert
+    spec:
+      spec:
+        commonName: Authentik Postgres serving
+        dnsNames:
+          - ar-postgres-rw
+          - ar-postgres-rw.default.svc
+        usages:
+          - server auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: ar-postgres-serving-cert
+  ar-postgres-streaming-replica-user-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: ar-postgres-streaming-replica-user-cert
+    spec:
+      spec:
+        commonName: streaming_replica
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: ar-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: ar-postgres-streaming-replica-user-cert
+  ar-postgres-authentik-cert:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    forceRename: ar-postgres-authentik-user-cert
+    spec:
+      spec:
+        commonName: authentik
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: ar-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: ar-postgres-authentik-user-cert
+  ar-postgres-cluster:
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    forceRename: ar-postgres
+    spec:
+      spec:
+        instances: 2 # One replica, one primary
+        bootstrap:
+          initdb:
+            database: authentik
+            owner: authentik
+            postInitSQL:
+              - ALTER USER "authentik" WITH PASSWORD NULL;
+        postgresql:
+          pg_hba:
+            - hostssl all all all cert
+        storage:
+          size: 5Gi
+          storageClass: openebs-zfs
+        backup:
+          target: prefer-standby
+          volumeSnapshot:
+            className: openebs-zfs
+            online: true
+            onlineConfiguration:
+              immediateCheckpoint: false
+              waitForArchive: true
+            snapshotOwnerReference: backup
+          barmanObjectStore:
+            destinationPath: s3://ar-postgres-wal/
+            endpointURL: http://seaweedfs-s3:8333
+            s3Credentials:
+              accessKeyId:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+              secretAccessKey:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+        certificates:
+          serverTLSSecret: ar-postgres-serving-cert
+          serverCASecret: ar-postgres-serving-cert
+          clientCASecret: ar-postgres-client-ca-cert
+          replicationTLSSecret: ar-postgres-streaming-replica-user-cert
