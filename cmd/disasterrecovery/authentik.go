@@ -10,15 +10,11 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/s3"
 )
 
-type AuthentikConfigCNPG struct {
-	Name                   string `yaml:"name" jsonschema:"required"`
-	ClientCACertIssuerName string `yaml:"clientCACertIssuerName" jsonschema:"required"`
-}
-
 type AuthentikBackupConfigCNPG struct {
-	AuthentikConfigCNPG   `yaml:",inline"`
-	ServingCertIssuerName string                            `yaml:"servingCertIssuerName" jsonschema:"required"`
-	CloneClusterOptions   clonedcluster.CloneClusterOptions `yaml:"clusterCloning,omitempty"`
+	Name                   string                            `yaml:"name" jsonschema:"required"`
+	ServingCertIssuerName  string                            `yaml:"servingCertIssuerName" jsonschema:"required"`
+	ClientCACertIssuerName string                            `yaml:"clientCACertIssuerName" jsonschema:"required"`
+	CloneClusterOptions    clonedcluster.CloneClusterOptions `yaml:"clusterCloning,omitempty"`
 }
 
 type AuthentikBackupConfigS3 struct {
@@ -38,8 +34,9 @@ type AuthentikBackupConfig struct {
 }
 
 type AuthentikRestoreConfigCNPG struct {
-	AuthentikConfigCNPG     `yaml:",inline"`
+	Name                    string                             `yaml:"name" jsonschema:"required"`
 	ServingCertName         string                             `yaml:"servingCertName" jsonschema:"required"`
+	ClientCertIssuerName    string                             `yaml:"clientCertIssuerName" jsonschema:"required"`
 	PostgresUserCertOptions cnpgrestore.CNPGRestoreOptionsCert `yaml:"postgresUserCert,omitempty"`
 }
 
@@ -87,7 +84,7 @@ func NewAuthentikDRCommand() *AuthentikDRCommand {
 		}
 
 		_, err := a.Restore(ctx, config.Namespace, config.BackupName, config.Cluster.Name, config.Cluster.ServingCertName,
-			config.Cluster.ClientCACertIssuerName, config.S3.S3Path, &config.S3.Credentials, opts)
+			config.Cluster.ClientCertIssuerName, config.S3.S3Path, &config.S3.Credentials, opts)
 
 		return err
 	}
