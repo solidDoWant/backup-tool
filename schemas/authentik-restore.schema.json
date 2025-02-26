@@ -1,0 +1,1372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/solidDoWant/backup-tool/cmd/disasterrecovery/authentik-restore-config",
+  "$ref": "#/$defs/AuthentikRestoreConfig",
+  "$defs": {
+    "AWSElasticBlockStoreVolumeSource": {
+      "properties": {
+        "VolumeID": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "Partition": {
+          "type": "integer"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AuthentikBackupConfigS3": {
+      "properties": {
+        "s3Path": {
+          "type": "string"
+        },
+        "credentials": {
+          "$ref": "#/$defs/Credentials"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "s3Path",
+        "credentials"
+      ]
+    },
+    "AuthentikRestoreConfig": {
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "backupName": {
+          "type": "string"
+        },
+        "cluster": {
+          "$ref": "#/$defs/AuthentikRestoreConfigCNPG"
+        },
+        "s3": {
+          "$ref": "#/$defs/AuthentikBackupConfigS3"
+        },
+        "backupToolInstance": {
+          "$ref": "#/$defs/ConfigBTI"
+        },
+        "cleanupTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "namespace",
+        "backupName",
+        "cluster",
+        "s3"
+      ]
+    },
+    "AuthentikRestoreConfigCNPG": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "servingCertName": {
+          "type": "string"
+        },
+        "clientCertIssuer": {
+          "$ref": "#/$defs/ConfigIssuer"
+        },
+        "postgresUserCert": {
+          "$ref": "#/$defs/CNPGRestoreOptionsCert"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "servingCertName",
+        "clientCertIssuer"
+      ]
+    },
+    "AzureDiskVolumeSource": {
+      "properties": {
+        "DiskName": {
+          "type": "string"
+        },
+        "DataDiskURI": {
+          "type": "string"
+        },
+        "CachingMode": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        },
+        "Kind": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureFileVolumeSource": {
+      "properties": {
+        "SecretName": {
+          "type": "string"
+        },
+        "ShareName": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CNPGRestoreOptionsCert": {
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/X509Subject"
+        },
+        "certificateRequestPolicy": {
+          "$ref": "#/$defs/NewClusterUserCertOptsCRP"
+        },
+        "waitForCertTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CSIVolumeSource": {
+      "properties": {
+        "Driver": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "VolumeAttributes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "NodePublishSecretRef": {
+          "$ref": "#/$defs/LocalObjectReference"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CephFSVolumeSource": {
+      "properties": {
+        "Monitors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Path": {
+          "type": "string"
+        },
+        "User": {
+          "type": "string"
+        },
+        "SecretFile": {
+          "type": "string"
+        },
+        "SecretRef": {
+          "$ref": "#/$defs/LocalObjectReference"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CinderVolumeSource": {
+      "properties": {
+        "VolumeID": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        },
+        "SecretRef": {
+          "$ref": "#/$defs/LocalObjectReference"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ClusterTrustBundleProjection": {
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "SignerName": {
+          "type": "string"
+        },
+        "LabelSelector": {
+          "$ref": "#/$defs/LabelSelector"
+        },
+        "Optional": {
+          "type": "boolean"
+        },
+        "Path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ConfigBTI": {
+      "properties": {
+        "namePrefix": {
+          "type": "string"
+        },
+        "volumes": {
+          "items": {
+            "$ref": "#/$defs/SingleContainerVolume"
+          },
+          "type": "array"
+        },
+        "cleanupTimeout": {
+          "type": "integer"
+        },
+        "serviceType": {
+          "type": "string"
+        },
+        "podWaitTimeout": {
+          "type": "integer"
+        },
+        "serviceWaitTimeout": {
+          "type": "integer"
+        },
+        "serviceSearchDomains": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ConfigIssuer": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "ConfigMapProjection": {
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Items": {
+          "items": {
+            "$ref": "#/$defs/KeyToPath"
+          },
+          "type": "array"
+        },
+        "Optional": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ConfigMapVolumeSource": {
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Items": {
+          "items": {
+            "$ref": "#/$defs/KeyToPath"
+          },
+          "type": "array"
+        },
+        "DefaultMode": {
+          "type": "integer"
+        },
+        "Optional": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Credentials": {
+      "properties": {
+        "accessKeyId": {
+          "type": "string"
+        },
+        "secretAccessKey": {
+          "type": "string"
+        },
+        "sessionToken": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "s3ForcePathStyle": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "accessKeyId",
+        "secretAccessKey"
+      ]
+    },
+    "DownwardAPIProjection": {
+      "properties": {
+        "Items": {
+          "items": {
+            "$ref": "#/$defs/DownwardAPIVolumeFile"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "DownwardAPIVolumeFile": {
+      "properties": {
+        "Path": {
+          "type": "string"
+        },
+        "FieldRef": {
+          "$ref": "#/$defs/ObjectFieldSelector"
+        },
+        "ResourceFieldRef": {
+          "$ref": "#/$defs/ResourceFieldSelector"
+        },
+        "Mode": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "DownwardAPIVolumeSource": {
+      "properties": {
+        "Items": {
+          "items": {
+            "$ref": "#/$defs/DownwardAPIVolumeFile"
+          },
+          "type": "array"
+        },
+        "DefaultMode": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "EmptyDirVolumeSource": {
+      "properties": {
+        "Medium": {
+          "type": "string"
+        },
+        "SizeLimit": {
+          "$ref": "#/$defs/Quantity"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "EphemeralVolumeSource": {
+      "properties": {
+        "VolumeClaimTemplate": {
+          "$ref": "#/$defs/PersistentVolumeClaimTemplate"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "FCVolumeSource": {
+      "properties": {
+        "TargetWWNs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Lun": {
+          "type": "integer"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        },
+        "WWIDs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "FieldsV1": {
+      "properties": {
+        "Raw": {
+          "type": "string",
+          "contentEncoding": "base64"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "FlexVolumeSource": {
+      "properties": {
+        "Driver": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "SecretRef": {
+          "$ref": "#/$defs/LocalObjectReference"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        },
+        "Options": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "FlockerVolumeSource": {
+      "properties": {
+        "DatasetName": {
+          "type": "string"
+        },
+        "DatasetUUID": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "GCEPersistentDiskVolumeSource": {
+      "properties": {
+        "PDName": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "Partition": {
+          "type": "integer"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "GitRepoVolumeSource": {
+      "properties": {
+        "Repository": {
+          "type": "string"
+        },
+        "Revision": {
+          "type": "string"
+        },
+        "Directory": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "GlusterfsVolumeSource": {
+      "properties": {
+        "EndpointsName": {
+          "type": "string"
+        },
+        "Path": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "HostPathVolumeSource": {
+      "properties": {
+        "Path": {
+          "type": "string"
+        },
+        "Type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ISCSIVolumeSource": {
+      "properties": {
+        "TargetPortal": {
+          "type": "string"
+        },
+        "IQN": {
+          "type": "string"
+        },
+        "Lun": {
+          "type": "integer"
+        },
+        "ISCSIInterface": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        },
+        "Portals": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "DiscoveryCHAPAuth": {
+          "type": "boolean"
+        },
+        "SessionCHAPAuth": {
+          "type": "boolean"
+        },
+        "SecretRef": {
+          "$ref": "#/$defs/LocalObjectReference"
+        },
+        "InitiatorName": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ImageVolumeSource": {
+      "properties": {
+        "Reference": {
+          "type": "string"
+        },
+        "PullPolicy": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "KeyToPath": {
+      "properties": {
+        "Key": {
+          "type": "string"
+        },
+        "Path": {
+          "type": "string"
+        },
+        "Mode": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "LabelSelector": {
+      "properties": {
+        "MatchLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "MatchExpressions": {
+          "items": {
+            "$ref": "#/$defs/LabelSelectorRequirement"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "LabelSelectorRequirement": {
+      "properties": {
+        "Key": {
+          "type": "string"
+        },
+        "Operator": {
+          "type": "string"
+        },
+        "Values": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "LocalObjectReference": {
+      "properties": {
+        "Name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ManagedFieldsEntry": {
+      "properties": {
+        "Manager": {
+          "type": "string"
+        },
+        "Operation": {
+          "type": "string"
+        },
+        "APIVersion": {
+          "type": "string"
+        },
+        "Time": {
+          "$ref": "#/$defs/Time"
+        },
+        "FieldsType": {
+          "type": "string"
+        },
+        "FieldsV1": {
+          "$ref": "#/$defs/FieldsV1"
+        },
+        "Subresource": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "NFSVolumeSource": {
+      "properties": {
+        "Server": {
+          "type": "string"
+        },
+        "Path": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "NewClusterUserCertOptsCRP": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "waitForCRPTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ObjectFieldSelector": {
+      "properties": {
+        "APIVersion": {
+          "type": "string"
+        },
+        "FieldPath": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "OwnerReference": {
+      "properties": {
+        "APIVersion": {
+          "type": "string"
+        },
+        "Kind": {
+          "type": "string"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "UID": {
+          "type": "string"
+        },
+        "Controller": {
+          "type": "boolean"
+        },
+        "BlockOwnerDeletion": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PersistentVolumeClaimSpec": {
+      "properties": {
+        "AccessModes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Selector": {
+          "$ref": "#/$defs/LabelSelector"
+        },
+        "Resources": {
+          "$ref": "#/$defs/VolumeResourceRequirements"
+        },
+        "VolumeName": {
+          "type": "string"
+        },
+        "StorageClassName": {
+          "type": "string"
+        },
+        "VolumeMode": {
+          "type": "string"
+        },
+        "DataSource": {
+          "$ref": "#/$defs/TypedLocalObjectReference"
+        },
+        "DataSourceRef": {
+          "$ref": "#/$defs/TypedObjectReference"
+        },
+        "VolumeAttributesClassName": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PersistentVolumeClaimTemplate": {
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "GenerateName": {
+          "type": "string"
+        },
+        "Namespace": {
+          "type": "string"
+        },
+        "SelfLink": {
+          "type": "string"
+        },
+        "UID": {
+          "type": "string"
+        },
+        "ResourceVersion": {
+          "type": "string"
+        },
+        "Generation": {
+          "type": "integer"
+        },
+        "CreationTimestamp": {
+          "$ref": "#/$defs/Time"
+        },
+        "DeletionTimestamp": {
+          "$ref": "#/$defs/Time"
+        },
+        "DeletionGracePeriodSeconds": {
+          "type": "integer"
+        },
+        "Labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "Annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "OwnerReferences": {
+          "items": {
+            "$ref": "#/$defs/OwnerReference"
+          },
+          "type": "array"
+        },
+        "Finalizers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ManagedFields": {
+          "items": {
+            "$ref": "#/$defs/ManagedFieldsEntry"
+          },
+          "type": "array"
+        },
+        "Spec": {
+          "$ref": "#/$defs/PersistentVolumeClaimSpec"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PersistentVolumeClaimVolumeSource": {
+      "properties": {
+        "ClaimName": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PhotonPersistentDiskVolumeSource": {
+      "properties": {
+        "PdID": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PortworxVolumeSource": {
+      "properties": {
+        "VolumeID": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ProjectedVolumeSource": {
+      "properties": {
+        "Sources": {
+          "items": {
+            "$ref": "#/$defs/VolumeProjection"
+          },
+          "type": "array"
+        },
+        "DefaultMode": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Quantity": {
+      "properties": {
+        "Format": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "QuobyteVolumeSource": {
+      "properties": {
+        "Registry": {
+          "type": "string"
+        },
+        "Volume": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        },
+        "User": {
+          "type": "string"
+        },
+        "Group": {
+          "type": "string"
+        },
+        "Tenant": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "RBDVolumeSource": {
+      "properties": {
+        "CephMonitors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "RBDImage": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "RBDPool": {
+          "type": "string"
+        },
+        "RadosUser": {
+          "type": "string"
+        },
+        "Keyring": {
+          "type": "string"
+        },
+        "SecretRef": {
+          "$ref": "#/$defs/LocalObjectReference"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ResourceFieldSelector": {
+      "properties": {
+        "ContainerName": {
+          "type": "string"
+        },
+        "Resource": {
+          "type": "string"
+        },
+        "Divisor": {
+          "$ref": "#/$defs/Quantity"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ResourceList": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Quantity"
+      },
+      "type": "object"
+    },
+    "ScaleIOVolumeSource": {
+      "properties": {
+        "Gateway": {
+          "type": "string"
+        },
+        "System": {
+          "type": "string"
+        },
+        "SecretRef": {
+          "$ref": "#/$defs/LocalObjectReference"
+        },
+        "SSLEnabled": {
+          "type": "boolean"
+        },
+        "ProtectionDomain": {
+          "type": "string"
+        },
+        "StoragePool": {
+          "type": "string"
+        },
+        "StorageMode": {
+          "type": "string"
+        },
+        "VolumeName": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "SecretProjection": {
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Items": {
+          "items": {
+            "$ref": "#/$defs/KeyToPath"
+          },
+          "type": "array"
+        },
+        "Optional": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "SecretVolumeSource": {
+      "properties": {
+        "SecretName": {
+          "type": "string"
+        },
+        "Items": {
+          "items": {
+            "$ref": "#/$defs/KeyToPath"
+          },
+          "type": "array"
+        },
+        "DefaultMode": {
+          "type": "integer"
+        },
+        "Optional": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ServiceAccountTokenProjection": {
+      "properties": {
+        "Audience": {
+          "type": "string"
+        },
+        "ExpirationSeconds": {
+          "type": "integer"
+        },
+        "Path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "SingleContainerVolume": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "mountPaths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "volumeSource": {
+          "$ref": "#/$defs/VolumeSource"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "mountPaths",
+        "volumeSource"
+      ]
+    },
+    "StorageOSVolumeSource": {
+      "properties": {
+        "VolumeName": {
+          "type": "string"
+        },
+        "VolumeNamespace": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "ReadOnly": {
+          "type": "boolean"
+        },
+        "SecretRef": {
+          "$ref": "#/$defs/LocalObjectReference"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Time": {
+      "properties": {},
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "TypedLocalObjectReference": {
+      "properties": {
+        "APIGroup": {
+          "type": "string"
+        },
+        "Kind": {
+          "type": "string"
+        },
+        "Name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "TypedObjectReference": {
+      "properties": {
+        "APIGroup": {
+          "type": "string"
+        },
+        "Kind": {
+          "type": "string"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Namespace": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "VolumeProjection": {
+      "properties": {
+        "Secret": {
+          "$ref": "#/$defs/SecretProjection"
+        },
+        "DownwardAPI": {
+          "$ref": "#/$defs/DownwardAPIProjection"
+        },
+        "ConfigMap": {
+          "$ref": "#/$defs/ConfigMapProjection"
+        },
+        "ServiceAccountToken": {
+          "$ref": "#/$defs/ServiceAccountTokenProjection"
+        },
+        "ClusterTrustBundle": {
+          "$ref": "#/$defs/ClusterTrustBundleProjection"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "VolumeResourceRequirements": {
+      "properties": {
+        "Limits": {
+          "$ref": "#/$defs/ResourceList"
+        },
+        "Requests": {
+          "$ref": "#/$defs/ResourceList"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "VolumeSource": {
+      "properties": {
+        "HostPath": {
+          "$ref": "#/$defs/HostPathVolumeSource"
+        },
+        "EmptyDir": {
+          "$ref": "#/$defs/EmptyDirVolumeSource"
+        },
+        "GCEPersistentDisk": {
+          "$ref": "#/$defs/GCEPersistentDiskVolumeSource"
+        },
+        "AWSElasticBlockStore": {
+          "$ref": "#/$defs/AWSElasticBlockStoreVolumeSource"
+        },
+        "GitRepo": {
+          "$ref": "#/$defs/GitRepoVolumeSource"
+        },
+        "Secret": {
+          "$ref": "#/$defs/SecretVolumeSource"
+        },
+        "NFS": {
+          "$ref": "#/$defs/NFSVolumeSource"
+        },
+        "ISCSI": {
+          "$ref": "#/$defs/ISCSIVolumeSource"
+        },
+        "Glusterfs": {
+          "$ref": "#/$defs/GlusterfsVolumeSource"
+        },
+        "PersistentVolumeClaim": {
+          "$ref": "#/$defs/PersistentVolumeClaimVolumeSource"
+        },
+        "RBD": {
+          "$ref": "#/$defs/RBDVolumeSource"
+        },
+        "FlexVolume": {
+          "$ref": "#/$defs/FlexVolumeSource"
+        },
+        "Cinder": {
+          "$ref": "#/$defs/CinderVolumeSource"
+        },
+        "CephFS": {
+          "$ref": "#/$defs/CephFSVolumeSource"
+        },
+        "Flocker": {
+          "$ref": "#/$defs/FlockerVolumeSource"
+        },
+        "DownwardAPI": {
+          "$ref": "#/$defs/DownwardAPIVolumeSource"
+        },
+        "FC": {
+          "$ref": "#/$defs/FCVolumeSource"
+        },
+        "AzureFile": {
+          "$ref": "#/$defs/AzureFileVolumeSource"
+        },
+        "ConfigMap": {
+          "$ref": "#/$defs/ConfigMapVolumeSource"
+        },
+        "VsphereVolume": {
+          "$ref": "#/$defs/VsphereVirtualDiskVolumeSource"
+        },
+        "Quobyte": {
+          "$ref": "#/$defs/QuobyteVolumeSource"
+        },
+        "AzureDisk": {
+          "$ref": "#/$defs/AzureDiskVolumeSource"
+        },
+        "PhotonPersistentDisk": {
+          "$ref": "#/$defs/PhotonPersistentDiskVolumeSource"
+        },
+        "Projected": {
+          "$ref": "#/$defs/ProjectedVolumeSource"
+        },
+        "PortworxVolume": {
+          "$ref": "#/$defs/PortworxVolumeSource"
+        },
+        "ScaleIO": {
+          "$ref": "#/$defs/ScaleIOVolumeSource"
+        },
+        "StorageOS": {
+          "$ref": "#/$defs/StorageOSVolumeSource"
+        },
+        "CSI": {
+          "$ref": "#/$defs/CSIVolumeSource"
+        },
+        "Ephemeral": {
+          "$ref": "#/$defs/EphemeralVolumeSource"
+        },
+        "Image": {
+          "$ref": "#/$defs/ImageVolumeSource"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "VsphereVirtualDiskVolumeSource": {
+      "properties": {
+        "VolumePath": {
+          "type": "string"
+        },
+        "FSType": {
+          "type": "string"
+        },
+        "StoragePolicyName": {
+          "type": "string"
+        },
+        "StoragePolicyID": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "X509Subject": {
+      "properties": {
+        "Organizations": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Countries": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "OrganizationalUnits": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Localities": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Provinces": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "StreetAddresses": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "PostalCodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "SerialNumber": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    }
+  }
+}
