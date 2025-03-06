@@ -155,7 +155,7 @@ func (es *executeState) Execute(ctx *contexts.Context, backupToolClient clients.
 	}
 
 	err = backupToolClient.S3().Sync(ctx.Child(), es.credentials, source, destination)
-	return trace.Wrap(err, "failed to sync files", "source", source, "destination", destination)
+	return trace.Wrap(err, "failed to sync files from %q to %q", source, destination)
 }
 
 type S3Sync struct {
