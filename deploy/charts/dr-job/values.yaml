@@ -61,6 +61,20 @@ resources:
             - path: /etc/backup-tool/config.yaml
               subPath: config.yaml
               readOnly: true
+    pod-labels:
+      type: custom
+      volumeSpec:
+          downwardAPI:
+            items:
+              - path: labels
+                fieldRef:
+                  fieldPath: metadata.labels
+      advancedMounts:
+        backup-tool:
+          backup-tool:
+            - path: /etc/backup-tool/labels
+              subPath: labels
+              readOnly: true
   serviceAccount:
     create: true
   rbac:

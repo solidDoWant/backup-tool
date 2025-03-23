@@ -2,6 +2,7 @@ package cnpg
 
 import (
 	"context"
+	"maps"
 	"sync"
 	"testing"
 	"time"
@@ -278,39 +279,28 @@ func TestCreateCluster(t *testing.T) {
 	clientCAName := "client-ca"
 	replicationUserCertName := "replication-user-cert"
 
-	standardClusterOptions := &apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-		},
-		Spec: apiv1.ClusterSpec{
-			Instances: 1,
-			Bootstrap: &apiv1.BootstrapConfiguration{},
-			StorageConfiguration: apiv1.StorageConfiguration{
-				Size: volumeSize.String(),
-			},
-			Certificates: &apiv1.CertificatesConfiguration{
-				ServerTLSSecret:      servingCertName,
-				ServerCASecret:       servingCertName,
-				ClientCASecret:       clientCAName,
-				ReplicationTLSSecret: replicationUserCertName,
-			},
-			PostgresConfiguration: apiv1.PostgresConfiguration{
-				PgHBA: []string{"hostssl all all all cert"},
-			},
-		},
-	}
-
 	tests := []struct {
 		desc                        string
 		enablePrometheusMetrics     bool
 		shouldFailToQueryForMetrics bool
 		opts                        CreateClusterOptions
+		commonLabels                map[string]string
 		expected                    *apiv1.Cluster
 		simulateClientFailure       bool
 	}{
 		{
 			desc: "basic cluster creation",
-			opts: CreateClusterOptions{},
+			expected: &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterName,
+				},
+			},
+		},
+		{
+			desc: "basic cluster with labels",
+			commonLabels: map[string]string{
+				"key": "value",
+			},
 			expected: &apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: clusterName,
@@ -439,6 +429,7 @@ func TestCreateCluster(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			ctx := th.NewTestContext()
 			client, cnpgFakeClient, apiExtensionsFakeClient := createTestClient()
+			client.SetCommonLabels(tt.commonLabels)
 
 			if tt.simulateClientFailure {
 				cnpgFakeClient.PrependReactor("create", "clusters", func(action kubetesting.Action) (bool, runtime.Object, error) {
@@ -466,7 +457,33 @@ func TestCreateCluster(t *testing.T) {
 				return
 			}
 
-			expectedCluster := standardClusterOptions.DeepCopy()
+			labels := map[string]string{
+				"app.kubernetes.io/component": "cnpg-cluster",
+			}
+			maps.Copy(labels, client.CommonLabels)
+
+			expectedCluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Labels:    labels,
+				},
+				Spec: apiv1.ClusterSpec{
+					Instances: 1,
+					Bootstrap: &apiv1.BootstrapConfiguration{},
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: volumeSize.String(),
+					},
+					Certificates: &apiv1.CertificatesConfiguration{
+						ServerTLSSecret:      servingCertName,
+						ServerCASecret:       servingCertName,
+						ClientCASecret:       clientCAName,
+						ReplicationTLSSecret: replicationUserCertName,
+					},
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						PgHBA: []string{"hostssl all all all cert"},
+					},
+				},
+			}
 			require.NoError(t, mergo.MergeWithOverwrite(expectedCluster, tt.expected))
 
 			require.NoError(t, err)

@@ -4,6 +4,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg/gen/clientset/versioned"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -11,9 +12,12 @@ import (
 )
 
 type ClientInterface interface {
+	helpers.ResourceLabeler
+	// Backups
 	CreateBackup(ctx *contexts.Context, namespace, backupName, clusterName string, opts CreateBackupOptions) (*apiv1.Backup, error)
 	WaitForReadyBackup(ctx *contexts.Context, namespace, name string, opts WaitForReadyBackupOpts) (*apiv1.Backup, error)
 	DeleteBackup(ctx *contexts.Context, namespace, name string) error
+	// Clusters
 	CreateCluster(ctx *contexts.Context, namespace, clusterName string, volumeSize resource.Quantity, servingCertificateSecretName, clientCASecretName, replicationUserCertName string, opts CreateClusterOptions) (*apiv1.Cluster, error)
 	WaitForReadyCluster(ctx *contexts.Context, namespace, name string, opts WaitForReadyClusterOpts) (*apiv1.Cluster, error)
 	GetCluster(ctx *contexts.Context, namespace, name string) (*apiv1.Cluster, error)
@@ -21,6 +25,7 @@ type ClientInterface interface {
 }
 
 type Client struct {
+	helpers.SimpleResourceLabeler
 	cnpgClient          versioned.Interface
 	apiExtensionsClient apiextensionsclientset.Interface
 }

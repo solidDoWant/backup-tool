@@ -39,6 +39,9 @@ func TestClonePVC(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/component": "force-bind",
+			},
 		},
 	}
 

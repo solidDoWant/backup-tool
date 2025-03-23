@@ -146,8 +146,7 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: helpers.CleanName(namePrefix),
 			Labels: map[string]string{
-				"app.kubernetes.io/name":     constants.ToolName,
-				"app.kubernetes.io/instance": instance,
+				"app.kubernetes.io/component": constants.ToolName,
 			},
 		},
 		// TODO probes, etc

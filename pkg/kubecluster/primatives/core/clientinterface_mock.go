@@ -590,6 +590,39 @@ func (_c *MockClientInterface_GetPVC_Call) RunAndReturn(run func(*contexts.Conte
 	return _c
 }
 
+// SetCommonLabels provides a mock function with given fields: labels
+func (_m *MockClientInterface) SetCommonLabels(labels map[string]string) {
+	_m.Called(labels)
+}
+
+// MockClientInterface_SetCommonLabels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetCommonLabels'
+type MockClientInterface_SetCommonLabels_Call struct {
+	*mock.Call
+}
+
+// SetCommonLabels is a helper method to define mock.On call
+//   - labels map[string]string
+func (_e *MockClientInterface_Expecter) SetCommonLabels(labels interface{}) *MockClientInterface_SetCommonLabels_Call {
+	return &MockClientInterface_SetCommonLabels_Call{Call: _e.mock.On("SetCommonLabels", labels)}
+}
+
+func (_c *MockClientInterface_SetCommonLabels_Call) Run(run func(labels map[string]string)) *MockClientInterface_SetCommonLabels_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(map[string]string))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_SetCommonLabels_Call) Return() *MockClientInterface_SetCommonLabels_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockClientInterface_SetCommonLabels_Call) RunAndReturn(run func(map[string]string)) *MockClientInterface_SetCommonLabels_Call {
+	_c.Run(run)
+	return _c
+}
+
 // WaitForReadyEndpoint provides a mock function with given fields: ctx, namespace, name, opts
 func (_m *MockClientInterface) WaitForReadyEndpoint(ctx *contexts.Context, namespace string, name string, opts WaitForReadyEndpointOpts) (*v1.Endpoints, error) {
 	ret := _m.Called(ctx, namespace, name, opts)

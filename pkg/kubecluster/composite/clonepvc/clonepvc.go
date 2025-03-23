@@ -109,6 +109,9 @@ func (p *Provider) ClonePVC(ctx *contexts.Context, namespace, pvcName string, op
 		pod, err = p.coreClient.CreatePod(ctx.Child(), namespace, &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "force-bind-" + clonedPvc.Name,
+				Labels: map[string]string{
+					"app.kubernetes.io/component": "force-bind",
+				},
 			},
 			Spec: corev1.PodSpec{
 				Volumes: []corev1.Volume{podVol.ToVolume()},

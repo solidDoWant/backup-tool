@@ -21,19 +21,18 @@ import (
 func TestCreatePod(t *testing.T) {
 	namespace := "test-ns"
 	podName := "test-pod"
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      podName,
-			Namespace: namespace,
-		},
-	}
 
 	tests := []struct {
 		desc                string
+		labels              map[string]string
 		simulateClientError bool
 	}{
 		{
 			desc: "create pod successfully",
+		},
+		{
+			desc:   "create pod with labels",
+			labels: map[string]string{"key": "value"},
 		},
 		{
 			desc:                "creation errors",
@@ -44,12 +43,20 @@ func TestCreatePod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			c, mockK8s := createTestClient()
+			c.SetCommonLabels(tt.labels)
 			ctx := th.NewTestContext()
 
 			if tt.simulateClientError {
 				mockK8s.PrependReactor("create", "pods", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, nil, assert.AnError
 				})
+			}
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      podName,
+					Namespace: namespace,
+					Labels:    map[string]string{"app": "test"},
+				},
 			}
 
 			createdPod, err := c.CreatePod(ctx, namespace, pod)

@@ -409,3 +409,43 @@ func TestCleanName(t *testing.T) {
 		})
 	}
 }
+
+func TestSimpleResourceLabelerSetCommonLabels(t *testing.T) {
+	srl := &SimpleResourceLabeler{}
+	expectedLabels := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
+
+	srl.SetCommonLabels(expectedLabels)
+	assert.Equal(t, expectedLabels, srl.CommonLabels)
+
+	srl.SetCommonLabels(nil)
+	assert.Nil(t, srl.CommonLabels)
+}
+
+func TestSimpleResourceLabelerLabelResource(t *testing.T) {
+	srl := &SimpleResourceLabeler{
+		CommonLabels: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+	}
+
+	resource := &metav1.ObjectMeta{
+		Labels: map[string]string{
+			"originalKey1": "originalValue1",
+			"key2":         "originalValue2",
+		},
+	}
+
+	srl.LabelResource(resource)
+
+	expectedLabels := map[string]string{
+		"key1":         "value1",
+		"key2":         "originalValue2",
+		"originalKey1": "originalValue1",
+	}
+
+	assert.Equal(t, expectedLabels, resource.Labels)
+}

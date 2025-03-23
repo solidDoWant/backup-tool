@@ -119,6 +119,11 @@ func (cnpgc *Client) CreateCluster(ctx *contexts.Context, namespace, clusterName
 	ctx.Log.Debug("Call parameters", "volumeSize", volumeSize.String(), "servingCertificateSecretName", servingCertificateSecretName, "clientCASecretName", clientCASecretName, "replicationUserCertName", replicationUserCertName, "opts", opts)
 
 	cluster := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				"app.kubernetes.io/component": "cnpg-cluster",
+			},
+		},
 		Spec: apiv1.ClusterSpec{
 			Instances: 1,
 			Bootstrap: &apiv1.BootstrapConfiguration{},
@@ -175,6 +180,8 @@ func (cnpgc *Client) CreateCluster(ctx *contexts.Context, namespace, clusterName
 	} else if !apierrors.IsNotFound(err) {
 		return nil, trace.Wrap(err, "failed to check if cluster has %q CRD", podMonitorCRDName)
 	}
+
+	cnpgc.LabelResource(cluster)
 
 	cluster, err = cnpgc.cnpgClient.PostgresqlV1().Clusters(namespace).Create(ctx.Child(), cluster, metav1.CreateOptions{})
 	if err != nil {

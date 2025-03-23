@@ -22,6 +22,8 @@ func (c *Client) CreatePod(ctx *contexts.Context, namespace string, pod *corev1.
 		ctx.Log.With("name", "").Warn("Creating pod without a name")
 	}
 
+	c.LabelResource(pod)
+
 	ctx.Log.Info("Creating pod")
 	ctx.Log.Debug("Call parameters", "pod", pod)
 

@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
@@ -10,6 +11,7 @@ import (
 )
 
 type ClientInterface interface {
+	helpers.ResourceLabeler
 	// Pods
 	CreatePod(ctx *contexts.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) // TODO see if this can be refined further
 	WaitForReadyPod(ctx *contexts.Context, namespace, name string, opts WaitForReadyPodOpts) (*corev1.Pod, error)
@@ -30,6 +32,7 @@ type ClientInterface interface {
 }
 
 type Client struct {
+	helpers.SimpleResourceLabeler
 	client kubernetes.Interface
 }
 

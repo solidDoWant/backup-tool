@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"maps"
+
 	"github.com/goccy/go-yaml"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
@@ -199,4 +201,38 @@ func CleanName(generateName string) string {
 	}
 
 	return cleanedName
+}
+
+// Describes a type that can label k8s resources.
+// Used to set common labels on resources, which is important for integration
+// with external systems like netpols.
+type ResourceLabeler interface {
+	SetCommonLabels(labels map[string]string)
+}
+
+// This is a subset of metav1.Object that only includes label functions.
+type LabelableResource interface {
+	GetLabels() map[string]string
+	SetLabels(labels map[string]string)
+}
+
+type SimpleResourceLabeler struct {
+	CommonLabels map[string]string
+}
+
+func (srl *SimpleResourceLabeler) SetCommonLabels(labels map[string]string) {
+	srl.CommonLabels = labels
+}
+
+// Label a resource with the common labels provided to the labeler, if labels with
+// the same keys do not already exist on the resource.
+func (srl SimpleResourceLabeler) LabelResource(resource LabelableResource) {
+	if srl.CommonLabels == nil {
+		return
+	}
+
+	combinedLabels := make(map[string]string, len(resource.GetLabels())+len(srl.CommonLabels))
+	maps.Copy(combinedLabels, srl.CommonLabels)
+	maps.Copy(combinedLabels, resource.GetLabels())
+	resource.SetLabels(combinedLabels)
 }
