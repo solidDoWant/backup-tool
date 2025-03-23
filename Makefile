@@ -241,6 +241,7 @@ release: CP_CMDS = $(foreach PLATFORM,$(BINARY_PLATFORMS),cp $(TARBALL_DIR)/$(PL
 release: SAFETY_PREFIX = $(if $(findstring t,$(PUSH_ALL)),,echo)
 release: build-all
 	@mkdir -p $(RELEASE_DIR)
+	@gh auth status
 	@$(CP_CMDS)
 	@$(SAFETY_PREFIX) git tag -a $(TAG) -m "Release $(TAG)"
 	@$(SAFETY_PREFIX) git push origin
