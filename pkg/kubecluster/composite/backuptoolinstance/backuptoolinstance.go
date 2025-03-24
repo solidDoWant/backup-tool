@@ -146,10 +146,9 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: helpers.CleanName(namePrefix),
 			Labels: map[string]string{
-				"app.kubernetes.io/component": constants.ToolName,
+				"app.kubernetes.io/component": constants.ToolName + "-grpc-server",
 			},
 		},
-		// TODO probes, etc
 		Spec: corev1.PodSpec{
 			HostUsers:       ptr.To(false), // Don't run as node root
 			Containers:      []corev1.Container{container},
