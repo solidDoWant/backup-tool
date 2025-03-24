@@ -127,6 +127,12 @@ func (rs *RemoteStage) execute(ctx *contexts.Context, btiOpts bti.CreateBackupTo
 		return trace.Wrap(err, "failed to create client for backup tool GRPC server")
 	}
 
+	defer cleanup.To(func(ctx *contexts.Context) error {
+		return backupToolClient.Close()
+	}).WithErrMessage("failed to close backup tool client").WithParentCtx(ctx).
+		WithOriginalErr(&err).WithTimeout(rs.opts.CleanupTimeout.MaxWait(time.Minute)).
+		Run()
+
 	for _, action := range rs.actions {
 		if err := action.remoteAction.Execute(ctx.Child(), backupToolClient); err != nil {
 			return trace.Wrap(err, fmt.Sprintf("failed to execute %s resources", action.name))
