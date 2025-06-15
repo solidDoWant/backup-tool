@@ -7,5 +7,5 @@ version: 0.0.1-dev
 appVersion: 0.0.1-dev
 dependencies:
   - name: common
-    repository: https://bjw-s.github.io/helm-charts
+    repository: https://bjw-s-labs.github.io/helm-charts
     version: 3.7.0
