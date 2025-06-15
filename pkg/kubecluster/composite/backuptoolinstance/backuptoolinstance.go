@@ -150,7 +150,9 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 			},
 		},
 		Spec: corev1.PodSpec{
-			HostUsers:       ptr.To(false), // Don't run as node root
+			// This is not compatible with NFS mounts because the NFS client in the kernel (all versions)
+			// does not support idmap mounts (MOUNT_ATTR_IDMAP).
+			// HostUsers:       ptr.To(false), // Don't run as node root
 			Containers:      []corev1.Container{container},
 			RestartPolicy:   corev1.RestartPolicyNever,
 			Volumes:         volumes,
