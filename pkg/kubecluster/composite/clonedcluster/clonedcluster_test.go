@@ -338,6 +338,7 @@ func TestCloneCluster(t *testing.T) {
 							Owner:    "test-owner",
 						},
 					},
+					ImageName: "my-custom-image:tag",
 				},
 			}
 			createdBackup := &apiv1.Backup{
@@ -388,6 +389,7 @@ func TestCloneCluster(t *testing.T) {
 			clusterOpts := cnpg.CreateClusterOptions{
 				BackupName:   createdBackup.Name,
 				StorageClass: "specified-storage-class",
+				ImageName:    existingCluster.Spec.ImageName,
 			}
 			if tt.opts.RecoveryTargetTime != "" {
 				clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{

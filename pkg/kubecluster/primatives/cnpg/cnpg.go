@@ -108,6 +108,7 @@ type CreateClusterOptions struct {
 	OwnerName            string
 	StorageClass         string
 	ResourceRequirements corev1.ResourceRequirements
+	ImageName            string
 }
 
 // Create a cluster for backup/recovery purposes specifically. Not intended for use general use. The created cluster should not be used by applications.
@@ -126,6 +127,7 @@ func (cnpgc *Client) CreateCluster(ctx *contexts.Context, namespace, clusterName
 		},
 		Spec: apiv1.ClusterSpec{
 			Instances: 1,
+			ImageName: opts.ImageName,
 			Bootstrap: &apiv1.BootstrapConfiguration{},
 			StorageConfiguration: apiv1.StorageConfiguration{
 				Size: volumeSize.String(),

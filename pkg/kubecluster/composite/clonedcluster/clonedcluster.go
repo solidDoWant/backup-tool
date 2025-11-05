@@ -260,6 +260,7 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 	ctx.Log.Step().Info("Creating new cluster from backup")
 	clusterOpts := cnpg.CreateClusterOptions{
 		BackupName: readyBackup.Name,
+		ImageName:  existingCluster.Spec.ImageName,
 	}
 
 	if existingCluster.Spec.StorageConfiguration.StorageClass != nil {
