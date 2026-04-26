@@ -19,8 +19,8 @@ func newFakePoolers(fake *FakePostgresqlV1, namespace string) apiv1.PoolerInterf
 		gentype.NewFakeClientWithList[*v1.Pooler, *v1.PoolerList](
 			fake.Fake,
 			namespace,
-			v1.GroupVersion.WithResource("poolers"),
-			v1.GroupVersion.WithKind("Pooler"),
+			v1.SchemeGroupVersion.WithResource("poolers"),
+			v1.SchemeGroupVersion.WithKind("Pooler"),
 			func() *v1.Pooler { return &v1.Pooler{} },
 			func() *v1.PoolerList { return &v1.PoolerList{} },
 			func(dst, src *v1.PoolerList) { dst.ListMeta = src.ListMeta },

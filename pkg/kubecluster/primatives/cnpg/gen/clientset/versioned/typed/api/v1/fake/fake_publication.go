@@ -19,8 +19,8 @@ func newFakePublications(fake *FakePostgresqlV1, namespace string) apiv1.Publica
 		gentype.NewFakeClientWithList[*v1.Publication, *v1.PublicationList](
 			fake.Fake,
 			namespace,
-			v1.GroupVersion.WithResource("publications"),
-			v1.GroupVersion.WithKind("Publication"),
+			v1.SchemeGroupVersion.WithResource("publications"),
+			v1.SchemeGroupVersion.WithKind("Publication"),
 			func() *v1.Publication { return &v1.Publication{} },
 			func() *v1.PublicationList { return &v1.PublicationList{} },
 			func(dst, src *v1.PublicationList) { dst.ListMeta = src.ListMeta },

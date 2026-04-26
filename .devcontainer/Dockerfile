@@ -1,5 +1,5 @@
 # TODO pin and auto update versions
-FROM mcr.microsoft.com/devcontainers/go:1-1.23-bookworm
+FROM mcr.microsoft.com/devcontainers/go:1.26-bookworm
 
 # Install protobuf and grpc tools
 RUN KERNEL="$(uname -s | tr '[:upper:]' '[:lower:]')" && \
@@ -25,7 +25,7 @@ RUN go install \
     k8s.io/code-generator/cmd/lister-gen@latest
 
 # Mockery
-RUN go install github.com/vektra/mockery/v2@v2.51.0 \
+RUN go install github.com/vektra/mockery/v2@v2.53.6 \
     mockery completion bash | sudo tee /etc/bash_completion.d/mockery.bash > /dev/null
 
 # Misc. development tools

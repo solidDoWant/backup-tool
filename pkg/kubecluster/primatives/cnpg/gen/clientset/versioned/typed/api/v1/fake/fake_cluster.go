@@ -19,8 +19,8 @@ func newFakeClusters(fake *FakePostgresqlV1, namespace string) apiv1.ClusterInte
 		gentype.NewFakeClientWithList[*v1.Cluster, *v1.ClusterList](
 			fake.Fake,
 			namespace,
-			v1.GroupVersion.WithResource("clusters"),
-			v1.GroupVersion.WithKind("Cluster"),
+			v1.SchemeGroupVersion.WithResource("clusters"),
+			v1.SchemeGroupVersion.WithKind("Cluster"),
 			func() *v1.Cluster { return &v1.Cluster{} },
 			func() *v1.ClusterList { return &v1.ClusterList{} },
 			func(dst, src *v1.ClusterList) { dst.ListMeta = src.ListMeta },

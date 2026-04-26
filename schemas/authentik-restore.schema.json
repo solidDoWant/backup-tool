@@ -881,6 +881,36 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "PodCertificateProjection": {
+      "properties": {
+        "SignerName": {
+          "type": "string"
+        },
+        "KeyType": {
+          "type": "string"
+        },
+        "MaxExpirationSeconds": {
+          "type": "integer"
+        },
+        "CredentialBundlePath": {
+          "type": "string"
+        },
+        "KeyPath": {
+          "type": "string"
+        },
+        "CertificateChainPath": {
+          "type": "string"
+        },
+        "UserAnnotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "PortworxVolumeSource": {
       "properties": {
         "VolumeID": {
@@ -1186,6 +1216,9 @@
         },
         "ClusterTrustBundle": {
           "$ref": "#/$defs/ClusterTrustBundleProjection"
+        },
+        "PodCertificate": {
+          "$ref": "#/$defs/PodCertificateProjection"
         }
       },
       "additionalProperties": false,

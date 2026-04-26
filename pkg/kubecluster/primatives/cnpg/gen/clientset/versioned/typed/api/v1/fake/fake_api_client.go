@@ -28,6 +28,10 @@ func (c *FakePostgresqlV1) Databases(namespace string) v1.DatabaseInterface {
 	return newFakeDatabases(c, namespace)
 }
 
+func (c *FakePostgresqlV1) FailoverQuorums(namespace string) v1.FailoverQuorumInterface {
+	return newFakeFailoverQuorums(c, namespace)
+}
+
 func (c *FakePostgresqlV1) ImageCatalogs(namespace string) v1.ImageCatalogInterface {
 	return newFakeImageCatalogs(c, namespace)
 }

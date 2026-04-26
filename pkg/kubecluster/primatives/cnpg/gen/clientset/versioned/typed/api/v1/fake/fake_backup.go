@@ -19,8 +19,8 @@ func newFakeBackups(fake *FakePostgresqlV1, namespace string) apiv1.BackupInterf
 		gentype.NewFakeClientWithList[*v1.Backup, *v1.BackupList](
 			fake.Fake,
 			namespace,
-			v1.GroupVersion.WithResource("backups"),
-			v1.GroupVersion.WithKind("Backup"),
+			v1.SchemeGroupVersion.WithResource("backups"),
+			v1.SchemeGroupVersion.WithKind("Backup"),
 			func() *v1.Backup { return &v1.Backup{} },
 			func() *v1.BackupList { return &v1.BackupList{} },
 			func(dst, src *v1.BackupList) { dst.ListMeta = src.ListMeta },

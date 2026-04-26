@@ -22,7 +22,7 @@ make binary                 # local-arch Go binary only -> build/binaries/<os>/<
 make container-image        # local-arch container image (depends on binary + licenses)
 make helm                   # package the dr-job Helm chart
 make build-all              # all platforms (linux/amd64, linux/arm64) + multi-arch manifest
-make test                   # `go test -timeout 30s -failfast -v ./...` (unit tests only)
+make test                   # `go test -timeout 30s -failfast -v ./cmd/... ./pkg/...` (unit tests only; e2e is excluded — run those with `go test ./e2e/...`)
 make generate-all           # run every code generator (protobuf, mocks, CNPG client, approver-policy client, DR schemas)
 make generate-protobuf-code # regenerate pkg/grpc/gen from .proto files
 make generate-mocks         # run mockery (config in .mockery.yaml)
@@ -65,7 +65,7 @@ Newer apps (Authentik) build the same flow declaratively using `pkg/disasterreco
 - `composite/` — multi-resource operations that orchestrate primitives: `clonepvc`, `clonedcluster` (CNPG PITR clone with TLS), `clusterusercert` (issue + CRP allow), `createcrpforcertificate`, `drvolume` (DR PVC + CNPG ImageCatalog), `backuptoolinstance` (the in-cluster pod).
 - `helpers/` — `MaxWaitTime`, watcher utilities, `FullName`, naming helpers (CNPG enforces a 40-char limit on cloned-cluster names).
 
-The CNPG and approver-policy primitives are partially generated (`make generate-cnpg-client`, `make generate-approver-policy-client`); both pin upstream to `main` until the libraries cut a release with required fixes (see Makefile comments).
+The CNPG and approver-policy primitives are partially generated (`make generate-cnpg-client`, `make generate-approver-policy-client`). The CNPG generator pins to the version recorded in `go.mod`; approver-policy still pins to `main` until upstream cuts a release with the needed fix (see Makefile comments).
 
 ### gRPC (`pkg/grpc/`)
 - `proto/backup-tool/{files,postgres,s3}/v1/*.proto` — sources. Generated code lives in `gen/`, including a `*_grpc_mock.pb.go` testify mock from `protoc-gen-go-grpcmock`.

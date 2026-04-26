@@ -10,6 +10,8 @@ type ClusterImageCatalogExpansion interface{}
 
 type DatabaseExpansion interface{}
 
+type FailoverQuorumExpansion interface{}
+
 type ImageCatalogExpansion interface{}
 
 type PoolerExpansion interface{}

@@ -19,8 +19,8 @@ func newFakeScheduledBackups(fake *FakePostgresqlV1, namespace string) apiv1.Sch
 		gentype.NewFakeClientWithList[*v1.ScheduledBackup, *v1.ScheduledBackupList](
 			fake.Fake,
 			namespace,
-			v1.GroupVersion.WithResource("scheduledbackups"),
-			v1.GroupVersion.WithKind("ScheduledBackup"),
+			v1.SchemeGroupVersion.WithResource("scheduledbackups"),
+			v1.SchemeGroupVersion.WithKind("ScheduledBackup"),
 			func() *v1.ScheduledBackup { return &v1.ScheduledBackup{} },
 			func() *v1.ScheduledBackupList { return &v1.ScheduledBackupList{} },
 			func(dst, src *v1.ScheduledBackupList) { dst.ListMeta = src.ListMeta },

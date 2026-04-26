@@ -1,5 +1,8 @@
 ---
-# yaml-language-server: $schema=https://artifacthub.io/api/v1/packages/8d3dd90d-2369-4830-b210-1f0fe0dab886/0.22.1/values-schema
+# yaml-language-server: $schema=https://artifacthub.io/api/v1/packages/8d3dd90d-2369-4830-b210-1f0fe0dab886/0.27.1/values-schema
+# Pin to the latest 1.28.x operator (the chart's appVersion is 1.28.1).
+image:
+  tag: "1.28.2"
 crds:
   create: true
 config:

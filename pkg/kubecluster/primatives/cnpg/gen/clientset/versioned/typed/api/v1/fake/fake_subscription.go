@@ -19,8 +19,8 @@ func newFakeSubscriptions(fake *FakePostgresqlV1, namespace string) apiv1.Subscr
 		gentype.NewFakeClientWithList[*v1.Subscription, *v1.SubscriptionList](
 			fake.Fake,
 			namespace,
-			v1.GroupVersion.WithResource("subscriptions"),
-			v1.GroupVersion.WithKind("Subscription"),
+			v1.SchemeGroupVersion.WithResource("subscriptions"),
+			v1.SchemeGroupVersion.WithKind("Subscription"),
 			func() *v1.Subscription { return &v1.Subscription{} },
 			func() *v1.SubscriptionList { return &v1.SubscriptionList{} },
 			func(dst, src *v1.SubscriptionList) { dst.ListMeta = src.ListMeta },

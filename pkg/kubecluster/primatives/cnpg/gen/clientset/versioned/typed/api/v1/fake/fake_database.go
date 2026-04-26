@@ -19,8 +19,8 @@ func newFakeDatabases(fake *FakePostgresqlV1, namespace string) apiv1.DatabaseIn
 		gentype.NewFakeClientWithList[*v1.Database, *v1.DatabaseList](
 			fake.Fake,
 			namespace,
-			v1.GroupVersion.WithResource("databases"),
-			v1.GroupVersion.WithKind("Database"),
+			v1.SchemeGroupVersion.WithResource("databases"),
+			v1.SchemeGroupVersion.WithKind("Database"),
 			func() *v1.Database { return &v1.Database{} },
 			func() *v1.DatabaseList { return &v1.DatabaseList{} },
 			func(dst, src *v1.DatabaseList) { dst.ListMeta = src.ListMeta },

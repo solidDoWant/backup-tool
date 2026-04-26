@@ -19,8 +19,8 @@ func newFakeClusterImageCatalogs(fake *FakePostgresqlV1) apiv1.ClusterImageCatal
 		gentype.NewFakeClientWithList[*v1.ClusterImageCatalog, *v1.ClusterImageCatalogList](
 			fake.Fake,
 			"",
-			v1.GroupVersion.WithResource("clusterimagecatalogs"),
-			v1.GroupVersion.WithKind("ClusterImageCatalog"),
+			v1.SchemeGroupVersion.WithResource("clusterimagecatalogs"),
+			v1.SchemeGroupVersion.WithKind("ClusterImageCatalog"),
 			func() *v1.ClusterImageCatalog { return &v1.ClusterImageCatalog{} },
 			func() *v1.ClusterImageCatalogList { return &v1.ClusterImageCatalogList{} },
 			func(dst, src *v1.ClusterImageCatalogList) { dst.ListMeta = src.ListMeta },

@@ -23,8 +23,7 @@ $(PROTOBUF_GEN_DIR)/%_grpc_mock.pb.go $(PROTOBUF_GEN_DIR)/%_grpc.pb.go $(PROTOBU
 
 KUBE_CODEGEN_VERSION ?= kubernetes-1.32.0
 
-# Temp setting to main until v1.25.1/later release
-CNPG_VERSION := main # $(shell go list -f '{{ .Version }}' -m github.com/cloudnative-pg/cloudnative-pg)
+CNPG_VERSION := $(shell go list -f '{{ .Version }}' -m github.com/cloudnative-pg/cloudnative-pg)
 CNPG_CODEGEN_WORKING_DIR := $(WORKING_DIR)/cnpg-gen
 CNPG_KUBE_CODEGEN = $(CNPG_CODEGEN_WORKING_DIR)/kube_codegen.sh
 CNPG_GIT_DIR = $(CNPG_CODEGEN_WORKING_DIR)/repo
@@ -55,11 +54,8 @@ generate-cnpg-client: $(CNPG_KUBE_CODEGEN) $(CNPG_GIT_DIR)
 	@cd $(CNPG_GIT_DIR) && \
 		. $(CNPG_KUBE_CODEGEN) && \
 		kube::codegen::gen_client --output-dir $(CNPG_GEN_DIR) --output-pkg $(MODULE_NAME)/$(CNPG_GEN_DIR:$(PROJECT_DIR)/%=%) --boilerplate /dev/null .
-	@# Patch the files until https://github.com/cloudnative-pg/cloudnative-pg/issues/6585 is fixed
-	@find $(CNPG_GEN_DIR) -type f -name '*.go' -exec sed -i 's/SchemeGroupVersion/GroupVersion/' {} \;
 
-# Needed until https://github.com/cert-manager/approver-policy/pull/571 is released
-APPROVER_POLICY_VERSION := main # $(shell go list -f '{{ .Version }}' -m github.com/cert-manager/approver-policy)
+APPROVER_POLICY_VERSION := $(shell go list -f '{{ .Version }}' -m github.com/cert-manager/approver-policy)
 APPROVER_POLICY_REPO = https://github.com/cert-manager/approver-policy.git
 APPROVER_POLICY_CODEGEN_WORKING_DIR := $(WORKING_DIR)/approver-policy-gen
 APPROVER_POLICY_KUBE_CODEGEN = $(APPROVER_POLICY_CODEGEN_WORKING_DIR)/kube_codegen.sh
@@ -93,7 +89,7 @@ generate-mocks:
 
 PHONY += test
 test:
-	@go test -timeout 30s -failfast -v ./...
+	@go test -timeout 30s -failfast -v ./cmd/... ./pkg/...
 
 PHONY += dep-licenses
 check-licenses:

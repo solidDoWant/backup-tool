@@ -19,8 +19,8 @@ func newFakeImageCatalogs(fake *FakePostgresqlV1, namespace string) apiv1.ImageC
 		gentype.NewFakeClientWithList[*v1.ImageCatalog, *v1.ImageCatalogList](
 			fake.Fake,
 			namespace,
-			v1.GroupVersion.WithResource("imagecatalogs"),
-			v1.GroupVersion.WithKind("ImageCatalog"),
+			v1.SchemeGroupVersion.WithResource("imagecatalogs"),
+			v1.SchemeGroupVersion.WithKind("ImageCatalog"),
 			func() *v1.ImageCatalog { return &v1.ImageCatalog{} },
 			func() *v1.ImageCatalogList { return &v1.ImageCatalogList{} },
 			func(dst, src *v1.ImageCatalogList) { dst.ListMeta = src.ListMeta },
