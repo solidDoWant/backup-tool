@@ -26,6 +26,7 @@ See [the design decision doc](docs/design%20decisions.md) for additional details
     * Restore from an in-cluster PVC
     * Only Postgres supported for "core" backend and audit events
     * Only S3-compatible object storage supported for audit session logs
+* Authentik
 
 ## Upcoming support:
 * ZFS snapshot to tape drive/library
