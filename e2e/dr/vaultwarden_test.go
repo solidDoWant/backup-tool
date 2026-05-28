@@ -129,7 +129,7 @@ func TestVaultWarden(t *testing.T) {
 		Assess("new vaultwarden instance successfully deploys", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			// Install the helm chart
 			hm := helm.New(cfg.KubeconfigFile())
-			err := hm.RunRepo(helm.WithArgs("add", "bjw-s-charts", "https://bjw-s.github.io/helm-charts"))
+			err := hm.RunRepo(helm.WithArgs("add", "bjw-s-charts", "https://bjw-s-labs.github.io/helm-charts"))
 			assert.NoError(t, err)
 
 			valuesFilePath := "config/vaultwarden/tests/restore-instance.values.yaml"

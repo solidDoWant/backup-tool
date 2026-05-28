@@ -91,6 +91,10 @@ PHONY += test
 test:
 	@go test -timeout 30s -failfast -v ./cmd/... ./pkg/...
 
+PHONY += test-e2e
+test-e2e:
+	@go test -timeout 30m -v ./e2e/...
+
 PHONY += dep-licenses
 check-licenses:
 	@go run github.com/google/go-licenses@latest report ./...

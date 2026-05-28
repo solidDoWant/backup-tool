@@ -9,7 +9,7 @@ helmDefaults:
 
 repositories:
   - name: bjw-s-charts
-    url: https://bjw-s.github.io/helm-charts
+    url: https://bjw-s-labs.github.io/helm-charts
   - name: teleport-charts
     url: https://charts.releases.teleport.dev
 

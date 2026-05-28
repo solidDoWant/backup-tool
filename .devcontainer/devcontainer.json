@@ -6,7 +6,6 @@
 		"dockerfile": "Dockerfile"
 	},
 	"features": {
-		"ghcr.io/devcontainers/features/docker-in-docker:2.12.0": {},
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
 		"ghcr.io/devcontainers/features/github-cli:1": {},
 		"ghcr.io/devcontainers/features/node:1": {},
@@ -22,7 +21,10 @@
 		}
 	},
 	// Host networking is required to communicate with registries at "localhost"
-	"postCreateCommand": "docker buildx create --use --bootstrap --driver docker-container --name container-builder --driver-opt network=host",
+	// The inotify limits must be increased for kind multi-node clusters; the default of 128 instances is exhausted
+	// by the control-plane node, causing the worker kubelet (cAdvisor) to fail with "inotify_init: too many open files".
+	// A privileged container is used because the devcontainer itself lacks CAP_SYS_ADMIN.
+	"postCreateCommand": "sleep 5 && docker run --privileged --rm alpine sh -c 'sysctl -w fs.inotify.max_user_instances=1024 fs.inotify.max_user_watches=1048576' && docker buildx create --use --bootstrap --driver docker-container --name container-builder --driver-opt network=host",
 	"forwardPorts": [
 		// Convenience for local testing. Useful in conjunction with, for example:
 		// kubectl port-forward --address 0.0.0.0 service/vaultwarden 8080:80

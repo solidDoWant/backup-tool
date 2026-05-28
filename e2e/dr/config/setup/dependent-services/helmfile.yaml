@@ -26,7 +26,7 @@ repositories:
   - name: cert-manager-charts
     url: https://charts.jetstack.io
   - name: bjw-s-charts
-    url: https://bjw-s.github.io/helm-charts
+    url: https://bjw-s-labs.github.io/helm-charts
 
 releases:
   - name: volume-snapshot-controller

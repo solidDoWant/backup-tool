@@ -233,7 +233,7 @@ func BuildChart() (types.EnvFunc, types.EnvFunc) {
 
 func Helmfile(helmfilePath string) (types.EnvFunc, types.EnvFunc) {
 	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		if p := utils.RunCommand(fmt.Sprintf("helmfile apply --file %q --skip-diff-on-install --suppress-diff --args --skip-schema-validation", helmfilePath)); p.Err() != nil {
+		if p := utils.RunCommand(fmt.Sprintf("helmfile apply --file %q --skip-diff-on-install --suppress-diff", helmfilePath)); p.Err() != nil {
 			return ctx, trace.Wrap(p.Err(), "failed to deploy helmfile at %q: %s", helmfilePath, p.Result())
 		}
 

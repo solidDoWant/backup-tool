@@ -55,14 +55,14 @@ global:
     - name: postgres-authentik-serving
       secret:
         secretName: authentik-postgres-serving-cert
-        defaultMode: 0440
+        defaultMode: 440
         items:
           - key: tls.crt
             path: tls.crt
     - name: postgres-authentik-user
       secret:
         secretName: authentik-postgres-authentik-user-cert
-        defaultMode: 0440
+        defaultMode: 440
         items:
           - key: tls.crt
             path: tls.crt
@@ -77,4 +77,4 @@ global:
     fsGroup: 1000
     fsGroupChangePolicy: OnRootMismatch
 redis:
-  enabled: true
+  enabled: false
