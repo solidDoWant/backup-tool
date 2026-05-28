@@ -1,4 +1,8 @@
 ---
+# Name the restored instance "ar" (matching the ar-* restore backend), so its server Service is
+# "ar-server" as the test expects. Without this the chart would derive the name from the
+# "authentik-restore" release name (-> "authentik-restore-server").
+fullnameOverride: ar
 global:
   env:
     # Postgres
@@ -76,7 +80,5 @@ global:
   securityContext:
     fsGroup: 1000
     fsGroupChangePolicy: OnRootMismatch
-redis:
-  enabled: true
 serviceAccount:
   fullnameOverride: authentik-restore

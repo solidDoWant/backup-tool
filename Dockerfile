@@ -2,7 +2,9 @@ ARG DEBIAN_IMAGE_VERSION=12.9-slim
 FROM debian:${DEBIAN_IMAGE_VERSION}
 
 # Install deps
-ARG POSTGRES_MAJOR_VERSION=17
+# Use the 18 client so a single image can dump both PG 17 and PG 18 servers (pg_dump/pg_dumpall
+# support dumping servers of the same or older major version, never newer). See the Makefile.
+ARG POSTGRES_MAJOR_VERSION=18
 RUN apt update && \
     apt install -y --no-install-recommends \
     ca-certificates \

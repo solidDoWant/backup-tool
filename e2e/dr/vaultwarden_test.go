@@ -136,6 +136,7 @@ func TestVaultWarden(t *testing.T) {
 			helpOpts := append(
 				getCommonHelmOpts(vaultwardenRestoreReleaseName, namespace),
 				helm.WithChart("bjw-s-charts/app-template"),
+				helm.WithVersion("3.7.0"),
 				helm.WithArgs("--values", valuesFilePath),
 			)
 

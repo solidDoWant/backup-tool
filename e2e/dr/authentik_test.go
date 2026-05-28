@@ -133,6 +133,7 @@ func TestAuthentik(t *testing.T) {
 			helpOpts := append(
 				getCommonHelmOpts(authentikRestoreReleaseName, namespace),
 				helm.WithChart("goauthentik-charts/authentik"),
+				helm.WithVersion("2026.5.2"),
 				helm.WithArgs("--values", valuesFilePath),
 			)
 

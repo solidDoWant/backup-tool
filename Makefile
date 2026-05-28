@@ -157,7 +157,11 @@ ALL_BUILDERS += tarball-all
 tarball-all: $(BINARY_PLATFORMS:%=$(TARBALL_DIR)/%/$(BINARY_NAME).tar.gz)
 
 DEBIAN_IMAGE_VERSION = 12.9-slim
-POSTGRES_MAJOR_VERSION = 17
+# pg_dumpall/pg_dump can dump servers of the same or older major version, but not newer ones.
+# CloudNativePG defaults new clusters to the latest PG major (18 as of CNPG 1.28+), while some
+# clusters (e.g. Teleport, which needs wal2json) are pinned to 17. Use the 18 client so a single
+# backup-tool image can dump both 17 and 18 servers.
+POSTGRES_MAJOR_VERSION = 18
 
 CONTAINER_IMAGE_TAG = $(CONTAINER_REGISTRY)/$(BINARY_NAME):$(VERSION)
 CONTAINER_BUILD_LABEL_VARS = org.opencontainers.image.source=https://github.com/solidDoWant/backup-tool org.opencontainers.image.licenses=AGPL-3.0

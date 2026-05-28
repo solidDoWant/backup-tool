@@ -7,4 +7,13 @@ crds:
   create: true
 config:
   data:
-    INHERITED_LABELS: app.kubernetes.io/name, app.kubernetes.io/component, app.kubernetes.io/instance
+    # Only inherit labels that CloudNativePG does not manage itself. `app.kubernetes.io/name`
+    # and `app.kubernetes.io/component` are set by CNPG on the resources it creates (e.g.
+    # `app.kubernetes.io/name=postgresql` on PVCs) and are used as internal label selectors.
+    # These clusters are deployed via the bjw-s app-template chart, which stamps
+    # `app.kubernetes.io/name=<release>` onto the Cluster; inheriting it overwrites CNPG's own
+    # value on the PVCs. As of CNPG 1.28 the volume-snapshot backup path selects the instance
+    # PVCs with `app.kubernetes.io/name=postgresql`, so the override makes PVC discovery return
+    # nothing and the backup hangs forever in the "started" phase. Only inherit the instance
+    # label, which CNPG does not manage and is the useful one for netpols.
+    INHERITED_LABELS: app.kubernetes.io/instance
