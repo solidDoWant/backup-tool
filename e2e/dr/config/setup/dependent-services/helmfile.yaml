@@ -74,7 +74,7 @@ releases:
       - ./cert-manager-approver-policy.values.yaml
   - name: dependent-resources
     chart: bjw-s-charts/app-template
-    version: 3.7.0
+    version: 5.0.1
     atomic: true
     needs:
       - volume-snapshot-controller

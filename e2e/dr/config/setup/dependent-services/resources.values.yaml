@@ -2,38 +2,40 @@
 rawResources:
   # Storage
   storageClass:
-    apiVersion: storage.k8s.io/v1
-    kind: StorageClass
     forceRename: openebs-zfs
-    annotations:
-      storageclass.kubernetes.io/is-default-class: "true"
-    spec:
+    manifest:
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        annotations:
+          storageclass.kubernetes.io/is-default-class: "true"
       provisioner: zfs.csi.openebs.io
       parameters:
         poolname: openebs-zpool
         fstype: zfs
   volumeSnapshotClass:
-    kind: VolumeSnapshotClass
-    apiVersion: snapshot.storage.k8s.io/v1
     forceRename: openebs-zfs
-    annotations:
-      snapshot.storage.kubernetes.io/is-default-class: "true"
-    spec:
+    manifest:
+      kind: VolumeSnapshotClass
+      apiVersion: snapshot.storage.k8s.io/v1
+      metadata:
+        annotations:
+          snapshot.storage.kubernetes.io/is-default-class: "true"
       driver: zfs.csi.openebs.io
       deletionPolicy: Delete
   # x509
   selfSignedCert:
-    apiVersion: cert-manager.io/v1
-    kind: Issuer
     forceRename: self-signed
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Issuer
       spec:
         selfSigned: {}
   requestPolicy:
-    apiVersion: policy.cert-manager.io/v1alpha1
-    kind: CertificateRequestPolicy
     forceRename: self-signed-issuer
-    spec:
+    manifest:
+      apiVersion: policy.cert-manager.io/v1alpha1
+      kind: CertificateRequestPolicy
       spec:
         selector:
           issuerRef:
@@ -84,10 +86,10 @@ rawResources:
             - microsoft sgc
             - netscape sgc
   requestPolicyRole:
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRole
     forceRename: cert-manager-policy:cert-manager
-    spec:
+    manifest:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRole
       rules:
         - apiGroups:
             - policy.cert-manager.io
@@ -96,10 +98,10 @@ rawResources:
           verbs:
             - use
   requestPolicyRoleBinding:
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRoleBinding
     forceRename: cert-manager-policy:cert-manager
-    spec:
+    manifest:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
       roleRef:
         apiGroup: rbac.authorization.k8s.io
         kind: ClusterRole

@@ -1,11 +1,11 @@
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
 rawResources:
   authentik-postgres-client-ca-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: authentik-postgres-client-ca-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: Authentik Postgres client CA
         isCA: true
@@ -20,20 +20,20 @@ rawResources:
           group: cert-manager.io
         secretName: authentik-postgres-client-ca-cert
   authentik-postgres-auth-ca-issuer:
-    apiVersion: cert-manager.io/v1
-    kind: Issuer
     forceRename: authentik-postgres-auth-ca-issuer
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Issuer
       spec:
         ca:
           secretName: authentik-postgres-client-ca-cert
   # This must be deployed prior to any certs, or whether cert requests
   # get approved or denied is racey
   authentik-postgres-auth-ca-request-policy:
-    apiVersion: policy.cert-manager.io/v1alpha1
-    kind: CertificateRequestPolicy
     forceRename: authentik-postgres-auth-ca-request-policy
-    spec:
+    manifest:
+      apiVersion: policy.cert-manager.io/v1alpha1
+      kind: CertificateRequestPolicy
       spec:
         selector:
           issuerRef:

@@ -1,11 +1,11 @@
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
 rawResources:
   teleport-core-postgres-client-ca-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: teleport-core-postgres-client-ca-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: Teleport Core Postgres client CA
         isCA: true
@@ -20,20 +20,20 @@ rawResources:
           group: cert-manager.io
         secretName: teleport-core-postgres-client-ca-cert
   teleport-core-postgres-auth-ca-issuer:
-    apiVersion: cert-manager.io/v1
-    kind: Issuer
     forceRename: teleport-core-postgres-auth-ca-issuer
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Issuer
       spec:
         ca:
           secretName: teleport-core-postgres-client-ca-cert
   # This must be deployed prior to any certs, or whether cert requests
   # get approved or denied is racey
   teleport-core-postgres-auth-ca-request-policy:
-    apiVersion: policy.cert-manager.io/v1alpha1
-    kind: CertificateRequestPolicy
     forceRename: teleport-core-postgres-auth-ca-request-policy
-    spec:
+    manifest:
+      apiVersion: policy.cert-manager.io/v1alpha1
+      kind: CertificateRequestPolicy
       spec:
         selector:
           issuerRef:
@@ -47,10 +47,10 @@ rawResources:
           usages:
             - client auth
   teleport-audit-postgres-client-ca-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: teleport-audit-postgres-client-ca-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: Teleport audit Postgres client CA
         isCA: true
@@ -65,20 +65,20 @@ rawResources:
           group: cert-manager.io
         secretName: teleport-audit-postgres-client-ca-cert
   teleport-audit-postgres-auth-ca-issuer:
-    apiVersion: cert-manager.io/v1
-    kind: Issuer
     forceRename: teleport-audit-postgres-auth-ca-issuer
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Issuer
       spec:
         ca:
           secretName: teleport-audit-postgres-client-ca-cert
   # This must be deployed prior to any certs, or whether cert requests
   # get approved or denied is racey
   teleport-audit-postgres-auth-ca-request-policy:
-    apiVersion: policy.cert-manager.io/v1alpha1
-    kind: CertificateRequestPolicy
     forceRename: teleport-audit-postgres-auth-ca-request-policy
-    spec:
+    manifest:
+      apiVersion: policy.cert-manager.io/v1alpha1
+      kind: CertificateRequestPolicy
       spec:
         selector:
           issuerRef:

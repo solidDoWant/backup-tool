@@ -20,6 +20,8 @@ resources:
         successfulJobsHistory: 3
         failedJobsHistory: 3
       pod:
+        # Needed for k8s access to manage resources
+        automountServiceAccountToken: true
         securityContext:
           runAsNonRoot: true
           runAsUser: 1000
@@ -64,11 +66,11 @@ resources:
     pod-labels:
       type: custom
       volumeSpec:
-          downwardAPI:
-            items:
-              - path: labels
-                fieldRef:
-                  fieldPath: metadata.labels
+        downwardAPI:
+          items:
+            - path: labels
+              fieldRef:
+                fieldPath: metadata.labels
       advancedMounts:
         backup-tool:
           backup-tool:
@@ -76,7 +78,7 @@ resources:
               subPath: labels
               readOnly: true
   serviceAccount:
-    create: true
+    default: {}
   rbac:
     roles:
       backup-tool:

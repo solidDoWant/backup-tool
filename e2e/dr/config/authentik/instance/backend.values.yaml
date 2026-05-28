@@ -1,9 +1,8 @@
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
 controllers:
   authentik-postgres-wal-bucket:
     type: job
-    nameOverride: authentik-postgres-wal-bucket
     containers:
       create-bucket:
         image:
@@ -32,7 +31,6 @@ controllers:
                 key: admin_secret_access_key
   authentik-media-bucket:
     type: job
-    nameOverride: authentik-media-bucket
     containers:
       create-bucket:
         image:
@@ -61,10 +59,10 @@ controllers:
                 key: admin_secret_access_key
 rawResources:
   authentik-postgres-serving-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: authentik-postgres-serving-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: Teleport Core Postgres serving
         dnsNames:
@@ -81,10 +79,10 @@ rawResources:
           group: cert-manager.io
         secretName: authentik-postgres-serving-cert
   authentik-postgres-streaming-replica-user-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: authentik-postgres-streaming-replica-user-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: streaming_replica
         usages:
@@ -98,10 +96,10 @@ rawResources:
           group: cert-manager.io
         secretName: authentik-postgres-streaming-replica-user-cert
   authentik-postgres-authentik-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: authentik-postgres-authentik-user-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: authentik
         usages:
@@ -115,10 +113,10 @@ rawResources:
           group: cert-manager.io
         secretName: authentik-postgres-authentik-user-cert
   authentik-postgres-cluster:
-    apiVersion: postgresql.cnpg.io/v1
-    kind: Cluster
     forceRename: authentik-postgres
-    spec:
+    manifest:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
       spec:
         instances: 2 # One replica, one primary
         bootstrap:

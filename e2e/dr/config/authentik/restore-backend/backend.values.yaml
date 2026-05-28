@@ -1,9 +1,8 @@
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
 controllers:
   ar-postgres-wal-bucket:
     type: job
-    nameOverride: ar-postgres-wal-bucket
     containers:
       create-bucket:
         image:
@@ -32,7 +31,6 @@ controllers:
                 key: admin_secret_access_key
   ar-media-bucket:
     type: job
-    nameOverride: ar-media-bucket
     containers:
       create-bucket:
         image:
@@ -61,10 +59,10 @@ controllers:
                 key: admin_secret_access_key
 rawResources:
   ar-postgres-serving-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: ar-postgres-serving-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: Authentik Postgres serving
         dnsNames:
@@ -81,10 +79,10 @@ rawResources:
           group: cert-manager.io
         secretName: ar-postgres-serving-cert
   ar-postgres-streaming-replica-user-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: ar-postgres-streaming-replica-user-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: streaming_replica
         usages:
@@ -98,10 +96,10 @@ rawResources:
           group: cert-manager.io
         secretName: ar-postgres-streaming-replica-user-cert
   ar-postgres-authentik-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: ar-postgres-authentik-user-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: authentik
         usages:
@@ -115,10 +113,10 @@ rawResources:
           group: cert-manager.io
         secretName: ar-postgres-authentik-user-cert
   ar-postgres-cluster:
-    apiVersion: postgresql.cnpg.io/v1
-    kind: Cluster
     forceRename: ar-postgres
-    spec:
+    manifest:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
       spec:
         instances: 2 # One replica, one primary
         bootstrap:

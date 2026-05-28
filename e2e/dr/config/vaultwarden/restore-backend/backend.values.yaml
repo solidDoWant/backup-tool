@@ -1,9 +1,8 @@
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
 controllers:
   postgres-restore-wal-bucket:
     type: job
-    nameOverride: postgres-restore-wal-bucket
     containers:
       create-bucket:
         image:
@@ -33,17 +32,17 @@ controllers:
                 key: admin_secret_access_key
 persistence:
   restore-data-vol:
-    nameOverride: restore-data-vol
+    suffix: restore-data-vol
     type: persistentVolumeClaim
     accessMode: ReadWriteOnce
     size: 1Gi
     storageClass: openebs-zfs
 rawResources:
   postgres-restore-serving-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: postgres-restore-serving-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: VaultWarden Postgres restore serving
         dnsNames:
@@ -60,10 +59,10 @@ rawResources:
           group: cert-manager.io
         secretName: postgres-restore-serving-cert
   postgres-restore-streaming-replica-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: postgres-restore-streaming-replica-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: streaming_replica
         usages:
@@ -77,10 +76,10 @@ rawResources:
           group: cert-manager.io
         secretName: postgres-restore-streaming-replica-cert
   postgres-restore-vaultwarden-cluster:
-    apiVersion: postgresql.cnpg.io/v1
-    kind: Cluster
     forceRename: vaultwarden-restore
-    spec:
+    manifest:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
       spec:
         instances: 2 # One replica, one primary
         bootstrap:

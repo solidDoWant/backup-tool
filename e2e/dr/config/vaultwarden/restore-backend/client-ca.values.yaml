@@ -1,11 +1,11 @@
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
 rawResources:
   postgres-restore-client-ca-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: postgres-restore-client-ca-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: VaultWarden Postgres restore client CA
         isCA: true
@@ -20,20 +20,20 @@ rawResources:
           group: cert-manager.io
         secretName: postgres-restore-client-ca-cert
   postgres-restore-auth-ca-issuer:
-    apiVersion: cert-manager.io/v1
-    kind: Issuer
     forceRename: postgres-restore-auth-ca-issuer
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Issuer
       spec:
         ca:
           secretName: postgres-restore-client-ca-cert
   # This must be deployed prior to any certs, or whether cert requests
   # get approved or denied is racey
   postgres-restore-auth-ca-request-policy:
-    apiVersion: policy.cert-manager.io/v1alpha1
-    kind: CertificateRequestPolicy
     forceRename: postgres-restore-auth-ca-request-policy
-    spec:
+    manifest:
+      apiVersion: policy.cert-manager.io/v1alpha1
+      kind: CertificateRequestPolicy
       spec:
         selector:
           issuerRef:

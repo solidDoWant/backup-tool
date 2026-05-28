@@ -1,5 +1,11 @@
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
+serviceAccount:
+  # app-template v5 auto-creates a default ServiceAccount named after the release ("vaultwarden"),
+  # which collides with the ServiceAccount CloudNativePG creates for the like-named CNPG cluster.
+  # Define one explicitly with a non-colliding name instead (this also suppresses the auto-default).
+  default:
+    forceRename: vaultwarden-server
 controllers:
   vaultwarden:
     containers:

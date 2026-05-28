@@ -1,9 +1,8 @@
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
 controllers:
   postgres-wal-bucket:
     type: job
-    nameOverride: postgres-wal-bucket
     containers:
       create-bucket:
         image:
@@ -32,10 +31,10 @@ controllers:
                 key: admin_secret_access_key
 rawResources:
   postgres-serving-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: postgres-serving-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: VaultWarden Postgres serving
         dnsNames:
@@ -52,10 +51,10 @@ rawResources:
           group: cert-manager.io
         secretName: postgres-serving-cert
   postgres-streaming-replica-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: postgres-streaming-replica-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: streaming_replica
         usages:
@@ -69,10 +68,10 @@ rawResources:
           group: cert-manager.io
         secretName: postgres-streaming-replica-cert
   postgres-vaultwarden-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: postgres-vaultwarden-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: vaultwarden
         usages:
@@ -86,10 +85,10 @@ rawResources:
           group: cert-manager.io
         secretName: postgres-vaultwarden-cert
   postgres-vaultwarden-cluster:
-    apiVersion: postgresql.cnpg.io/v1
-    kind: Cluster
     forceRename: vaultwarden
-    spec:
+    manifest:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
       spec:
         instances: 2 # One replica, one primary
         bootstrap:

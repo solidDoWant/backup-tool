@@ -1,9 +1,8 @@
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/common-3.7.0/charts/library/common/values.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
 controllers:
   tpr-core-postgres-wal-bucket:
     type: job
-    nameOverride: tpr-core-postgres-wal-bucket
     containers:
       create-bucket:
         image:
@@ -32,7 +31,6 @@ controllers:
                 key: admin_secret_access_key
   tpr-audit-postgres-wal-bucket:
     type: job
-    nameOverride: tpr-audit-postgres-wal-bucket
     containers:
       create-bucket:
         image:
@@ -61,7 +59,6 @@ controllers:
                 key: admin_secret_access_key
   tpr-audit-session-logs-bucket:
     type: job
-    nameOverride: tpr-audit-session-logs-bucket
     containers:
       create-bucket:
         image:
@@ -90,10 +87,10 @@ controllers:
                 key: admin_secret_access_key
 rawResources:
   tpr-core-postgres-serving-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: tpr-core-postgres-serving-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: Teleport Core Postgres serving
         dnsNames:
@@ -110,10 +107,10 @@ rawResources:
           group: cert-manager.io
         secretName: tpr-core-postgres-serving-cert
   tpr-core-postgres-streaming-replica-user-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: tpr-core-postgres-streaming-replica-user-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: streaming_replica
         usages:
@@ -127,10 +124,10 @@ rawResources:
           group: cert-manager.io
         secretName: tpr-core-postgres-streaming-replica-user-cert
   tpr-core-postgres-tpr-core-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: tpr-core-postgres-tpr-core-user-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: tpr-core
         usages:
@@ -144,10 +141,10 @@ rawResources:
           group: cert-manager.io
         secretName: tpr-core-postgres-tpr-core-user-cert
   tpr-core-postgres-cluster:
-    apiVersion: postgresql.cnpg.io/v1
-    kind: Cluster
     forceRename: tpr-core
-    spec:
+    manifest:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
       spec:
         instances: 2 # One replica, one primary
         imageName: ghcr.io/soliddowant/postgresql-teleport:17.0 # Needed for wal2json plugin
@@ -195,10 +192,10 @@ rawResources:
           clientCASecret: tpr-core-postgres-client-ca-cert
           replicationTLSSecret: tpr-core-postgres-streaming-replica-user-cert
   tpr-audit-postgres-serving-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: tpr-audit-postgres-serving-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: Teleport audit Postgres serving
         dnsNames:
@@ -215,10 +212,10 @@ rawResources:
           group: cert-manager.io
         secretName: tpr-audit-postgres-serving-cert
   tpr-audit-postgres-streaming-replica-user-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: tpr-audit-postgres-streaming-replica-user-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: streaming_replica
         usages:
@@ -232,10 +229,10 @@ rawResources:
           group: cert-manager.io
         secretName: tpr-audit-postgres-streaming-replica-user-cert
   tpr-audit-postgres-tpr-audit-user-cert:
-    apiVersion: cert-manager.io/v1
-    kind: Certificate
     forceRename: tpr-audit-postgres-tpr-audit-user-cert
-    spec:
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       spec:
         commonName: tpr-audit
         usages:
@@ -249,10 +246,10 @@ rawResources:
           group: cert-manager.io
         secretName: tpr-audit-postgres-tpr-audit-user-cert
   tpr-audit-postgres-cluster:
-    apiVersion: postgresql.cnpg.io/v1
-    kind: Cluster
     forceRename: tpr-audit
-    spec:
+    manifest:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
       spec:
         instances: 2 # One replica, one primary
         bootstrap:
