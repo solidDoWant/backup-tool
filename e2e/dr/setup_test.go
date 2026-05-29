@@ -3,9 +3,12 @@ package dr
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,13 +16,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	k8stypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
-	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
@@ -53,28 +52,95 @@ func TestMain(m *testing.M) {
 	registrySetup, registryFinish := Registry(clusterName)
 	pushImageSetup, pushImageFinish := PushImage()
 	buildChartSetup, buildChartFinish := BuildChart()
+	zfsPoolSetup, zfsPoolFinish := ZfsPool(clusterName)
 	deployDependentServicesSetup, deployDependentServicesFinish := DeployDependentServices(clusterName)
+	addTestHelmReposSetup, addTestHelmReposFinish := AddTestHelmRepos()
 
-	// Use pre-defined environment funcs to create a kind cluster prior to test run
+	// The cluster must exist before anything else (the registry attaches to its network,
+	// dependent services deploy into it, and the image is pushed to a registry on its
+	// network). Once it's up, the remaining setup steps are independent of one another
+	// and run concurrently so the slow image build overlaps the slow dependent-services
+	// deploy (seaweedfs in particular) instead of running after it. The registry must be
+	// up before the image is pushed, so those two stay sequential within their branch.
 	testenv.Setup(
-		clusterSetup,
-		registrySetup,
-		pushImageSetup,
-		buildChartSetup,
-		deployDependentServicesSetup,
+		timed("cluster", clusterSetup),
+		Parallel(
+			Sequential(timed("registry", registrySetup), timed("push-image", pushImageSetup)),
+			// The ZFS pool must exist before the dependent services (openebs consumes it).
+			Sequential(timed("zfs-pool", zfsPoolSetup), timed("dependent-services", deployDependentServicesSetup)),
+			timed("build-chart", buildChartSetup),
+			timed("add-test-helm-repos", addTestHelmReposSetup),
+		),
 	)
 
-	// Use pre-defined environment funcs to teardown kind cluster after tests
+	// Teardown mirrors setup: tear down the in-cluster/host resources concurrently, then
+	// destroy the cluster last. These are registered as two separate Finish actions on
+	// purpose: a Finish action stops at its first erroring func, so if the parallel group
+	// fails (e.g. a flaky resource cleanup) the cluster destroy must be its own action to
+	// still run and avoid leaking the kind cluster.
 	testenv.Finish(
-		deployDependentServicesFinish,
-		buildChartFinish,
-		pushImageFinish,
-		registryFinish,
-		clusterFinish,
+		Parallel(
+			Sequential(timed("push-image-finish", pushImageFinish), timed("registry-finish", registryFinish)),
+			timed("dependent-services-finish", deployDependentServicesFinish),
+			timed("build-chart-finish", buildChartFinish),
+			timed("add-test-helm-repos-finish", addTestHelmReposFinish),
+		),
+	)
+	testenv.Finish(
+		timed("cluster-finish", clusterFinish),
+	)
+	// The host-side ZFS pool is torn down last, after the cluster is gone (see ZfsPool for why).
+	testenv.Finish(
+		timed("zfs-pool-finish", zfsPoolFinish),
 	)
 
 	// launch package tests
 	os.Exit(testenv.Run(m))
+}
+
+// Sequential runs the given env funcs in order, threading the context through each. It
+// stops and returns on the first error.
+func Sequential(funcs ...types.EnvFunc) types.EnvFunc {
+	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		var err error
+		for _, fn := range funcs {
+			if ctx, err = fn(ctx, cfg); err != nil {
+				return ctx, err
+			}
+		}
+		return ctx, nil
+	}
+}
+
+// Parallel runs the given env funcs concurrently against the same incoming context,
+// returning that context once all have completed and aggregating any errors. The branches
+// must be independent: they may read cfg and mutate package-level globals, but must not
+// depend on context values produced by one another (the returned contexts are discarded).
+func Parallel(funcs ...types.EnvFunc) types.EnvFunc {
+	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		var wg sync.WaitGroup
+		errs := make([]error, len(funcs))
+		for i, fn := range funcs {
+			wg.Go(func() {
+				_, errs[i] = fn(ctx, cfg)
+			})
+		}
+		wg.Wait()
+		return ctx, trace.NewAggregate(errs...)
+	}
+}
+
+// timed wraps an env func to log when it starts and how long it took. This makes the
+// per-phase setup/teardown cost visible in `go test -v` output so future slow steps are
+// easy to spot.
+func timed(name string, fn types.EnvFunc) types.EnvFunc {
+	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		start := time.Now()
+		log.Printf("[e2e] %s: starting", name)
+		ctx, err := fn(ctx, cfg)
+		log.Printf("[e2e] %s: done in %s (failed=%t)", name, time.Since(start).Round(time.Second), err != nil)
+		return ctx, err
+	}
 }
 
 func Cluster() (types.EnvFunc, types.EnvFunc, string) {
@@ -179,8 +245,14 @@ func Registry(clusterName string) (types.EnvFunc, types.EnvFunc) {
 
 func PushImage() (types.EnvFunc, types.EnvFunc) {
 	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		// Call the makefile target used for releases
-		if p := utils.RunCommand(fmt.Sprintf("make -C %q container-manifest CONTAINER_REGISTRY=%s CONTAINER_MANIFEST_PUSH=true", repoRoot, registryName)); p.Err() != nil {
+		// Call the makefile target used for releases, but only build the image for the
+		// architecture of the host the kind cluster runs on. The release flow builds a
+		// multi-arch manifest (linux/amd64 + linux/arm64), but the e2e cluster only ever
+		// pulls the local arch. Building the non-native arch costs minutes because the
+		// Dockerfile's `apt install` step runs under QEMU emulation, and that image is
+		// never used here. Restricting to the local platform removes that wasted work.
+		localPlatform := "linux/" + runtime.GOARCH
+		if p := utils.RunCommand(fmt.Sprintf("make -C %q container-manifest CONTAINER_REGISTRY=%s CONTAINER_MANIFEST_PUSH=true CONTAINER_PLATFORMS=%s", repoRoot, registryName, localPlatform)); p.Err() != nil {
 			return ctx, trace.Wrap(p.Err(), "failed to build image: %s", p.Result())
 		}
 
@@ -232,37 +304,81 @@ func BuildChart() (types.EnvFunc, types.EnvFunc) {
 }
 
 func Helmfile(helmfilePath string) (types.EnvFunc, types.EnvFunc) {
-	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		if p := utils.RunCommand(fmt.Sprintf("helmfile apply --file %q --skip-diff-on-install --suppress-diff", helmfilePath)); p.Err() != nil {
-			return ctx, trace.Wrap(p.Err(), "failed to deploy helmfile at %q: %s", helmfilePath, p.Result())
+	// Each helmfile invocation gets its own helm repository config + cache. The DR suites run
+	// in parallel, and `helmfile apply` runs `helm repo add` for its declared repositories;
+	// without isolation those concurrent writes corrupt the shared
+	// ~/.config/helm/repositories.yaml ("Adding repo ..." failures). A private HELM home per
+	// invocation removes the shared-state race. Config paths contain no spaces, so the command
+	// is wrapped in a single-quoted `sh -c` to carry the env without quote nesting.
+	helmHome, mkdirErr := os.MkdirTemp("", "e2e-helm-")
+	helmEnv := fmt.Sprintf("HELM_REPOSITORY_CONFIG=%s/repositories.yaml HELM_REPOSITORY_CACHE=%s/cache", helmHome, helmHome)
+
+	run := func(ctx context.Context, helmfileCommand string) (context.Context, error) {
+		if mkdirErr != nil {
+			return ctx, trace.Wrap(mkdirErr, "failed to create temporary helm home")
+		}
+
+		command := fmt.Sprintf("sh -c '%s %s'", helmEnv, helmfileCommand)
+		if p := utils.RunCommand(command); p.Err() != nil {
+			return ctx, trace.Wrap(p.Err(), "failed to run %q for helmfile %q: %s", helmfileCommand, helmfilePath, p.Result())
 		}
 
 		return ctx, nil
 	}
 
-	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		if p := utils.RunCommand(fmt.Sprintf("helmfile destroy --file %q", helmfilePath)); p.Err() != nil {
-			return ctx, trace.Wrap(p.Err(), "failed to remove helmfile at %q: %s", helmfilePath, p.Result())
-		}
+	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		return run(ctx, fmt.Sprintf("helmfile apply --file %s --skip-diff-on-install --suppress-diff", helmfilePath))
+	}
 
+	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		ctx, err := run(ctx, fmt.Sprintf("helmfile destroy --file %s", helmfilePath))
+		if helmHome != "" {
+			_ = os.RemoveAll(helmHome)
+		}
+		return ctx, err
+	}
+
+	return setup, finish
+}
+
+// AddTestHelmRepos adds the helm repositories used directly by the in-test `helm install`
+// calls (the "new <app> instance successfully deploys" assessments). These installs go
+// through the e2e-framework helm.Manager, which uses the shared/global helm repository
+// config, so the repos must exist there. Adding them once up front (serially) means the
+// parallel suites only ever *read* the global config during their installs and never race
+// on `helm repo add`. Helmfile-managed repos are isolated separately (see Helmfile).
+func AddTestHelmRepos() (types.EnvFunc, types.EnvFunc) {
+	repos := map[string]string{
+		"goauthentik-charts": "https://charts.goauthentik.io",
+		"teleport-charts":    "https://charts.releases.teleport.dev",
+		"bjw-s-charts":       "https://bjw-s-labs.github.io/helm-charts",
+	}
+
+	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		for name, url := range repos {
+			if p := utils.RunCommand(fmt.Sprintf("helm repo add %s %s --force-update", name, url)); p.Err() != nil {
+				return ctx, trace.Wrap(p.Err(), "failed to add helm repo %q: %s", name, p.Result())
+			}
+		}
+		return ctx, nil
+	}
+
+	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 		return ctx, nil
 	}
 
 	return setup, finish
 }
 
-// Services needed by multiple DR tests
-func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) {
+// ZfsPool manages the host-side ZFS pool that backs the openebs storage class: a sparse image
+// file attached to a loopback device, plus the zfsutils packages installed on the kind nodes
+// (openebs-zfs needs them). It is created before the dependent services (openebs consumes the
+// pool) and, crucially, torn down AFTER the cluster is destroyed (see TestMain). Once the kind
+// node containers are gone nothing holds the datasets, so `zpool destroy` is immediate and
+// reliable; destroying it while openebs is still running is what made teardown slow and flaky.
+func ZfsPool(clusterName string) (types.EnvFunc, types.EnvFunc) {
 	imageFilePath := fmt.Sprintf("/tmp/%s-vdev.img", zpoolName)
-	defaultStorageClass := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard"}}
-	storageClassPatch := func(isDefault bool) k8s.Patch {
-		return k8s.Patch{
-			PatchType: k8stypes.StrategicMergePatchType,
-			Data:      []byte(fmt.Sprintf(`{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "%t"}}}`, isDefault)),
-		}
-	}
-	var loopDevice *string // This will be set during setup and used during finish
-	helmSetup, helmFinish := Helmfile("./config/setup/dependent-services/helmfile.yaml")
+	var loopDevice string // Set during setup, used during finish
 
 	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 		// Deploy ZFS zpool for openebs
@@ -275,8 +391,8 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 			return ctx, trace.Wrap(p.Err(), "failed to attach file to loop device: %s", p.Result())
 		}
 
-		loopDevice = ptr.To(strings.TrimSpace(p.Result()))
-		if p := utils.RunCommand(fmt.Sprintf("zpool create -f -o ashift=12 %q %q", zpoolName, *loopDevice)); p.Err() != nil {
+		loopDevice = strings.TrimSpace(p.Result())
+		if p := utils.RunCommand(fmt.Sprintf("zpool create -f -o ashift=12 %q %q", zpoolName, loopDevice)); p.Err() != nil {
 			return ctx, trace.Wrap(p.Err(), "failed to create ZFS pool: %s", p.Result())
 		}
 
@@ -289,6 +405,54 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 		if err := RunNodesScript(clusterName, commands); err != nil {
 			return ctx, trace.Wrap(err, "failed to install ZFS userspace utilities")
 		}
+
+		return ctx, nil
+	}
+
+	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		errors := []error{} // Collect errors to return as an aggregate so that all cleanup steps are attempted
+
+		// The cluster has already been destroyed by the time this runs, so the openebs CSI
+		// driver and every dataset mount are gone and the pool can be destroyed right away. A
+		// short retry just covers the occasional lingering handle.
+		if err := wait.For(func(ctx context.Context) (bool, error) {
+			return utils.RunCommand(fmt.Sprintf("zpool destroy -f %q", zpoolName)).Err() == nil, nil
+		}, wait.WithContext(ctx), wait.WithInterval(2*time.Second), wait.WithTimeout(30*time.Second), wait.WithImmediate()); err != nil {
+			errors = append(errors, trace.Wrap(err, "failed to remove ZFS pool"))
+		}
+
+		if loopDevice != "" {
+			if p := utils.RunCommand(fmt.Sprintf("losetup -d %q", loopDevice)); p.Err() != nil {
+				errors = append(errors, trace.Wrap(p.Err(), "failed to detach loop device: %s", p.Result()))
+			}
+		}
+
+		if err := os.Remove(imageFilePath); err != nil && !os.IsNotExist(err) {
+			errors = append(errors, trace.Wrap(err, "failed to remove ZFS pool file"))
+		}
+
+		return ctx, trace.NewAggregate(errors...)
+	}
+
+	return setup, finish
+}
+
+// DeployDependentServices deploys the cluster-side services shared by the DR tests (openebs,
+// seaweedfs, CNPG, cert-manager, ...) via helmfile, and makes the openebs-backed storage class
+// the default. It depends on ZfsPool having created the backing pool first. There is no
+// teardown: these services live only inside the kind cluster, which TestMain destroys wholesale,
+// so a graceful helm uninstall here would only add minutes for no benefit.
+func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) {
+	defaultStorageClass := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard"}}
+	storageClassPatch := func(isDefault bool) k8s.Patch {
+		return k8s.Patch{
+			PatchType: k8stypes.StrategicMergePatchType,
+			Data:      []byte(fmt.Sprintf(`{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "%t"}}}`, isDefault)),
+		}
+	}
+	helmSetup, _ := Helmfile("./config/setup/dependent-services/helmfile.yaml")
+
+	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 
 		// Remove the "default" annotation from local-path CSI storage class
 		if err := cfg.Client().Resources().Patch(ctx, defaultStorageClass, storageClassPatch(false)); err != nil {
@@ -312,50 +476,8 @@ func DeployDependentServices(clusterName string) (types.EnvFunc, types.EnvFunc) 
 	}
 
 	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		errors := []error{} // Collect errors to return as an aggregate so that all cleanup steps are attempted
-
-		// Remove the services
-		var err error
-		if ctx, err = helmFinish(ctx, cfg); err != nil {
-			errors = append(errors, trace.Wrap(err, "failed to remove dependent services"))
-		}
-
-		// Set the "default" annotation from local-path CSI storage class
-		if err := cfg.Client().Resources().Patch(ctx, defaultStorageClass, storageClassPatch(true)); err != nil {
-			return ctx, trace.Wrap(err, "failed to set default annotation from storage class %q", defaultStorageClass.Name)
-		}
-
-		// Wait for Helm-created pods to be deleted
-		// Helmfile will wait for the deployments and daemonsets to be deleted, but not the pods
-		pods := &corev1.PodList{}
-		if err := cfg.Client().Resources().List(ctx, pods, resources.WithLabelSelector(labels.FormatLabels(map[string]string{"heritage": "Helm"}))); err != nil {
-			errors = append(errors, trace.Wrap(err, "failed to list Helm-created pods"))
-		} else if err := wait.For(conditions.New(cfg.Client().Resources()).ResourcesDeleted(pods), wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute)); err != nil {
-			errors = append(errors, trace.Wrap(err, "failed to wait for pods to be deleted"))
-		}
-
-		// Uninstall ZFS userspace utilities in the cluster node containers
-		if err := RunNodesCommand(clusterName, "apt autoremove --purge -y zfsutils-linux"); err != nil {
-			errors = append(errors, trace.Wrap(err, "failed to uninstall ZFS userspace utilities"))
-		}
-
-		// Destroy the ZFS pool. Sometimes this may fail and need to be retried.
-		if err := wait.For(func(ctx context.Context) (bool, error) {
-			return utils.RunCommand(fmt.Sprintf("zpool destroy -f %q", zpoolName)).Err() == nil, nil
-		}, wait.WithContext(ctx), wait.WithInterval(2*time.Second), wait.WithTimeout(30*time.Second), wait.WithImmediate()); err != nil {
-			errors = append(errors, trace.Wrap(err, "failed to remove ZFS pool"))
-		} else {
-			// Do the rest of the ZFS cleanup, which will fail if the pool isn't destroyed
-			if p := utils.RunCommand(fmt.Sprintf("losetup -d %q", *loopDevice)); p.Err() != nil {
-				errors = append(errors, trace.Wrap(p.Err(), "failed to detach loop device: %s", p.Result()))
-			}
-
-			if err := os.Remove(imageFilePath); err != nil {
-				errors = append(errors, trace.Wrap(err, "failed to remove ZFS pool file"))
-			}
-		}
-
-		return ctx, trace.NewAggregate(errors...)
+		// No teardown — the cluster is destroyed wholesale by TestMain (see the doc comment).
+		return ctx, nil
 	}
 
 	return setup, finish

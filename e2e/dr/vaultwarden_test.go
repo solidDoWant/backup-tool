@@ -46,7 +46,7 @@ func DeployVaultWarden() (features.Func, features.Func) {
 			}
 
 			return false, nil
-		}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute))
+		}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
 		require.NoError(t, err, "failed to wait for vaultwarden service to be ready")
 
 		return ctx
@@ -86,6 +86,9 @@ func DeployVaultWardenRestore() (features.Func, features.Func) {
 }
 
 func TestVaultWarden(t *testing.T) {
+	// Run concurrently with the other DR suites. See TestAuthentik for why this is safe.
+	t.Parallel()
+
 	backupReleaseName := "vw-test-successfull-backup"
 	backupCronJobName := backupReleaseName + "-dr-job"
 
@@ -127,10 +130,9 @@ func TestVaultWarden(t *testing.T) {
 		Assess("restore resources are deployed", verifyCronJobIsDeployed(restoreCronJobName, namespace)).
 		Assess("restore job succeeds", verifyJobSucceeds(restoreCronJobName, namespace)).
 		Assess("new vaultwarden instance successfully deploys", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			// Install the helm chart
+			// Install the helm chart. The bjw-s-charts repo is added once during suite setup
+			// (see AddTestHelmRepos) so parallel suites don't race on `helm repo add`.
 			hm := helm.New(cfg.KubeconfigFile())
-			err := hm.RunRepo(helm.WithArgs("add", "bjw-s-charts", "https://bjw-s-labs.github.io/helm-charts"))
-			assert.NoError(t, err)
 
 			valuesFilePath := "config/vaultwarden/tests/restore-instance.values.yaml"
 			helpOpts := append(
@@ -140,7 +142,7 @@ func TestVaultWarden(t *testing.T) {
 				helm.WithArgs("--values", valuesFilePath),
 			)
 
-			err = hm.RunInstall(helpOpts...)
+			err := hm.RunInstall(helpOpts...)
 			assert.NoError(t, err)
 			defer uninstallBTHelmChart(vaultwardenRestoreReleaseName, namespace)(ctx, t, cfg)
 
@@ -162,7 +164,7 @@ func TestVaultWarden(t *testing.T) {
 				}
 
 				return false, nil
-			}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute))
+			}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
 			assert.NoError(t, err, "vaultwarden-restore endpoints are not ready")
 
 			return ctx

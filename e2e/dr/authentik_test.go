@@ -44,7 +44,7 @@ func DeployAuthentik() (features.Func, features.Func) {
 			}
 
 			return false, nil
-		}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute))
+		}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
 		require.NoError(t, err, "failed to wait for authentik service to be ready")
 
 		return ctx
@@ -84,6 +84,12 @@ func DeployAuthentikRestore() (features.Func, features.Func) {
 }
 
 func TestAuthentik(t *testing.T) {
+	// Run concurrently with the other DR suites. They share the cluster but use distinct
+	// namespaced resource names, S3 buckets, and DR PVCs, so they don't collide. The shared
+	// setup (cluster/registry/image/dependent-services) has already completed by the time any
+	// parallel test resumes.
+	t.Parallel()
+
 	backupReleaseName := "at-test-successfull-backup"
 	backupCronJobName := backupReleaseName + "-dr-job"
 
@@ -124,10 +130,9 @@ func TestAuthentik(t *testing.T) {
 		Assess("restore resources are deployed", verifyCronJobIsDeployed(restoreCronJobName, namespace)).
 		Assess("restore job succeeds", verifyJobSucceeds(restoreCronJobName, namespace)).
 		Assess("new authentik instance successfully deploys", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			// Install the helm chart
+			// Install the helm chart. The goauthentik-charts repo is added once during suite
+			// setup (see AddTestHelmRepos) so parallel suites don't race on `helm repo add`.
 			hm := helm.New(cfg.KubeconfigFile())
-			err := hm.RunRepo(helm.WithArgs("add", "goauthentik-charts", "https://charts.goauthentik.io"))
-			assert.NoError(t, err)
 
 			valuesFilePath := "config/authentik/tests/restore-instance.values.yaml"
 			helpOpts := append(
@@ -137,7 +142,7 @@ func TestAuthentik(t *testing.T) {
 				helm.WithArgs("--values", valuesFilePath),
 			)
 
-			err = hm.RunInstall(helpOpts...)
+			err := hm.RunInstall(helpOpts...)
 			assert.NoError(t, err)
 			defer uninstallBTHelmChart(authentikRestoreReleaseName, namespace)(ctx, t, cfg)
 
@@ -159,7 +164,7 @@ func TestAuthentik(t *testing.T) {
 				}
 
 				return false, nil
-			}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute))
+			}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
 			assert.NoError(t, err, "ar-server endpoints are not ready")
 			return ctx
 		}).

@@ -26,6 +26,10 @@ func getCommonHelmOpts(releaseName, namespace string) []helm.Option {
 		helm.WithName(releaseName),
 		helm.WithNamespace(namespace),
 		helm.WithWait(),
+		// The default helm timeout is 5m. Raise it so the heavier restore-instance deploys
+		// (e.g. teleport-cluster) don't get cut off when the three DR suites run in parallel
+		// and contend for cluster CPU. This only bounds failure; ready deploys return sooner.
+		helm.WithTimeout("600s"),
 	}
 }
 
@@ -85,9 +89,11 @@ func getPVCLocalPath(ctx context.Context, t *testing.T, c *envconf.Config, names
 	assert.NoError(t, p.Err())
 	snapshotName := strings.TrimSpace(p.Result())
 
-	// Create a new dataset from the snapshot
+	// Create a new dataset from the snapshot. The dataset name includes the PVC name so that
+	// suites running in parallel (each inspecting a different DR PVC) don't collide on a single
+	// shared "backup-test" dataset.
 	mountpoint := t.TempDir()
-	cloneDatasetName := fmt.Sprintf("%s/%s", zpoolName, "backup-test")
+	cloneDatasetName := fmt.Sprintf("%s/backup-test-%s", zpoolName, pvcName)
 	p = utils.RunCommand(fmt.Sprintf("zfs clone -o %q %q %q", "mountpoint="+mountpoint, snapshotName, cloneDatasetName))
 	assert.NoError(t, p.Err())
 	cleanup := func() {
@@ -120,7 +126,7 @@ func waitForCNPGClusterToBeReady(ctx context.Context, cfg *envconf.Config, clust
 		}
 
 		return false, nil
-	}, wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute))
+	}, wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
 	return trace.Wrap(err, "failed to wait for CNPG cluster to be ready")
 }
 

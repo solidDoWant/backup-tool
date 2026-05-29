@@ -47,7 +47,7 @@ func DeployTeleport() (features.Func, features.Func) {
 			}
 
 			return false, nil
-		}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute))
+		}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
 		require.NoError(t, err, "failed to wait for teleport service to be ready")
 
 		return ctx
@@ -90,6 +90,9 @@ func DeployTeleportRestore() (features.Func, features.Func) {
 }
 
 func TestTeleport(t *testing.T) {
+	// Run concurrently with the other DR suites. See TestAuthentik for why this is safe.
+	t.Parallel()
+
 	backupReleaseName := "tp-test-successfull-backup"
 	backupCronJobName := backupReleaseName + "-dr-job"
 
@@ -131,10 +134,9 @@ func TestTeleport(t *testing.T) {
 		Assess("restore resources are deployed", verifyCronJobIsDeployed(restoreCronJobName, namespace)).
 		Assess("restore job succeeds", verifyJobSucceeds(restoreCronJobName, namespace)).
 		Assess("new teleport instance successfully deploys", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			// Install the helm chart
+			// Install the helm chart. The teleport-charts repo is added once during suite
+			// setup (see AddTestHelmRepos) so parallel suites don't race on `helm repo add`.
 			hm := helm.New(cfg.KubeconfigFile())
-			err := hm.RunRepo(helm.WithArgs("add", "teleport-charts", "https://charts.releases.teleport.dev"))
-			assert.NoError(t, err)
 
 			valuesFilePath := "config/teleport/tests/restore-instance.values.yaml"
 			helpOpts := append(
@@ -144,7 +146,7 @@ func TestTeleport(t *testing.T) {
 				helm.WithArgs("--values", valuesFilePath),
 			)
 
-			err = hm.RunInstall(helpOpts...)
+			err := hm.RunInstall(helpOpts...)
 			assert.NoError(t, err)
 			defer uninstallBTHelmChart(teleportRestoreReleaseName, namespace)(ctx, t, cfg)
 
@@ -166,7 +168,7 @@ func TestTeleport(t *testing.T) {
 				}
 
 				return false, nil
-			}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(2*time.Minute))
+			}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
 			assert.NoError(t, err, "teleport-restore endpoints are not ready")
 
 			// TODO run job to get backup instance CA endpoint, and verify that it's the same on the restored instance
