@@ -30,7 +30,7 @@ releases:
       - ./backend.values.yaml
   - name: teleport
     chart: teleport-charts/teleport-cluster
-    version: 17.0.2
+    version: 18.1.4
     atomic: true
     needs:
       - teleport-backend

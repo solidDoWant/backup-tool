@@ -140,7 +140,7 @@ func TestTeleport(t *testing.T) {
 			helpOpts := append(
 				getCommonHelmOpts(teleportRestoreReleaseName, namespace),
 				helm.WithChart("teleport-charts/teleport-cluster"),
-				helm.WithVersion("17.0.2"),
+				helm.WithVersion("18.1.4"),
 				helm.WithArgs("--values", valuesFilePath),
 			)
 
