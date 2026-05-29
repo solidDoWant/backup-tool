@@ -70,16 +70,9 @@ func (_c *MockBackupToolInstanceInterface_Delete_Call) RunAndReturn(run func(*co
 	return _c
 }
 
-// GetGRPCClient provides a mock function with given fields: ctx, searchDomains
-func (_m *MockBackupToolInstanceInterface) GetGRPCClient(ctx *contexts.Context, searchDomains ...string) (clients.ClientInterface, error) {
-	_va := make([]interface{}, len(searchDomains))
-	for _i := range searchDomains {
-		_va[_i] = searchDomains[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
+// GetGRPCClient provides a mock function with given fields: ctx
+func (_m *MockBackupToolInstanceInterface) GetGRPCClient(ctx *contexts.Context) (clients.ClientInterface, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetGRPCClient")
@@ -87,19 +80,19 @@ func (_m *MockBackupToolInstanceInterface) GetGRPCClient(ctx *contexts.Context, 
 
 	var r0 clients.ClientInterface
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*contexts.Context, ...string) (clients.ClientInterface, error)); ok {
-		return rf(ctx, searchDomains...)
+	if rf, ok := ret.Get(0).(func(*contexts.Context) (clients.ClientInterface, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(*contexts.Context, ...string) clients.ClientInterface); ok {
-		r0 = rf(ctx, searchDomains...)
+	if rf, ok := ret.Get(0).(func(*contexts.Context) clients.ClientInterface); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(clients.ClientInterface)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*contexts.Context, ...string) error); ok {
-		r1 = rf(ctx, searchDomains...)
+	if rf, ok := ret.Get(1).(func(*contexts.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -114,21 +107,13 @@ type MockBackupToolInstanceInterface_GetGRPCClient_Call struct {
 
 // GetGRPCClient is a helper method to define mock.On call
 //   - ctx *contexts.Context
-//   - searchDomains ...string
-func (_e *MockBackupToolInstanceInterface_Expecter) GetGRPCClient(ctx interface{}, searchDomains ...interface{}) *MockBackupToolInstanceInterface_GetGRPCClient_Call {
-	return &MockBackupToolInstanceInterface_GetGRPCClient_Call{Call: _e.mock.On("GetGRPCClient",
-		append([]interface{}{ctx}, searchDomains...)...)}
+func (_e *MockBackupToolInstanceInterface_Expecter) GetGRPCClient(ctx interface{}) *MockBackupToolInstanceInterface_GetGRPCClient_Call {
+	return &MockBackupToolInstanceInterface_GetGRPCClient_Call{Call: _e.mock.On("GetGRPCClient", ctx)}
 }
 
-func (_c *MockBackupToolInstanceInterface_GetGRPCClient_Call) Run(run func(ctx *contexts.Context, searchDomains ...string)) *MockBackupToolInstanceInterface_GetGRPCClient_Call {
+func (_c *MockBackupToolInstanceInterface_GetGRPCClient_Call) Run(run func(ctx *contexts.Context)) *MockBackupToolInstanceInterface_GetGRPCClient_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]string, len(args)-1)
-		for i, a := range args[1:] {
-			if a != nil {
-				variadicArgs[i] = a.(string)
-			}
-		}
-		run(args[0].(*contexts.Context), variadicArgs...)
+		run(args[0].(*contexts.Context))
 	})
 	return _c
 }
@@ -138,7 +123,7 @@ func (_c *MockBackupToolInstanceInterface_GetGRPCClient_Call) Return(_a0 clients
 	return _c
 }
 
-func (_c *MockBackupToolInstanceInterface_GetGRPCClient_Call) RunAndReturn(run func(*contexts.Context, ...string) (clients.ClientInterface, error)) *MockBackupToolInstanceInterface_GetGRPCClient_Call {
+func (_c *MockBackupToolInstanceInterface_GetGRPCClient_Call) RunAndReturn(run func(*contexts.Context) (clients.ClientInterface, error)) *MockBackupToolInstanceInterface_GetGRPCClient_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -190,53 +175,6 @@ func (_c *MockBackupToolInstanceInterface_GetPod_Call) RunAndReturn(run func() *
 	return _c
 }
 
-// GetService provides a mock function with no fields
-func (_m *MockBackupToolInstanceInterface) GetService() *v1.Service {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetService")
-	}
-
-	var r0 *v1.Service
-	if rf, ok := ret.Get(0).(func() *v1.Service); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Service)
-		}
-	}
-
-	return r0
-}
-
-// MockBackupToolInstanceInterface_GetService_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetService'
-type MockBackupToolInstanceInterface_GetService_Call struct {
-	*mock.Call
-}
-
-// GetService is a helper method to define mock.On call
-func (_e *MockBackupToolInstanceInterface_Expecter) GetService() *MockBackupToolInstanceInterface_GetService_Call {
-	return &MockBackupToolInstanceInterface_GetService_Call{Call: _e.mock.On("GetService")}
-}
-
-func (_c *MockBackupToolInstanceInterface_GetService_Call) Run(run func()) *MockBackupToolInstanceInterface_GetService_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockBackupToolInstanceInterface_GetService_Call) Return(_a0 *v1.Service) *MockBackupToolInstanceInterface_GetService_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockBackupToolInstanceInterface_GetService_Call) RunAndReturn(run func() *v1.Service) *MockBackupToolInstanceInterface_GetService_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // setPod provides a mock function with given fields: pod
 func (_m *MockBackupToolInstanceInterface) setPod(pod *v1.Pod) {
 	_m.Called(pod)
@@ -266,39 +204,6 @@ func (_c *MockBackupToolInstanceInterface_setPod_Call) Return() *MockBackupToolI
 }
 
 func (_c *MockBackupToolInstanceInterface_setPod_Call) RunAndReturn(run func(*v1.Pod)) *MockBackupToolInstanceInterface_setPod_Call {
-	_c.Run(run)
-	return _c
-}
-
-// setService provides a mock function with given fields: service
-func (_m *MockBackupToolInstanceInterface) setService(service *v1.Service) {
-	_m.Called(service)
-}
-
-// MockBackupToolInstanceInterface_setService_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'setService'
-type MockBackupToolInstanceInterface_setService_Call struct {
-	*mock.Call
-}
-
-// setService is a helper method to define mock.On call
-//   - service *v1.Service
-func (_e *MockBackupToolInstanceInterface_Expecter) setService(service interface{}) *MockBackupToolInstanceInterface_setService_Call {
-	return &MockBackupToolInstanceInterface_setService_Call{Call: _e.mock.On("setService", service)}
-}
-
-func (_c *MockBackupToolInstanceInterface_setService_Call) Run(run func(service *v1.Service)) *MockBackupToolInstanceInterface_setService_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*v1.Service))
-	})
-	return _c
-}
-
-func (_c *MockBackupToolInstanceInterface_setService_Call) Return() *MockBackupToolInstanceInterface_setService_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockBackupToolInstanceInterface_setService_Call) RunAndReturn(run func(*v1.Service)) *MockBackupToolInstanceInterface_setService_Call {
 	_c.Run(run)
 	return _c
 }

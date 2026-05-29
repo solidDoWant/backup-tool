@@ -11,8 +11,7 @@ type ConfigBackupVolume struct {
 }
 
 type ConfigBTI struct {
-	CreationOptions      backuptoolinstance.CreateBackupToolInstanceOptions `yaml:",inline"`
-	ServiceSearchDomains []string                                           `yaml:"serviceSearchDomains,omitempty"`
+	CreationOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:",inline"`
 }
 
 type ConfigIssuer struct {

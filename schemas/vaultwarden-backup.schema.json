@@ -285,13 +285,7 @@
         "cleanupTimeout": {
           "type": "integer"
         },
-        "serviceType": {
-          "type": "string"
-        },
         "podWaitTimeout": {
-          "type": "integer"
-        },
-        "serviceWaitTimeout": {
           "type": "integer"
         }
       },
@@ -1180,12 +1174,6 @@
         },
         "remoteBackupToolOptions": {
           "$ref": "#/$defs/CreateBackupToolInstanceOptions"
-        },
-        "clusterServiceSearchDomains": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
         },
         "cleanupTimeout": {
           "type": "integer"

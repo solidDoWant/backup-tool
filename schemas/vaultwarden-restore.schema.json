@@ -203,13 +203,7 @@
         "cleanupTimeout": {
           "type": "integer"
         },
-        "serviceType": {
-          "type": "string"
-        },
         "podWaitTimeout": {
-          "type": "integer"
-        },
-        "serviceWaitTimeout": {
           "type": "integer"
         }
       },

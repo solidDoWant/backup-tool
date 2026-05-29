@@ -44,15 +44,14 @@ type TeleportBackupOptionsAudit struct {
 }
 
 type TeleportBackupOptions struct {
-	VolumeSize                  resource.Quantity                                  `yaml:"volumeSize,omitempty"`
-	VolumeStorageClass          string                                             `yaml:"volumeStorageClass,omitempty"`
-	CloneClusterOptions         clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
-	AuditCluster                TeleportBackupOptionsAudit                         `yaml:"auditCluster,omitempty"`
-	AuditSessionLogs            TeleportOptionsS3Sync                              `yaml:"auditSessionLogs,omitempty"`
-	RemoteBackupToolOptions     backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
-	ClusterServiceSearchDomains []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
-	BackupSnapshot              OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
-	CleanupTimeout              helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
+	VolumeSize              resource.Quantity                                  `yaml:"volumeSize,omitempty"`
+	VolumeStorageClass      string                                             `yaml:"volumeStorageClass,omitempty"`
+	CloneClusterOptions     clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
+	AuditCluster            TeleportBackupOptionsAudit                         `yaml:"auditCluster,omitempty"`
+	AuditSessionLogs        TeleportOptionsS3Sync                              `yaml:"auditSessionLogs,omitempty"`
+	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
+	BackupSnapshot          OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
+	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
 type Teleport struct {
@@ -114,8 +113,7 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 	// Configuration
 	ctx.Log.Step().Info("Configuring backup actions")
 	stage := t.newRemoteStage(t.kubeClusterClient, namespace, backup.GetFullName(), remote.RemoteStageOptions{
-		ClusterServiceSearchDomains: opts.ClusterServiceSearchDomains,
-		CleanupTimeout:              opts.CleanupTimeout,
+		CleanupTimeout: opts.CleanupTimeout,
 	})
 
 	if opts.CloneClusterOptions.RecoveryTargetTime == "" {
@@ -178,13 +176,12 @@ type TeleportRestoreOptionsAudit struct {
 }
 
 type TeleportRestoreOptions struct {
-	AuditCluster                TeleportRestoreOptionsAudit                        `yaml:"auditCluster,omitempty"`
-	PostgresUserCert            cnpgrestore.CNPGRestoreOptionsCert                 `yaml:"postgresUserCert,omitempty"`
-	IssuerKind                  string                                             `yaml:"issuerKind,omitempty"`
-	AuditSessionLogs            TeleportOptionsS3Sync                              `yaml:"auditSessionLogs,omitempty"`
-	RemoteBackupToolOptions     backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
-	ClusterServiceSearchDomains []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
-	CleanupTimeout              helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
+	AuditCluster            TeleportRestoreOptionsAudit                        `yaml:"auditCluster,omitempty"`
+	PostgresUserCert        cnpgrestore.CNPGRestoreOptionsCert                 `yaml:"postgresUserCert,omitempty"`
+	IssuerKind              string                                             `yaml:"issuerKind,omitempty"`
+	AuditSessionLogs        TeleportOptionsS3Sync                              `yaml:"auditSessionLogs,omitempty"`
+	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
+	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
 // Restore requirements:
@@ -221,8 +218,7 @@ func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreCl
 	// 1. Configuration
 	ctx.Log.Step().Info("Configuring restoration actions")
 	stage := t.newRemoteStage(t.kubeClusterClient, namespace, restore.GetFullName(), remote.RemoteStageOptions{
-		ClusterServiceSearchDomains: opts.ClusterServiceSearchDomains,
-		CleanupTimeout:              opts.CleanupTimeout,
+		CleanupTimeout: opts.CleanupTimeout,
 	})
 
 	coreRestore := t.newCNPGRestore()

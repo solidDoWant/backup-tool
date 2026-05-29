@@ -272,10 +272,9 @@ func TestVaultWardenBackup(t *testing.T) {
 				})
 
 				// Step 5
-				btInstance.EXPECT().GetGRPCClient(mock.Anything, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, searchDomains ...string) (clients.ClientInterface, error) {
+				btInstance.EXPECT().GetGRPCClient(mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context) (clients.ClientInterface, error) {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.Equal(t, tt.backupOptions.ClusterServiceSearchDomains, searchDomains)
 						return th.ErrOr1Val(mockGRPCClient, tt.simulateGRPCClientErr)
 					})
 				if tt.simulateGRPCClientErr {

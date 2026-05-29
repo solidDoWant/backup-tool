@@ -40,7 +40,6 @@ type VaultWardenBackupOptions struct {
 	BackupToolPodCreationTimeout helpers.MaxWaitTime                                `yaml:"backupToolPodCreationTimeout,omitempty"`
 	BackupSnapshot               OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
 	RemoteBackupToolOptions      backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
-	ClusterServiceSearchDomains  []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
 	CleanupTimeout               helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
@@ -156,7 +155,7 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 
 	// 5. Sync the data directory to the DR volume
 	ctx.Log.Step().Info("Syncing data directory to DR volume")
-	backupToolClient, err := btInstance.GetGRPCClient(ctx.Child(), backupOptions.ClusterServiceSearchDomains...)
+	backupToolClient, err := btInstance.GetGRPCClient(ctx.Child())
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to create client for backup tool GRPC server")
 	}

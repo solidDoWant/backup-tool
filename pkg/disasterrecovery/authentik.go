@@ -22,13 +22,12 @@ const (
 )
 
 type AuthentikBackupOptions struct {
-	VolumeSize                  resource.Quantity                                  `yaml:"volumeSize,omitempty"`
-	VolumeStorageClass          string                                             `yaml:"volumeStorageClass,omitempty"`
-	CloneClusterOptions         clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
-	RemoteBackupToolOptions     backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
-	ClusterServiceSearchDomains []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
-	BackupSnapshot              OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
-	CleanupTimeout              helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
+	VolumeSize              resource.Quantity                                  `yaml:"volumeSize,omitempty"`
+	VolumeStorageClass      string                                             `yaml:"volumeStorageClass,omitempty"`
+	CloneClusterOptions     clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
+	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
+	BackupSnapshot          OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
+	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
 type Authentik struct {
@@ -76,8 +75,7 @@ func (a *Authentik) Backup(ctx *contexts.Context, namespace, backupName, cluster
 	// Configuration
 	ctx.Log.Step().Info("Configuring backup actions")
 	stage := a.newRemoteStage(a.kubeClusterClient, namespace, backup.GetFullName(), remote.RemoteStageOptions{
-		ClusterServiceSearchDomains: opts.ClusterServiceSearchDomains,
-		CleanupTimeout:              opts.CleanupTimeout,
+		CleanupTimeout: opts.CleanupTimeout,
 	})
 
 	backupOpts := cnpgbackup.CNPGBackupOptions{
@@ -117,11 +115,10 @@ func (a *Authentik) Backup(ctx *contexts.Context, namespace, backupName, cluster
 }
 
 type AuthentikRestoreOptions struct {
-	PostgresUserCert            cnpgrestore.CNPGRestoreOptionsCert                 `yaml:"postgresUserCert,omitempty"`
-	IssuerKind                  string                                             `yaml:"issuerKind,omitempty"`
-	RemoteBackupToolOptions     backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
-	ClusterServiceSearchDomains []string                                           `yaml:"clusterServiceSearchDomains,omitempty"`
-	CleanupTimeout              helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
+	PostgresUserCert        cnpgrestore.CNPGRestoreOptionsCert                 `yaml:"postgresUserCert,omitempty"`
+	IssuerKind              string                                             `yaml:"issuerKind,omitempty"`
+	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
+	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
 func (a *Authentik) Restore(ctx *contexts.Context, namespace, restoreName, clusterName, servingCertName, clientCertIssuerName string, mediaS3Path string, mediaS3Credentials s3.CredentialsInterface, opts AuthentikRestoreOptions) (restore *DREvent, err error) {
@@ -140,8 +137,7 @@ func (a *Authentik) Restore(ctx *contexts.Context, namespace, restoreName, clust
 	// 1. Configuration
 	ctx.Log.Step().Info("Configuring restoration actions")
 	stage := a.newRemoteStage(a.kubeClusterClient, namespace, restore.GetFullName(), remote.RemoteStageOptions{
-		ClusterServiceSearchDomains: opts.ClusterServiceSearchDomains,
-		CleanupTimeout:              opts.CleanupTimeout,
+		CleanupTimeout: opts.CleanupTimeout,
 	})
 
 	cnpgRestore := a.newCNPGRestore()

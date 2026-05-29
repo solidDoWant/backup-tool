@@ -75,9 +75,7 @@ func TestAuthentikBackup(t *testing.T) {
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
 				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{
-					ServiceWaitTimeout: helpers.ShortWaitTime,
 				},
-				ClusterServiceSearchDomains: []string{"cluster.local"},
 				BackupSnapshot: OptionsBackupSnapshot{
 					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
 					SnapshotClass: "custom-snapshot-class",
@@ -129,7 +127,6 @@ func TestAuthentikBackup(t *testing.T) {
 					assert.Equal(t, mockClient, kubeClusterClient)
 					assert.Equal(t, namespace, calledNamespace)
 					assert.True(t, strings.Contains(calledEventName, backupName))
-					assert.Equal(t, tt.opts.ClusterServiceSearchDomains, calledOpts.ClusterServiceSearchDomains)
 					assert.Equal(t, tt.opts.CleanupTimeout, calledOpts.CleanupTimeout)
 
 					return mockRemoteStage
@@ -253,9 +250,7 @@ func TestAuthentikRestore(t *testing.T) {
 				},
 				IssuerKind: "ClusterIssuer",
 				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{
-					ServiceWaitTimeout: helpers.ShortWaitTime,
 				},
-				ClusterServiceSearchDomains: []string{"cluster.local"},
 				CleanupTimeout:              helpers.MaxWaitTime(3 * time.Second),
 			},
 		},
@@ -281,7 +276,6 @@ func TestAuthentikRestore(t *testing.T) {
 					assert.Equal(t, mockClient, kubeClusterClient)
 					assert.Equal(t, namespace, calledNamespace)
 					assert.True(t, strings.Contains(calledEventName, restoreName))
-					assert.Equal(t, tt.opts.ClusterServiceSearchDomains, calledOpts.ClusterServiceSearchDomains)
 					assert.Equal(t, tt.opts.CleanupTimeout, calledOpts.CleanupTimeout)
 
 					return mockRemoteStage

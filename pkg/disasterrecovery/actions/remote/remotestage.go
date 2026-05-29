@@ -38,8 +38,7 @@ func newNamedRemoteAction(name string, action RemoteAction) namedRemoteAction {
 }
 
 type RemoteStageOptions struct {
-	ClusterServiceSearchDomains []string            `yaml:"clusterServiceSearchDomains,omitempty"`
-	CleanupTimeout              helpers.MaxWaitTime `yaml:"cleanupTimeout,omitempty"`
+	CleanupTimeout helpers.MaxWaitTime `yaml:"cleanupTimeout,omitempty"`
 }
 
 type RemoteStageInterface interface {
@@ -122,7 +121,7 @@ func (rs *RemoteStage) execute(ctx *contexts.Context, btiOpts bti.CreateBackupTo
 	defer cleanup.To(btInstance.Delete).WithErrMessage("failed to cleanup backup tool instance %q resources", rs.eventName).
 		WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(rs.opts.CleanupTimeout.MaxWait(time.Minute)).Run()
 
-	backupToolClient, err := btInstance.GetGRPCClient(ctx.Child(), rs.opts.ClusterServiceSearchDomains...)
+	backupToolClient, err := btInstance.GetGRPCClient(ctx.Child())
 	if err != nil {
 		return trace.Wrap(err, "failed to create client for backup tool GRPC server")
 	}

@@ -1,8 +1,6 @@
 package backuptoolinstance
 
 import (
-	"fmt"
-	"net"
 	"testing"
 
 	"github.com/gravitational/trace"
@@ -17,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 )
 
@@ -27,14 +24,6 @@ func TestNewBackupToolInstance(t *testing.T) {
 	casted := btInstance.(*BackupToolInstance)
 
 	assert.Equal(t, c, casted.p)
-
-	// Test the default testConnection function
-	listener, err := net.Listen("tcp", net.JoinHostPort("localhost", fmt.Sprintf("%d", grpc.GRPCPort)))
-	require.NoError(t, err)
-	defer listener.Close()
-
-	ctx := th.NewTestContext()
-	assert.True(t, casted.testConnection(ctx, "localhost"))
 }
 
 func TestCreateBackupToolInstanceOptions(t *testing.T) {
@@ -50,8 +39,6 @@ func TestCreateBackupToolInstance(t *testing.T) {
 		simulateBackupToolInstanceCleanupError bool
 		simulateCreatePodError                 bool
 		simulateWaitForPodError                bool
-		simulateCreateServiceError             bool
-		simulateWaitForServiceError            bool
 	}{
 		{
 			name: "basic instance creation",
@@ -91,10 +78,8 @@ func TestCreateBackupToolInstance(t *testing.T) {
 						},
 					},
 				},
-				CleanupTimeout:     helpers.ShortWaitTime,
-				ServiceType:        corev1.ServiceTypeNodePort,
-				PodWaitTimeout:     helpers.ShortWaitTime,
-				ServiceWaitTimeout: helpers.ShortWaitTime,
+				CleanupTimeout: helpers.ShortWaitTime,
+				PodWaitTimeout: helpers.ShortWaitTime,
 			},
 		},
 		{
@@ -110,14 +95,6 @@ func TestCreateBackupToolInstance(t *testing.T) {
 			name:                    "simulate wait for pod error",
 			simulateWaitForPodError: true,
 		},
-		{
-			name:                       "simulate create service error",
-			simulateCreateServiceError: true,
-		},
-		{
-			name:                        "simulate wait for service error",
-			simulateWaitForServiceError: true,
-		},
 	}
 
 	for _, tt := range tests {
@@ -129,8 +106,6 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				tt.simulateBackupToolInstanceCleanupError,
 				tt.simulateCreatePodError,
 				tt.simulateWaitForPodError,
-				tt.simulateCreateServiceError,
-				tt.simulateWaitForServiceError,
 			)
 
 			func() {
@@ -179,6 +154,9 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				if tt.simulateCreatePodError {
 					return
 				}
+				// setPod is called once with the freshly-created pod (so the deferred cleanup can
+				// delete it even if the readiness wait fails) and again with the ready pod, which
+				// carries the assigned IP address used by the GRPC client.
 				p.backupToolInstance.EXPECT().setPod(mock.Anything).Run(func(pod *corev1.Pod) {
 					require.Equal(t, createdPod, pod)
 				})
@@ -191,34 +169,6 @@ func TestCreateBackupToolInstance(t *testing.T) {
 				if tt.simulateWaitForPodError {
 					return
 				}
-
-				var createdService *corev1.Service
-				p.coreClient.EXPECT().CreateService(mock.Anything, namespace, mock.Anything).RunAndReturn(func(calledCtx *contexts.Context, _ string, service *corev1.Service) (*corev1.Service, error) {
-					createdService = service
-					assert.True(t, calledCtx.IsChildOf(ctx))
-					require.Equal(t, createdPod.ObjectMeta.Labels, service.Spec.Selector)
-
-					require.Len(t, service.Spec.Ports, 1)
-					port := service.Spec.Ports[0]
-					require.Equal(t, "grpc", port.Name)
-					require.Equal(t, int32(grpc.GRPCPort), port.Port)
-					require.Equal(t, intstr.FromString("grpc"), port.TargetPort)
-					require.Equal(t, corev1.ProtocolTCP, port.Protocol)
-
-					return th.ErrOr1Val(service, tt.simulateCreateServiceError)
-				})
-				if tt.simulateCreateServiceError {
-					return
-				}
-				p.backupToolInstance.EXPECT().setService(mock.Anything).Run(func(service *corev1.Service) {
-					require.Equal(t, createdService, service)
-				})
-
-				p.coreClient.EXPECT().WaitForReadyService(mock.Anything, namespace, mock.Anything, core.WaitForReadyServiceOpts{MaxWaitTime: tt.opts.ServiceWaitTimeout}).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts core.WaitForReadyServiceOpts) (*corev1.Service, error) {
-						assert.True(t, calledCtx.IsChildOf(ctx))
-						return th.ErrOr1Val(createdService, tt.simulateWaitForServiceError)
-					})
 			}()
 
 			btInstance, err := p.CreateBackupToolInstance(ctx, namespace, "unique-instance-name", tt.opts)
@@ -300,66 +250,29 @@ func TestBackupToolInstanceGetPod(t *testing.T) {
 	}
 }
 
-func TestBackupToolInstanceSetService(t *testing.T) {
+func TestBackupToolInstanceGetGRPCClient(t *testing.T) {
 	tests := []struct {
-		desc    string
-		service *corev1.Service
+		desc string
+		pod  *corev1.Pod
 	}{
 		{
-			desc: "set non-nil service",
-			service: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-service",
-					Namespace: "test-ns",
-				},
-			},
+			desc: "nil pod returns an error",
 		},
 		{
-			desc: "set nil service",
+			desc: "pod without an assigned IP returns an error",
+			pod:  &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "test-ns"}},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			btInstance := &BackupToolInstance{}
-			btInstance.setService(tt.service)
-			assert.Equal(t, tt.service, btInstance.service)
-		})
-	}
-}
+			ctx := th.NewTestContext()
+			btInstance := &BackupToolInstance{pod: tt.pod}
 
-func TestBackupToolInstanceGetService(t *testing.T) {
-	tests := []struct {
-		desc       string
-		btInstance BackupToolInstance
-		want       *corev1.Service
-	}{
-		{
-			desc: "get existing service",
-			btInstance: BackupToolInstance{
-				service: &corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-service",
-						Namespace: "test-ns",
-					},
-				},
-			},
-			want: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-service",
-					Namespace: "test-ns",
-				},
-			},
-		},
-		{
-			desc: "get nil service",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.desc, func(t *testing.T) {
-			got := tt.btInstance.GetService()
-			assert.Equal(t, tt.want, got)
+			client, err := btInstance.GetGRPCClient(ctx)
+			assert.Error(t, err)
+			assert.True(t, trace.IsNotFound(err))
+			assert.Nil(t, client)
 		})
 	}
 }
@@ -369,59 +282,24 @@ func TestBackupToolInstanceDelete(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "test-ns"},
 	}
 
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-service", Namespace: "test-ns"},
-	}
-
-	allResourcesInstance := BackupToolInstance{
-		pod:     pod,
-		service: service,
-	}
-
 	tests := []struct {
-		desc                       string
-		btInstance                 BackupToolInstance
-		simulatePodDeleteError     bool
-		simulateServiceDeleteError bool
-		expectedErrorsInMessage    int
+		desc                   string
+		btInstance             BackupToolInstance
+		simulatePodDeleteError bool
+		wantErr                bool
 	}{
 		{
-			desc:       "delete all resources",
-			btInstance: allResourcesInstance,
-		},
-		{
-			desc: "delete with just pod",
-			btInstance: BackupToolInstance{
-				pod: pod,
-			},
-		},
-		{
-			desc: "delete with just service",
-			btInstance: BackupToolInstance{
-				service: service,
-			},
+			desc:       "delete with pod",
+			btInstance: BackupToolInstance{pod: pod},
 		},
 		{
 			desc: "delete empty backup tool instance",
 		},
 		{
-			desc:                       "all deletions fail",
-			btInstance:                 allResourcesInstance,
-			simulatePodDeleteError:     true,
-			simulateServiceDeleteError: true,
-			expectedErrorsInMessage:    2,
-		},
-		{
-			desc:                    "pod deletion fails",
-			btInstance:              allResourcesInstance,
-			simulatePodDeleteError:  true,
-			expectedErrorsInMessage: 1,
-		},
-		{
-			desc:                       "service deletion fails",
-			btInstance:                 allResourcesInstance,
-			simulateServiceDeleteError: true,
-			expectedErrorsInMessage:    1,
+			desc:                   "pod deletion fails",
+			btInstance:             BackupToolInstance{pod: pod},
+			simulatePodDeleteError: true,
+			wantErr:                true,
 		},
 	}
 
@@ -439,182 +317,12 @@ func TestBackupToolInstanceDelete(t *testing.T) {
 					})
 			}
 
-			if tt.btInstance.service != nil {
-				p.coreClient.EXPECT().DeleteService(mock.Anything, tt.btInstance.service.Namespace, tt.btInstance.service.Name).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) error {
-						assert.True(t, calledCtx.IsChildOf(ctx))
-						return th.ErrIfTrue(tt.simulateServiceDeleteError)
-					})
-			}
-
 			err := tt.btInstance.Delete(ctx)
-			if tt.expectedErrorsInMessage == 0 {
-				assert.NoError(t, err)
-				return
-			}
-
-			require.Error(t, err)
-			if tErr, ok := err.(trace.Error); ok {
-				if oErrs, ok := tErr.OrigError().(trace.Aggregate); ok {
-					assert.Equal(t, tt.expectedErrorsInMessage, len(oErrs.Errors()))
-				}
-				return
-			}
-			require.Fail(t, "error is not a trace.Error")
-		})
-	}
-}
-
-func TestBackupToolInstanceFindReachableServiceAddress(t *testing.T) {
-	noSucceedFunc := func(string) bool {
-		return false
-	}
-
-	serviceClusterIP := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-svc",
-			Namespace: "test-ns",
-		},
-		Spec: corev1.ServiceSpec{
-			Type:       corev1.ServiceTypeClusterIP,
-			ClusterIPs: []string{"1.2.3.4", "5.6.7.8"},
-		},
-	}
-
-	serviceLoadBalancer := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-svc",
-			Namespace: "test-ns",
-		},
-		Status: corev1.ServiceStatus{
-			LoadBalancer: corev1.LoadBalancerStatus{
-				Ingress: []corev1.LoadBalancerIngress{
-					{IP: "1.2.3.4"},
-					{IP: "5.6.7.8"},
-				},
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeLoadBalancer,
-		},
-	}
-
-	tests := []struct {
-		desc            string
-		searchDomains   []string
-		service         *corev1.Service
-		testConnFunc    func(string) bool
-		expectedQueries []string
-		want            string
-		wantErr         bool
-	}{
-		{
-			desc:         "test default queries made",
-			service:      serviceClusterIP,
-			testConnFunc: noSucceedFunc, // Run through all options
-			expectedQueries: []string{
-				"test-svc",
-				"test-svc.test-ns",
-				"test-svc.test-ns.svc",
-				"test-svc.test-ns.svc.cluster.local",
-			},
-			wantErr: true,
-		},
-		{
-			desc:          "test queries with search domains set",
-			service:       serviceLoadBalancer,
-			searchDomains: []string{"example.com", "test.local"},
-			testConnFunc:  noSucceedFunc, // Run through all options
-			expectedQueries: []string{
-				"test-svc",
-				"test-svc.test-ns",
-				"test-svc.test-ns.svc",
-				"test-svc.test-ns.svc.cluster.local",
-				"test-svc.example.com",
-				"test-svc.test-ns.example.com",
-				"test-svc.test-ns.svc.example.com",
-				"test-svc.test-ns.svc.cluster.local.example.com",
-				"test-svc.test.local",
-				"test-svc.test-ns.test.local",
-				"test-svc.test-ns.svc.test.local",
-				"test-svc.test-ns.svc.cluster.local.test.local",
-			},
-			wantErr: true,
-		},
-		{
-			desc:          "find via DNS lookup",
-			searchDomains: []string{"example.com", "test.local"},
-			service:       serviceClusterIP,
-			testConnFunc: func(addr string) bool {
-				return addr == "127.0.0.12"
-			},
-			want: "test-svc.test-ns.svc.cluster.local",
-		},
-		{
-			desc:    "find via cluster IP",
-			service: serviceClusterIP,
-			testConnFunc: func(addr string) bool {
-				return addr == "5.6.7.8"
-			},
-			want: "5.6.7.8",
-		},
-		{
-			desc:    "find via load balancer IP",
-			service: serviceLoadBalancer,
-			testConnFunc: func(addr string) bool {
-				return addr == "5.6.7.8"
-			},
-			want: "5.6.7.8",
-		},
-		{
-			desc: "no reachable address found",
-			service: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-svc",
-					Namespace: "test-ns",
-				},
-			},
-			testConnFunc: func(addr string) bool {
-				return false
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.desc, func(t *testing.T) {
-			var testedConnections []string
-			var queries []string
-
-			btInstance := &BackupToolInstance{
-				service: tt.service,
-				testConnection: func(_ *contexts.Context, address string) bool {
-					testedConnections = append(testedConnections, address)
-					return tt.testConnFunc(address)
-				},
-				lookupIP: func(_ *contexts.Context, host string) ([]net.IP, error) {
-					queries = append(queries, host)
-					return []net.IP{
-						net.ParseIP(fmt.Sprintf("127.0.0.%d", len(queries))),
-					}, nil
-				},
-			}
-
-			ctx := th.NewTestContext()
-			got, err := btInstance.findReachableServiceAddress(ctx, tt.searchDomains)
-
-			if len(tt.expectedQueries) > 0 {
-				assert.ElementsMatch(t, tt.expectedQueries, queries)
-			}
-
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.Empty(t, got)
 				return
 			}
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.NoError(t, err)
 		})
 	}
 }

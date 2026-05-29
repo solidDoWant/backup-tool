@@ -86,30 +86,10 @@ resources:
         rules:
           # TODO prefix all resources with a fixed name, and limit RBAC to that prefix with a wildcard
           # Core/baseline k8s resources
-          # Needed for verifying if services (i.e. backup tool, CNPG cluster) _should_ be accessible
           - apiGroups:
               - ""
             resources:
-              - endpoints
-            verbs:
-              - get
-              - list
-              - watch
-          # Needed for creating services for backup tool GRPC instances
-          - apiGroups:
-              - ""
-            resources:
-              - services
-            verbs:
-              - create
-              - get
-              - list
-              - watch
-              - delete
-          - apiGroups:
-              - ""
-            resources:
-              # Needed to deploy backup tool GRPC instances, and clean them up
+              # Needed to deploy backup tool GRPC instances, and clean them up.
               - pods
               # Needed for cloning PVCs
               - persistentvolumeclaims

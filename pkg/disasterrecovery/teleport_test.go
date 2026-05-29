@@ -156,7 +156,6 @@ func TestTeleportBackup(t *testing.T) {
 					assert.Equal(t, mockClient, kubeClusterClient)
 					assert.Equal(t, namespace, calledNamespace)
 					assert.True(t, strings.Contains(calledEventName, backupName))
-					assert.Equal(t, tt.opts.ClusterServiceSearchDomains, calledOpts.ClusterServiceSearchDomains)
 					assert.Equal(t, tt.opts.CleanupTimeout, calledOpts.CleanupTimeout)
 
 					return mockRemoteStage
@@ -368,7 +367,6 @@ func TestTeleportRestore(t *testing.T) {
 					assert.Equal(t, mockClient, kubeClusterClient)
 					assert.Equal(t, namespace, calledNamespace)
 					assert.True(t, strings.Contains(calledEventName, restoreName))
-					assert.Equal(t, tt.opts.ClusterServiceSearchDomains, calledOpts.ClusterServiceSearchDomains)
 					assert.Equal(t, tt.opts.CleanupTimeout, calledOpts.CleanupTimeout)
 
 					return mockRemoteStage

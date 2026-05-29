@@ -246,20 +246,8 @@
         "cleanupTimeout": {
           "type": "integer"
         },
-        "serviceType": {
-          "type": "string"
-        },
         "podWaitTimeout": {
           "type": "integer"
-        },
-        "serviceWaitTimeout": {
-          "type": "integer"
-        },
-        "serviceSearchDomains": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
         }
       },
       "additionalProperties": false,

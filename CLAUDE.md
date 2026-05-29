@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `dr <app> <backup|restore> run --config-file <yaml>` — drives a DR event from outside the cluster.
 - `dr <app> <backup|restore> gen-config-schema` — emits a JSON schema for the YAML config.
-- `grpc` — the in-cluster pod mode; serves files/postgres/s3 RPCs to the local driver on TCP port 40983.
+- `grpc` — the in-cluster pod mode; serves files/postgres/s3 RPCs to the driver on TCP port 40983 (plaintext). The driver reaches it directly via the pod IP, so no Service is created and the driver must be on the cluster pod network.
 
 Backups produce on-cluster PVC snapshots (no external storage hop), and DBs are dumped logically (via `pg_dumpall`) so they're human-readable and don't require an identical target. See `docs/design decisions.md` for the rationale.
 
@@ -53,7 +53,7 @@ The release flow is `make release PUSH_ALL=true VERSION=x.y.z` (defaults to a no
 The high-level Backup/Restore methods (e.g. `VaultWarden.Backup`) are imperative scripts that:
 1. Snapshot/clone PVCs and clone CNPG clusters via composite operations.
 2. Spawn a `backup-tool` pod (`backuptoolinstance`) inside the target namespace with the relevant volumes/secrets mounted.
-3. Connect to that pod over gRPC and drive file/Postgres/S3 work remotely.
+3. Connect to that pod over gRPC (plaintext, directly to the pod IP — no Service) and drive file/Postgres/S3 work remotely. Because it dials the pod IP, the driver must run on the cluster pod network (i.e. in-cluster, as the dr-job Job does).
 4. Snapshot the resulting DR PVC.
 5. Tear everything down via deferred `cleanup.To(...)`.
 

@@ -83,10 +83,9 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 				S3Path:      config.AuditSessionLogs.S3Path,
 				Credentials: config.AuditSessionLogs.Credentials,
 			},
-			RemoteBackupToolOptions:     config.BackupToolInstance.CreationOptions,
-			ClusterServiceSearchDomains: config.BackupToolInstance.ServiceSearchDomains,
-			BackupSnapshot:              config.BackupSnapshot,
-			CleanupTimeout:              config.CleanupTimeout,
+			RemoteBackupToolOptions: config.BackupToolInstance.CreationOptions,
+			BackupSnapshot:          config.BackupSnapshot,
+			CleanupTimeout:          config.CleanupTimeout,
 		}
 
 		_, err := t.Backup(ctx, config.Namespace, config.BackupName, config.CNPGClusters.Core.CNPGClusterName,
@@ -115,11 +114,10 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 					S3Path:      config.AuditSessionLogs.S3Path,
 					Credentials: config.AuditSessionLogs.Credentials,
 				},
-				PostgresUserCert:            config.CNPGClusters.Core.ClusterUserCert,
-				IssuerKind:                  config.CNPGClusters.Core.ClientCertIssuer.Kind,
-				RemoteBackupToolOptions:     config.BackupToolInstance.CreationOptions,
-				ClusterServiceSearchDomains: config.BackupToolInstance.ServiceSearchDomains,
-				CleanupTimeout:              config.CleanupTimeout,
+				PostgresUserCert:        config.CNPGClusters.Core.ClusterUserCert,
+				IssuerKind:              config.CNPGClusters.Core.ClientCertIssuer.Kind,
+				RemoteBackupToolOptions: config.BackupToolInstance.CreationOptions,
+				CleanupTimeout:          config.CleanupTimeout,
 			})
 
 		return err

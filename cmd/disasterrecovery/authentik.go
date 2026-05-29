@@ -58,13 +58,12 @@ func NewAuthentikDRCommand() *AuthentikDRCommand {
 		a := disasterrecovery.NewAuthentik(kubeCluster)
 
 		opts := disasterrecovery.AuthentikBackupOptions{
-			VolumeSize:                  config.BackupVolume.Size,
-			VolumeStorageClass:          config.BackupVolume.StorageClass,
-			CloneClusterOptions:         config.Cluster.CloneClusterOptions,
-			RemoteBackupToolOptions:     config.BackupToolInstance.CreationOptions,
-			ClusterServiceSearchDomains: config.BackupToolInstance.ServiceSearchDomains,
-			BackupSnapshot:              config.BackupSnapshot,
-			CleanupTimeout:              config.CleanupTimeout,
+			VolumeSize:              config.BackupVolume.Size,
+			VolumeStorageClass:      config.BackupVolume.StorageClass,
+			CloneClusterOptions:     config.Cluster.CloneClusterOptions,
+			RemoteBackupToolOptions: config.BackupToolInstance.CreationOptions,
+			BackupSnapshot:          config.BackupSnapshot,
+			CleanupTimeout:          config.CleanupTimeout,
 		}
 
 		_, err := a.Backup(ctx, config.Namespace, config.BackupName, config.Cluster.Name, config.Cluster.ServingCertIssuerName,
@@ -77,11 +76,10 @@ func NewAuthentikDRCommand() *AuthentikDRCommand {
 		a := disasterrecovery.NewAuthentik(kubeCluster)
 
 		opts := disasterrecovery.AuthentikRestoreOptions{
-			PostgresUserCert:            config.Cluster.PostgresUserCertOptions,
-			IssuerKind:                  config.Cluster.ClientCertIssuer.Kind,
-			RemoteBackupToolOptions:     config.BackupToolInstance.CreationOptions,
-			ClusterServiceSearchDomains: config.BackupToolInstance.ServiceSearchDomains,
-			CleanupTimeout:              config.CleanupTimeout,
+			PostgresUserCert:        config.Cluster.PostgresUserCertOptions,
+			IssuerKind:              config.Cluster.ClientCertIssuer.Kind,
+			RemoteBackupToolOptions: config.BackupToolInstance.CreationOptions,
+			CleanupTimeout:          config.CleanupTimeout,
 		}
 
 		_, err := a.Restore(ctx, config.Namespace, config.BackupName, config.Cluster.Name, config.Cluster.ServingCertName,

@@ -25,7 +25,6 @@ func TestNewRemoteStage(t *testing.T) {
 	namespace := "test-namespace"
 	eventName := "test-event"
 	opts := RemoteStageOptions{
-		ClusterServiceSearchDomains: []string{"test.domain"},
 		CleanupTimeout:              helpers.MaxWaitTime(5),
 	}
 
