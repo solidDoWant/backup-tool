@@ -1,8 +1,12 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+# The node image is pinned for a deterministic Kubernetes version. It must be one supported by the
+# kind version pinned in .devcontainer/Dockerfile (KIND_VERSION); see that release's node images.
 nodes:
   - role: control-plane
+    image: kindest/node:v1.35.1@sha256:05d7bcdefbda08b4e038f644c4df690cdac3fba8b06f8289f30e10026720a1ab
   - role: worker
+    image: kindest/node:v1.35.1@sha256:05d7bcdefbda08b4e038f644c4df690cdac3fba8b06f8289f30e10026720a1ab
 containerdConfigPatches:
   # Docs: https://github.com/containerd/containerd/blob/main/docs/cri/registry.md
   # When KinD moves to containerd v2, the TOML key will need to be replaced with

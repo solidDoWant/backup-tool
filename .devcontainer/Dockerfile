@@ -29,11 +29,19 @@ RUN go install github.com/vektra/mockery/v2@v2.53.6 \
     mockery completion bash | sudo tee /etc/bash_completion.d/mockery.bash > /dev/null
 
 # Misc. development tools
-COPY --from=registry.k8s.io/kubectl:v1.31.2 /bin/kubectl /usr/local/bin/kubectl
+COPY --from=registry.k8s.io/kubectl:v1.35.1 /bin/kubectl /usr/local/bin/kubectl
 COPY --from=registry.k8s.io/kustomize/kustomize:v5.0.0 /app/kustomize /usr/local/bin/kustomize
 COPY --from=ghcr.io/helmfile/helmfile:v1.0.0-rc.7 /usr/local/bin/helmfile /usr/local/bin/helmfile
 ENV HELM_DATA_HOME=/usr/local/share/helm
 COPY --from=alpine/helm:3.16.2 /usr/bin/helm /usr/local/bin/helm
+# kind (e2e tests). The e2e-framework uses whatever "kind" is found on PATH; without a pinned
+# binary it go-installs its own (older) default. Pin it here, matched to the kindest/node image
+# in e2e/dr/config/setup/kind-config.yaml.
+ARG KIND_VERSION=v0.31.0
+RUN KERNEL="$(uname -s | tr '[:upper:]' '[:lower:]')" && \
+    ARCH="$(dpkg --print-architecture)" && \
+    curl -fsSL -o /usr/local/bin/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-${KERNEL}-${ARCH}" && \
+    chmod +x /usr/local/bin/kind
 RUN helm plugin install https://github.com/jkroepke/helm-secrets --version v4.6.2 && \
     helm plugin install https://github.com/databus23/helm-diff --version v3.9.11
 RUN sed -i 's/main/main contrib non-free non-free-firmware/g' /etc/apt/sources.list.d/debian.sources && \
