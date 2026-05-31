@@ -3,6 +3,7 @@ package clonedcluster
 import (
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/barmancloud"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 )
@@ -18,17 +19,19 @@ type providerInterfaceInternal interface {
 }
 
 type Provider struct {
-	cucp             clusterusercert.ProviderInterface
-	cmClient         certmanager.ClientInterface
-	cnpgClient       cnpg.ClientInterface
-	newClonedCluster func() ClonedClusterInterface
+	cucp              clusterusercert.ProviderInterface
+	cmClient          certmanager.ClientInterface
+	cnpgClient        cnpg.ClientInterface
+	barmanCloudClient barmancloud.ClientInterface
+	newClonedCluster  func() ClonedClusterInterface
 }
 
-func NewProvider(cucp clusterusercert.ProviderInterface, cmClient certmanager.ClientInterface, cnpgClient cnpg.ClientInterface) *Provider {
+func NewProvider(cucp clusterusercert.ProviderInterface, cmClient certmanager.ClientInterface, cnpgClient cnpg.ClientInterface, barmanCloudClient barmancloud.ClientInterface) *Provider {
 	p := &Provider{
-		cucp:       cucp,
-		cmClient:   cmClient,
-		cnpgClient: cnpgClient,
+		cucp:              cucp,
+		cmClient:          cmClient,
+		cnpgClient:        cnpgClient,
+		barmanCloudClient: barmanCloudClient,
 	}
 	p.newClonedCluster = func() ClonedClusterInterface {
 		return newClonedCluster(p)

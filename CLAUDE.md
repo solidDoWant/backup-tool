@@ -23,9 +23,10 @@ make container-image        # local-arch container image (depends on binary + li
 make helm                   # package the dr-job Helm chart
 make build-all              # all platforms (linux/amd64, linux/arm64) + multi-arch manifest
 make test                   # `go test -timeout 30s -failfast -v ./cmd/... ./pkg/...` (unit tests only; e2e is excluded — run those with `go test ./e2e/...`)
-make generate-all           # run every code generator (protobuf, mocks, CNPG client, approver-policy client, DR schemas)
+make generate-all           # run every code generator (protobuf, mocks, CNPG client, barman-cloud client, approver-policy client, DR schemas)
 make generate-protobuf-code # regenerate pkg/grpc/gen from .proto files
 make generate-mocks         # run mockery (config in .mockery.yaml)
+make generate-barman-cloud-client # regenerate the barman-cloud plugin ObjectStore clientset
 make generate-dr-schemas    # regenerate schemas/<app>-<event>.schema.json (requires building the binary)
 make clean                  # rm build/, working/, deps charts/, drop local container image
 make clean-e2e              # tear down leaked e2e resources (kind clusters, registries, zpool, loop devices)
@@ -61,11 +62,13 @@ Newer apps (Authentik) build the same flow declaratively using `pkg/disasterreco
 
 ### Kubernetes client (`pkg/kubecluster/`)
 - `client.go` exposes a single `ClientInterface` that embeds smaller clients. Composites are wired to their primitive deps in `NewClient`.
-- `primatives/` — thin wrappers over typed clients per CRD group: `core` (PVCs/Pods/Secrets/Services), `cnpg` (CloudNative-PG clusters), `certmanager`, `externalsnapshotter`, `approverpolicy`. Each exposes a `ClientInterface`.
+- `primatives/` — thin wrappers over typed clients per CRD group: `core` (PVCs/Pods/Secrets/Services), `cnpg` (CloudNative-PG clusters), `certmanager`, `externalsnapshotter`, `approverpolicy`, `barmancloud` (the barman-cloud plugin's `ObjectStore` resources; read-only `GetObjectStore`). Each exposes a `ClientInterface`.
 - `composite/` — multi-resource operations that orchestrate primitives: `clonepvc`, `clonedcluster` (CNPG PITR clone with TLS), `clusterusercert` (issue + CRP allow), `createcrpforcertificate`, `drvolume` (DR PVC + CNPG ImageCatalog), `backuptoolinstance` (the in-cluster pod).
 - `helpers/` — `MaxWaitTime`, watcher utilities, `FullName`, naming helpers (CNPG enforces a 40-char limit on cloned-cluster names).
 
-The CNPG and approver-policy primitives are partially generated (`make generate-cnpg-client`, `make generate-approver-policy-client`). The CNPG generator pins to the version recorded in `go.mod`; approver-policy still pins to `main` until upstream cuts a release with the needed fix (see Makefile comments).
+The CNPG, barman-cloud, and approver-policy primitives are partially generated (`make generate-cnpg-client`, `make generate-barman-cloud-client`, `make generate-approver-policy-client`). The CNPG and barman-cloud generators pin to the versions recorded in `go.mod` (the barman-cloud generator also rewrites the plugin's controller-runtime-style `GroupVersion` to the `SchemeGroupVersion` that client-gen expects — see the Makefile target); approver-policy still pins to `main` until upstream cuts a release with the needed fix (see Makefile comments).
+
+**Barman WAL archiving — in-tree vs plugin.** CNPG deprecated in-tree barman WAL archiving (`.spec.backup.barmanObjectStore`) in favor of the barman-cloud CNPG-I plugin (`.spec.plugins` referencing a `barmancloud.cnpg.io/v1` `ObjectStore`). `clonedcluster.CloneCluster` supports both, and the cloned cluster recovers to the same point in both: the backup's **consistency point** (volume-snapshot base + WAL replayed from the source's object store only up to that point). It inspects the source cluster; for plugin-based sources it recovers via `bootstrap.recovery.source` + `volumeSnapshots`, fetching WAL through an `externalClusters[].plugin` reference to the same `ObjectStore` (read-only — the clone never archives), and **must** set `recoveryTarget.targetImmediate` so recovery stops at the consistency point. For in-tree sources it recovers from the `Backup` object directly (`recovery.backup`); CNPG's snapshot recovery for a Backup object recovers to the consistency point and **ignores** `recoveryTarget.targetTime`, so the deprecated path never did true wall-clock PITR either — the `targetImmediate` plugin path matches it. (Don't "fix" the plugin path to honor a wall-clock `recoveryTarget.targetTime`: on a quiescent source it fails with `recovery ended before configured recovery target was reached`, since no transaction commits at/after the target.) In-tree-specific option fields/branches are marked `// Deprecated:` but remain fully supported. The vaultwarden e2e exercises the plugin path; teleport/authentik stay on in-tree for coverage. The dr-job chart's RBAC grants read-only access to `objectstores.barmancloud.cnpg.io` (harmless when the CRD is absent).
 
 ### gRPC (`pkg/grpc/`)
 - `proto/backup-tool/{files,postgres,s3}/v1/*.proto` — sources. Generated code lives in `gen/`, including a `*_grpc_mock.pb.go` testify mock from `protoc-gen-go-grpcmock`.

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/barmancloud"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
@@ -18,6 +19,7 @@ func TestNewClient(t *testing.T) {
 		externalsnapshotter.NewMockClientInterface(t),
 		core.NewMockClientInterface(t),
 		approverpolicy.NewMockClientInterface(t),
+		barmancloud.NewMockClientInterface(t),
 	)
 
 	assert.NotNil(t, client)

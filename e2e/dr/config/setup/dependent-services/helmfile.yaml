@@ -57,6 +57,21 @@ releases:
     atomic: true
     values:
       - ./cnpg.values.yaml
+  # The barman-cloud CNPG-I plugin supersedes the deprecated in-tree barman WAL archiving support.
+  # It must run in the same namespace as the CNPG operator (here, the release namespace) and requires
+  # cert-manager for its gRPC serving certificate. appVersion v0.10.0 pins to a CNPG 1.28-compatible
+  # build. The vaultwarden source/restore clusters use this plugin; teleport/authentik stay on the
+  # in-tree path so both code paths get e2e coverage.
+  - name: plugin-barman-cloud
+    chart: cnpg-charts/plugin-barman-cloud
+    version: 0.4.0
+    atomic: true
+    needs:
+      - cnpg-operator
+      - cert-manager
+      # dependent-resources installs the CertificateRequestPolicy that lets approver-policy approve
+      # the plugin's self-signed certs; without it the plugin pod hangs waiting for its TLS secrets.
+      - dependent-resources
   - name: cert-manager
     chart: cert-manager-charts/cert-manager
     version: 1.16.1

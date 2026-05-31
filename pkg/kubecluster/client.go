@@ -8,6 +8,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/barmancloud"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
@@ -70,7 +71,7 @@ func (c *Client) AP() approverpolicy.ClientInterface {
 	return c.apClient
 }
 
-func NewClient(cm certmanager.ClientInterface, cnpg cnpg.ClientInterface, esClient externalsnapshotter.ClientInterface, coreClient core.ClientInterface, apClient approverpolicy.ClientInterface) *Client {
+func NewClient(cm certmanager.ClientInterface, cnpg cnpg.ClientInterface, esClient externalsnapshotter.ClientInterface, coreClient core.ClientInterface, apClient approverpolicy.ClientInterface, bcClient barmancloud.ClientInterface) *Client {
 	c := &Client{
 		cmClient:   cm,
 		cnpgClient: cnpg,
@@ -83,7 +84,7 @@ func NewClient(cm certmanager.ClientInterface, cnpg cnpg.ClientInterface, esClie
 	c.clonePVCProvider = clonepvc.NewProvider(coreClient, esClient)
 	c.createCRPForProfileProvider = createcrpforcertificate.NewProvider(apClient)
 	c.clusterUserCertProvider = clusterusercert.NewProvider(c.createCRPForProfileProvider, apClient, cm)
-	c.clonedClusterProvider = clonedcluster.NewProvider(c.clusterUserCertProvider, cm, cnpg)
+	c.clonedClusterProvider = clonedcluster.NewProvider(c.clusterUserCertProvider, cm, cnpg, bcClient)
 	c.drVolumeProvider = drvolume.NewProvider(c.coreClient, c.esClient, c.cnpgClient)
 
 	return c

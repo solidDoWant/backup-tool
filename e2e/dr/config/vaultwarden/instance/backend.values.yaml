@@ -84,6 +84,25 @@ rawResources:
           kind: Issuer
           group: cert-manager.io
         secretName: postgres-vaultwarden-cert
+  # WAL archiving is handled by the barman-cloud plugin (rather than the deprecated in-tree
+  # barman support). The plugin reads the bucket/credentials from this ObjectStore resource, which
+  # the cluster references by name via .spec.plugins.
+  postgres-wal-objectstore:
+    forceRename: vaultwarden-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://vaultwarden-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials:
+            accessKeyId:
+              name: seaweedfs-s3-secret
+              key: admin_access_key_id
+            secretAccessKey:
+              name: seaweedfs-s3-secret
+              key: admin_secret_access_key
   postgres-vaultwarden-cluster:
     forceRename: vaultwarden
     manifest:
@@ -103,6 +122,11 @@ rawResources:
         storage:
           size: 5Gi
           storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: vaultwarden-wal-store
         backup:
           target: prefer-standby
           volumeSnapshot:
@@ -112,16 +136,6 @@ rawResources:
               immediateCheckpoint: false
               waitForArchive: true
             snapshotOwnerReference: backup
-          barmanObjectStore:
-            destinationPath: s3://vaultwarden-wal/
-            endpointURL: http://seaweedfs-s3:8333
-            s3Credentials:
-              accessKeyId:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-              secretAccessKey:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
         certificates:
           serverTLSSecret: postgres-serving-cert
           serverCASecret: postgres-serving-cert

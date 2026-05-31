@@ -75,6 +75,24 @@ rawResources:
           kind: Issuer
           group: cert-manager.io
         secretName: postgres-restore-streaming-replica-cert
+  # See the instance backend values for why WAL archiving uses the barman-cloud plugin. This is a
+  # separate object store/bucket from the source instance.
+  postgres-restore-wal-objectstore:
+    forceRename: vaultwarden-restore-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://vaultwarden-restore-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials:
+            accessKeyId:
+              name: seaweedfs-s3-secret
+              key: admin_access_key_id
+            secretAccessKey:
+              name: seaweedfs-s3-secret
+              key: admin_secret_access_key
   postgres-restore-vaultwarden-cluster:
     forceRename: vaultwarden-restore
     manifest:
@@ -94,6 +112,11 @@ rawResources:
         storage:
           size: 5Gi
           storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: vaultwarden-restore-wal-store
         backup:
           target: prefer-standby
           volumeSnapshot:
@@ -103,16 +126,6 @@ rawResources:
               immediateCheckpoint: false
               waitForArchive: true
             snapshotOwnerReference: backup
-          barmanObjectStore:
-            destinationPath: s3://vaultwarden-restore-wal/
-            endpointURL: http://seaweedfs-s3:8333
-            s3Credentials:
-              accessKeyId:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-              secretAccessKey:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
         certificates:
           serverTLSSecret: postgres-restore-serving-cert
           serverCASecret: postgres-restore-serving-cert

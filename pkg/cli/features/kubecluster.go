@@ -10,6 +10,7 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/barmancloud"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
@@ -142,11 +143,17 @@ func (kcc *KubeClusterCommand) NewKubeClusterClient() (kubecluster.ClientInterfa
 		return nil, trace.Wrap(err, "failed to create approver-policy client")
 	}
 
+	bcClient, err := barmancloud.NewClient(config)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create barman-cloud plugin client")
+	}
+
 	return kubecluster.NewClient(
 		cmClient,
 		cnpgClient,
 		esClient,
 		coreClient,
 		apClient,
+		bcClient,
 	), nil
 }

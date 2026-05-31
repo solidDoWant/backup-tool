@@ -55,6 +55,42 @@ generate-cnpg-client: $(CNPG_KUBE_CODEGEN) $(CNPG_GIT_DIR)
 		. $(CNPG_KUBE_CODEGEN) && \
 		kube::codegen::gen_client --output-dir $(CNPG_GEN_DIR) --output-pkg $(MODULE_NAME)/$(CNPG_GEN_DIR:$(PROJECT_DIR)/%=%) --boilerplate /dev/null .
 
+BARMAN_CLOUD_VERSION := $(shell go list -f '{{ .Version }}' -m github.com/cloudnative-pg/plugin-barman-cloud)
+BARMAN_CLOUD_CODEGEN_WORKING_DIR := $(WORKING_DIR)/barman-cloud-gen
+BARMAN_CLOUD_KUBE_CODEGEN = $(BARMAN_CLOUD_CODEGEN_WORKING_DIR)/kube_codegen.sh
+BARMAN_CLOUD_GIT_DIR = $(BARMAN_CLOUD_CODEGEN_WORKING_DIR)/repo
+BARMAN_CLOUD_GEN_DIR = $(PROJECT_DIR)/pkg/kubecluster/primatives/barmancloud/gen
+
+$(BARMAN_CLOUD_KUBE_CODEGEN):
+	@mkdir -p "$(@D)"
+	@ # Deps are already installed via devcontainer, and this logic is flawed
+	@ # (https://github.com/kubernetes/code-generator/issues/184), so remove it
+	@curl -fsSL https://raw.githubusercontent.com/kubernetes/code-generator/refs/tags/$(KUBE_CODEGEN_VERSION)/kube_codegen.sh | \
+		sed 's/^[^#]*go install.*//' > $(BARMAN_CLOUD_KUBE_CODEGEN)
+
+$(BARMAN_CLOUD_GIT_DIR): SHELL := bash
+$(BARMAN_CLOUD_GIT_DIR):
+	@mkdir -p "$(@D)"
+	@git -c advice.detachedHead=false \
+		clone --quiet --branch $(BARMAN_CLOUD_VERSION) --single-branch https://github.com/cloudnative-pg/plugin-barman-cloud.git $(BARMAN_CLOUD_GIT_DIR)
+	@# Do a really rudimentary semver comparison to determine if the plugin Go version should be downgraded
+	@# This is useful for when the base devcontainer image has not been updated to the latest Go version
+	@if (( "$$(go mod edit -json $(BARMAN_CLOUD_GIT_DIR)/go.mod | jq -r .Go | sed 's/\.//g')" > "$$(go version | sed -r 's/.*go([0-9])\.([0-9]+)\.([0-9]+).*/\1\2\3/')" )); then \
+		go mod edit -go="$$(go version | sed -r 's/.*go([0-9][^ ]+).*/\1/')" $(BARMAN_CLOUD_GIT_DIR)/go.mod; \
+	fi
+
+PHONY += generate-barman-cloud-client
+GENERATORS += generate-barman-cloud-client
+generate-barman-cloud-client: SHELL := bash
+generate-barman-cloud-client: $(BARMAN_CLOUD_KUBE_CODEGEN) $(BARMAN_CLOUD_GIT_DIR)
+	@cd $(BARMAN_CLOUD_GIT_DIR) && \
+		. $(BARMAN_CLOUD_KUBE_CODEGEN) && \
+		kube::codegen::gen_client --output-dir $(BARMAN_CLOUD_GEN_DIR) --output-pkg $(MODULE_NAME)/$(BARMAN_CLOUD_GEN_DIR:$(PROJECT_DIR)/%=%) --boilerplate /dev/null .
+	@# The plugin's api/v1 package follows the controller-runtime convention and exposes its
+	@# schema.GroupVersion as `GroupVersion`, whereas client-gen emits references to the classic
+	@# `SchemeGroupVersion`. Both are the same schema.GroupVersion value, so rewrite the references.
+	@grep -rl '\.SchemeGroupVersion' $(BARMAN_CLOUD_GEN_DIR) | xargs -r sed -i 's/\.SchemeGroupVersion/.GroupVersion/g'
+
 APPROVER_POLICY_VERSION := $(shell go list -f '{{ .Version }}' -m github.com/cert-manager/approver-policy)
 APPROVER_POLICY_REPO = https://github.com/cert-manager/approver-policy.git
 APPROVER_POLICY_CODEGEN_WORKING_DIR := $(WORKING_DIR)/approver-policy-gen

@@ -5,8 +5,10 @@ import (
 	"time"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	barmanapi "github.com/cloudnative-pg/barman-cloud/pkg/api"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	barmancloudv1 "github.com/cloudnative-pg/plugin-barman-cloud/api/v1"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
@@ -19,7 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 func TestGetClusterDomainNames(t *testing.T) {
@@ -146,7 +147,7 @@ func TestGetCredentials(t *testing.T) {
 
 func TestNewClonedCluster(t *testing.T) {
 	t.Run("returns new ClonedCluster with client reference set", func(t *testing.T) {
-		p := NewProvider(nil, nil, nil)
+		p := NewProvider(nil, nil, nil, nil)
 		cc := newClonedCluster(p)
 		casted := cc.(*ClonedCluster)
 
@@ -330,7 +331,7 @@ func TestCloneCluster(t *testing.T) {
 				Spec: apiv1.ClusterSpec{
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size:         "10Gi",
-						StorageClass: ptr.To("specified-storage-class"),
+						StorageClass: new("specified-storage-class"),
 					},
 					Bootstrap: &apiv1.BootstrapConfiguration{
 						InitDB: &apiv1.BootstrapInitDB{
@@ -637,6 +638,174 @@ func TestCloneCluster(t *testing.T) {
 			require.NotNil(t, clonedCluster)
 
 			// The expected "set" functions above confirm that the clonedcluster values are set correctly
+		})
+	}
+}
+
+func barmanCloudPlugin(params map[string]string, isWALArchiver bool) apiv1.PluginConfiguration {
+	return apiv1.PluginConfiguration{
+		Name:          cnpg.BarmanCloudPluginName,
+		IsWALArchiver: new(isWALArchiver),
+		Parameters:    params,
+	}
+}
+
+func snapshotBackup(elements ...apiv1.BackupSnapshotElementStatus) *apiv1.Backup {
+	return &apiv1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-backup", Namespace: "test-ns"},
+		Status: apiv1.BackupStatus{
+			BackupSnapshotStatus: apiv1.BackupSnapshotStatus{Elements: elements},
+		},
+	}
+}
+
+func TestConfigureWALRecovery(t *testing.T) {
+	namespace := "test-ns"
+	clusterName := "source-cluster"
+	dataElement := apiv1.BackupSnapshotElementStatus{Name: "snap-data", Type: string(utils.PVCRolePgData)}
+	walElement := apiv1.BackupSnapshotElementStatus{Name: "snap-wal", Type: string(utils.PVCRolePgWal)}
+
+	pluginWALSource := func(serverName string) apiv1.ExternalCluster {
+		return apiv1.ExternalCluster{
+			Name: serverName,
+			PluginConfiguration: &apiv1.PluginConfiguration{
+				Name: cnpg.BarmanCloudPluginName,
+				Parameters: map[string]string{
+					"barmanObjectName": "store",
+					"serverName":       serverName,
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		desc            string
+		plugins         []apiv1.PluginConfiguration
+		backup          *apiv1.Backup
+		objectStore     *barmancloudv1.ObjectStore
+		objectStoreErr  bool
+		expectGetStore  bool
+		expectErr       bool
+		expectedOptions cnpg.CreateClusterOptions
+	}{
+		{
+			desc:            "in-tree barman (no plugins) recovers from the backup object",
+			backup:          snapshotBackup(dataElement),
+			expectedOptions: cnpg.CreateClusterOptions{BackupName: "test-backup"},
+		},
+		{
+			desc:            "non-barman plugin is ignored and treated as in-tree",
+			plugins:         []apiv1.PluginConfiguration{{Name: "some-other.plugin", IsWALArchiver: new(true)}},
+			backup:          snapshotBackup(dataElement),
+			expectedOptions: cnpg.CreateClusterOptions{BackupName: "test-backup"},
+		},
+		{
+			desc:    "plugin with explicit serverName parameter",
+			plugins: []apiv1.PluginConfiguration{barmanCloudPlugin(map[string]string{"barmanObjectName": "store", "serverName": "custom-server"}, true)},
+			backup:  snapshotBackup(dataElement),
+			expectedOptions: cnpg.CreateClusterOptions{
+				RecoveryTarget: &apiv1.RecoveryTarget{TargetImmediate: new(true)},
+				VolumeSnapshotRecovery: &cnpg.VolumeSnapshotRecovery{
+					DataSnapshotName: "snap-data",
+					WALSource:        pluginWALSource("custom-server"),
+				},
+			},
+		},
+		{
+			desc:    "plugin with separate WAL volume snapshot",
+			plugins: []apiv1.PluginConfiguration{barmanCloudPlugin(map[string]string{"barmanObjectName": "store", "serverName": "custom-server"}, true)},
+			backup:  snapshotBackup(dataElement, walElement),
+			expectedOptions: cnpg.CreateClusterOptions{
+				RecoveryTarget: &apiv1.RecoveryTarget{TargetImmediate: new(true)},
+				VolumeSnapshotRecovery: &cnpg.VolumeSnapshotRecovery{
+					DataSnapshotName: "snap-data",
+					WALSnapshotName:  "snap-wal",
+					WALSource:        pluginWALSource("custom-server"),
+				},
+			},
+		},
+		{
+			desc:           "plugin without serverName falls back to the object store's server name",
+			plugins:        []apiv1.PluginConfiguration{barmanCloudPlugin(map[string]string{"barmanObjectName": "store"}, true)},
+			backup:         snapshotBackup(dataElement),
+			objectStore:    &barmancloudv1.ObjectStore{Spec: barmancloudv1.ObjectStoreSpec{Configuration: barmanapi.BarmanObjectStoreConfiguration{ServerName: "store-server"}}},
+			expectGetStore: true,
+			expectedOptions: cnpg.CreateClusterOptions{
+				RecoveryTarget: &apiv1.RecoveryTarget{TargetImmediate: new(true)},
+				VolumeSnapshotRecovery: &cnpg.VolumeSnapshotRecovery{
+					DataSnapshotName: "snap-data",
+					WALSource: apiv1.ExternalCluster{
+						Name: "store-server",
+						PluginConfiguration: &apiv1.PluginConfiguration{
+							Name:       cnpg.BarmanCloudPluginName,
+							Parameters: map[string]string{"barmanObjectName": "store", "serverName": "store-server"},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:           "plugin without serverName and empty object store server name defaults to cluster name",
+			plugins:        []apiv1.PluginConfiguration{barmanCloudPlugin(map[string]string{"barmanObjectName": "store"}, true)},
+			backup:         snapshotBackup(dataElement),
+			objectStore:    &barmancloudv1.ObjectStore{Spec: barmancloudv1.ObjectStoreSpec{Configuration: barmanapi.BarmanObjectStoreConfiguration{}}},
+			expectGetStore: true,
+			expectedOptions: cnpg.CreateClusterOptions{
+				RecoveryTarget: &apiv1.RecoveryTarget{TargetImmediate: new(true)},
+				VolumeSnapshotRecovery: &cnpg.VolumeSnapshotRecovery{
+					DataSnapshotName: "snap-data",
+					WALSource:        pluginWALSource(clusterName),
+				},
+			},
+		},
+		{
+			desc:      "plugin missing barmanObjectName parameter is an error",
+			plugins:   []apiv1.PluginConfiguration{barmanCloudPlugin(map[string]string{"serverName": "custom-server"}, true)},
+			backup:    snapshotBackup(dataElement),
+			expectErr: true,
+		},
+		{
+			desc:      "plugin backup without a PG_DATA snapshot is an error",
+			plugins:   []apiv1.PluginConfiguration{barmanCloudPlugin(map[string]string{"barmanObjectName": "store", "serverName": "custom-server"}, true)},
+			backup:    snapshotBackup(walElement),
+			expectErr: true,
+		},
+		{
+			desc:           "object store lookup failure is an error",
+			plugins:        []apiv1.PluginConfiguration{barmanCloudPlugin(map[string]string{"barmanObjectName": "store"}, true)},
+			backup:         snapshotBackup(dataElement),
+			objectStoreErr: true,
+			expectGetStore: true,
+			expectErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			ctx := th.NewTestContext()
+			p := newMockProvider(t)
+
+			sourceCluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+				Spec:       apiv1.ClusterSpec{Plugins: tt.plugins},
+			}
+
+			if tt.expectGetStore {
+				p.barmanCloudClient.EXPECT().GetObjectStore(mock.Anything, namespace, "store").
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*barmancloudv1.ObjectStore, error) {
+						return th.ErrOr1Val(tt.objectStore, tt.objectStoreErr)
+					})
+			}
+
+			clusterOpts := cnpg.CreateClusterOptions{}
+			err := p.configureWALRecovery(ctx, namespace, sourceCluster, tt.backup, &clusterOpts)
+
+			if tt.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedOptions, clusterOpts)
 		})
 	}
 }

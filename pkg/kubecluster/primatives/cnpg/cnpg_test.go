@@ -396,6 +396,61 @@ func TestCreateCluster(t *testing.T) {
 			},
 		},
 		{
+			desc: "cluster with volume snapshot recovery and plugin WAL source",
+			opts: CreateClusterOptions{
+				VolumeSnapshotRecovery: &VolumeSnapshotRecovery{
+					DataSnapshotName: "snap-data",
+					WALSnapshotName:  "snap-wal",
+					WALSource: apiv1.ExternalCluster{
+						Name: "source-server",
+						PluginConfiguration: &apiv1.PluginConfiguration{
+							Name:       BarmanCloudPluginName,
+							Parameters: map[string]string{"barmanObjectName": "store", "serverName": "source-server"},
+						},
+					},
+				},
+				RecoveryTarget: &apiv1.RecoveryTarget{TargetTime: "2024-01-01T00:00:00Z"},
+				DatabaseName:   "testdb",
+				OwnerName:      "testowner",
+			},
+			expected: &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterName,
+				},
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{
+							Source: "source-server",
+							VolumeSnapshots: &apiv1.DataSource{
+								Storage: corev1.TypedLocalObjectReference{
+									APIGroup: ptr.To("snapshot.storage.k8s.io"),
+									Kind:     "VolumeSnapshot",
+									Name:     "snap-data",
+								},
+								WalStorage: &corev1.TypedLocalObjectReference{
+									APIGroup: ptr.To("snapshot.storage.k8s.io"),
+									Kind:     "VolumeSnapshot",
+									Name:     "snap-wal",
+								},
+							},
+							RecoveryTarget: &apiv1.RecoveryTarget{TargetTime: "2024-01-01T00:00:00Z"},
+							Database:       "testdb",
+							Owner:          "testowner",
+						},
+					},
+					ExternalClusters: []apiv1.ExternalCluster{
+						{
+							Name: "source-server",
+							PluginConfiguration: &apiv1.PluginConfiguration{
+								Name:       BarmanCloudPluginName,
+								Parameters: map[string]string{"barmanObjectName": "store", "serverName": "source-server"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			desc: "cluster with initdb",
 			opts: CreateClusterOptions{
 				DatabaseName: "testdb",

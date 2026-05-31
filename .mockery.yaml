@@ -85,6 +85,7 @@ packages:
     <<: *baseline_config
     interfaces:
       ClientInterface:
+  github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/barmancloud: *kube_primative_config
   github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager: *kube_primative_config
   github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg: *kube_primative_config
   github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter: *kube_primative_config

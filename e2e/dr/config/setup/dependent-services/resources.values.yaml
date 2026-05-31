@@ -42,7 +42,7 @@ rawResources:
             group: cert-manager.io
             kind: Issuer
             name: self-signed
-        allowed:
+        allowed: &allowed_all
           isCA: true
           commonName: &all_value
             value: "*"
@@ -85,6 +85,22 @@ rawResources:
             - ocsp signing
             - microsoft sgc
             - netscape sgc
+  # The barman-cloud plugin creates its own self-signed Issuer for its gRPC serving/client certs.
+  # approver-policy denies every CertificateRequest without a matching policy, so without this the
+  # plugin's certs never issue and its pod hangs waiting for the TLS secrets. The issuer name is
+  # "<release>-selfsigned-issuer"; the release is named "plugin-barman-cloud" in the helmfile.
+  barmanCloudRequestPolicy:
+    forceRename: barman-cloud-plugin-selfsigned-issuer
+    manifest:
+      apiVersion: policy.cert-manager.io/v1alpha1
+      kind: CertificateRequestPolicy
+      spec:
+        selector:
+          issuerRef:
+            group: cert-manager.io
+            kind: Issuer
+            name: plugin-barman-cloud-selfsigned-issuer
+        allowed: *allowed_all
   requestPolicyRole:
     forceRename: cert-manager-policy:cert-manager
     manifest:

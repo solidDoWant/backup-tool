@@ -5,12 +5,13 @@ go 1.26.2
 require (
 	dario.cat/mergo v1.0.1
 	github.com/cert-manager/approver-policy v0.19.0
-	github.com/cert-manager/cert-manager v1.16.3
+	github.com/cert-manager/cert-manager v1.19.2
+	github.com/cloudnative-pg/barman-cloud v0.5.0
 	github.com/cloudnative-pg/cloudnative-pg v1.28.2
 	github.com/cloudnative-pg/machinery v0.3.3
 	github.com/fatih/structtag v1.2.0
 	github.com/go-playground/validator/v10 v10.24.0
-	github.com/goccy/go-yaml v1.15.15
+	github.com/goccy/go-yaml v1.18.0
 	github.com/gravitational/trace v1.4.0
 	github.com/jinzhu/copier v0.4.0
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.4.0
@@ -34,7 +35,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudnative-pg/barman-cloud v0.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
@@ -93,7 +93,7 @@ require (
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20251125145642-4e65d59e963e // indirect
 	sigs.k8s.io/controller-runtime v0.23.3 // indirect
-	sigs.k8s.io/gateway-api v1.2.1 // indirect
+	sigs.k8s.io/gateway-api v1.4.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
@@ -101,6 +101,7 @@ require (
 require (
 	github.com/aws/aws-sdk-go v1.53.19
 	github.com/charmbracelet/log v0.4.0
+	github.com/cloudnative-pg/plugin-barman-cloud v0.10.0
 	github.com/invopop/jsonschema v0.13.0
 	github.com/seqsense/s3sync v1.10.0
 	k8s.io/apiserver v0.35.3
@@ -137,7 +138,7 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
+	golang.org/x/exp v0.0.0-20250718183923-645b1fa84792 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 )
