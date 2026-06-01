@@ -2,7 +2,6 @@ package disasterrecovery
 
 import (
 	"os"
-	"time"
 
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
@@ -116,10 +115,10 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 		CleanupTimeout: opts.CleanupTimeout,
 	})
 
-	if opts.CloneClusterOptions.RecoveryTargetTime == "" {
-		// Backup postgres clusters with their states at the same point in time
-		opts.CloneClusterOptions.RecoveryTargetTime = backup.StartTime.Format(time.RFC3339)
-	}
+	// No wall-clock recovery target: the cloned clusters are created in Setup, before the S3 capture in
+	// Execute, so the alignment instant isn't known yet. The base backup still precedes the S3 capture
+	// (consistency point before the non-DB capture — the safe direction); recovering forward to the S3
+	// instant needs the Setup/Execute split and is a separate work item.
 
 	backupOpts := cnpgbackup.CNPGBackupOptions{
 		CloningOpts:    opts.CloneClusterOptions,

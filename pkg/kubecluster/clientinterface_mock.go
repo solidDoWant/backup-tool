@@ -22,6 +22,8 @@ import (
 
 	core "github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 
+	corev1 "k8s.io/api/core/v1"
+
 	createcrpforcertificate "github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 
 	drvolume "github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume"
@@ -32,7 +34,7 @@ import (
 
 	resource "k8s.io/apimachinery/pkg/api/resource"
 
-	v1 "k8s.io/api/core/v1"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	v1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 )
@@ -255,24 +257,89 @@ func (_c *MockClientInterface_CloneCluster_Call) RunAndReturn(run func(*contexts
 	return _c
 }
 
+// CloneClusterFromBackup provides a mock function with given fields: ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts
+func (_m *MockClientInterface) CloneClusterFromBackup(ctx *contexts.Context, namespace string, existingClusterName string, newClusterName string, servingCertIssuerName string, clientCertIssuerName string, backup *v1.Backup, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
+	ret := _m.Called(ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CloneClusterFromBackup")
+	}
+
+	var r0 clonedcluster.ClonedClusterInterface
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, string, string, *v1.Backup, clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error)); ok {
+		return rf(ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, string, string, *v1.Backup, clonedcluster.CloneClusterOptions) clonedcluster.ClonedClusterInterface); ok {
+		r0 = rf(ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(clonedcluster.ClonedClusterInterface)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, string, string, string, *v1.Backup, clonedcluster.CloneClusterOptions) error); ok {
+		r1 = rf(ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_CloneClusterFromBackup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CloneClusterFromBackup'
+type MockClientInterface_CloneClusterFromBackup_Call struct {
+	*mock.Call
+}
+
+// CloneClusterFromBackup is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - existingClusterName string
+//   - newClusterName string
+//   - servingCertIssuerName string
+//   - clientCertIssuerName string
+//   - backup *v1.Backup
+//   - opts clonedcluster.CloneClusterOptions
+func (_e *MockClientInterface_Expecter) CloneClusterFromBackup(ctx interface{}, namespace interface{}, existingClusterName interface{}, newClusterName interface{}, servingCertIssuerName interface{}, clientCertIssuerName interface{}, backup interface{}, opts interface{}) *MockClientInterface_CloneClusterFromBackup_Call {
+	return &MockClientInterface_CloneClusterFromBackup_Call{Call: _e.mock.On("CloneClusterFromBackup", ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts)}
+}
+
+func (_c *MockClientInterface_CloneClusterFromBackup_Call) Run(run func(ctx *contexts.Context, namespace string, existingClusterName string, newClusterName string, servingCertIssuerName string, clientCertIssuerName string, backup *v1.Backup, opts clonedcluster.CloneClusterOptions)) *MockClientInterface_CloneClusterFromBackup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(string), args[6].(*v1.Backup), args[7].(clonedcluster.CloneClusterOptions))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_CloneClusterFromBackup_Call) Return(cluster clonedcluster.ClonedClusterInterface, err error) *MockClientInterface_CloneClusterFromBackup_Call {
+	_c.Call.Return(cluster, err)
+	return _c
+}
+
+func (_c *MockClientInterface_CloneClusterFromBackup_Call) RunAndReturn(run func(*contexts.Context, string, string, string, string, string, *v1.Backup, clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error)) *MockClientInterface_CloneClusterFromBackup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ClonePVC provides a mock function with given fields: ctx, namespace, pvcName, opts
-func (_m *MockClientInterface) ClonePVC(ctx *contexts.Context, namespace string, pvcName string, opts clonepvc.ClonePVCOptions) (*v1.PersistentVolumeClaim, error) {
+func (_m *MockClientInterface) ClonePVC(ctx *contexts.Context, namespace string, pvcName string, opts clonepvc.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error) {
 	ret := _m.Called(ctx, namespace, pvcName, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ClonePVC")
 	}
 
-	var r0 *v1.PersistentVolumeClaim
+	var r0 *corev1.PersistentVolumeClaim
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, clonepvc.ClonePVCOptions) (*v1.PersistentVolumeClaim, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, clonepvc.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error)); ok {
 		return rf(ctx, namespace, pvcName, opts)
 	}
-	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, clonepvc.ClonePVCOptions) *v1.PersistentVolumeClaim); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, clonepvc.ClonePVCOptions) *corev1.PersistentVolumeClaim); ok {
 		r0 = rf(ctx, namespace, pvcName, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.PersistentVolumeClaim)
+			r0 = ret.Get(0).(*corev1.PersistentVolumeClaim)
 		}
 	}
 
@@ -306,12 +373,12 @@ func (_c *MockClientInterface_ClonePVC_Call) Run(run func(ctx *contexts.Context,
 	return _c
 }
 
-func (_c *MockClientInterface_ClonePVC_Call) Return(clonedPvc *v1.PersistentVolumeClaim, err error) *MockClientInterface_ClonePVC_Call {
+func (_c *MockClientInterface_ClonePVC_Call) Return(clonedPvc *corev1.PersistentVolumeClaim, err error) *MockClientInterface_ClonePVC_Call {
 	_c.Call.Return(clonedPvc, err)
 	return _c
 }
 
-func (_c *MockClientInterface_ClonePVC_Call) RunAndReturn(run func(*contexts.Context, string, string, clonepvc.ClonePVCOptions) (*v1.PersistentVolumeClaim, error)) *MockClientInterface_ClonePVC_Call {
+func (_c *MockClientInterface_ClonePVC_Call) RunAndReturn(run func(*contexts.Context, string, string, clonepvc.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error)) *MockClientInterface_ClonePVC_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -480,6 +547,67 @@ func (_c *MockClientInterface_CreateCRPForCertificate_Call) Return(_a0 *v1alpha1
 }
 
 func (_c *MockClientInterface_CreateCRPForCertificate_Call) RunAndReturn(run func(*contexts.Context, *certmanagerv1.Certificate, createcrpforcertificate.CreateCRPForCertificateOpts) (*v1alpha1.CertificateRequestPolicy, error)) *MockClientInterface_CreateCRPForCertificate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateClusterBackup provides a mock function with given fields: ctx, namespace, existingClusterName, opts
+func (_m *MockClientInterface) CreateClusterBackup(ctx *contexts.Context, namespace string, existingClusterName string, opts clonedcluster.CloneClusterOptions) (*v1.Backup, error) {
+	ret := _m.Called(ctx, namespace, existingClusterName, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateClusterBackup")
+	}
+
+	var r0 *v1.Backup
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, clonedcluster.CloneClusterOptions) (*v1.Backup, error)); ok {
+		return rf(ctx, namespace, existingClusterName, opts)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, clonedcluster.CloneClusterOptions) *v1.Backup); ok {
+		r0 = rf(ctx, namespace, existingClusterName, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Backup)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, clonedcluster.CloneClusterOptions) error); ok {
+		r1 = rf(ctx, namespace, existingClusterName, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_CreateClusterBackup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateClusterBackup'
+type MockClientInterface_CreateClusterBackup_Call struct {
+	*mock.Call
+}
+
+// CreateClusterBackup is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - existingClusterName string
+//   - opts clonedcluster.CloneClusterOptions
+func (_e *MockClientInterface_Expecter) CreateClusterBackup(ctx interface{}, namespace interface{}, existingClusterName interface{}, opts interface{}) *MockClientInterface_CreateClusterBackup_Call {
+	return &MockClientInterface_CreateClusterBackup_Call{Call: _e.mock.On("CreateClusterBackup", ctx, namespace, existingClusterName, opts)}
+}
+
+func (_c *MockClientInterface_CreateClusterBackup_Call) Run(run func(ctx *contexts.Context, namespace string, existingClusterName string, opts clonedcluster.CloneClusterOptions)) *MockClientInterface_CreateClusterBackup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(clonedcluster.CloneClusterOptions))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_CreateClusterBackup_Call) Return(_a0 *v1.Backup, _a1 error) *MockClientInterface_CreateClusterBackup_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_CreateClusterBackup_Call) RunAndReturn(run func(*contexts.Context, string, string, clonedcluster.CloneClusterOptions) (*v1.Backup, error)) *MockClientInterface_CreateClusterBackup_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -54,15 +54,15 @@ func NewVaultWarden(client kubecluster.ClientInterface) *VaultWarden {
 }
 
 // Backup process:
-// 1. Clone the CNPG cluster
-// 2. Snapshot/clone PVC containing data directory
+// 1. Take the CNPG base backup (establishes the DB consistency point, before the other captures)
+// 2. Snapshot/clone the PVC containing the data directory (its clone time is the recovery target T_dr)
 // 3. Create the DR PVC if not exists
-// 4. Spawn a new tool instance with the cloned PVC attached, and DR mount attached
-// 5. Sync the data directory to the DR volume
-// 6. Perform a CNPG logical backup
-// 7. Copy the logical backup to the DR mount
+// 4. Create the cloned CNPG cluster, recovering forward to T_dr (idle source falls back to the consistency point)
+// 5. Spawn a tool instance with the cloned PVC, cloned-cluster certs, and DR mount attached
+// 6. Sync the data directory to the DR volume
+// 7. Perform a CNPG logical backup (pg_dumpall) to the DR mount
 // 8. Take a snapshot of the DR volume
-// 9. Exit the tool instance, delete all created resources except for DR volume snapshot
+// 9. Exit the tool instance, delete all created resources except for the DR volume snapshot
 func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, dataPVC, cnpgClusterName, servingCertIssuerName, clientCertIssuerName string, backupOptions VaultWardenBackupOptions) (backup *DREvent, err error) {
 	backup = NewDREventNow(backupName)
 	ctx.Log.With("backupName", backup.GetFullName(), "namespace", namespace).Info("Starting backup process")
@@ -76,32 +76,28 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 		}
 	}()
 
-	// 1. Clone the CNPG cluster. This must run before the filesystem/DR captures so that the
-	// database's consistency point (the instant the CNPG base backup completes) precedes them.
-	// Postgres can only be recovered forward from its base backup, so for cross-resource PITR
-	// consistency the base backup has to be the earliest capture in the event. See
-	// docs/cross-resource-pitr-consistency.md.
-	ctx.Log.Step().Info("Cloning CNPG cluster")
-	// Try and come up with the most useful name for the cloned cluster fitting CNPG requirements
-	// More info is better, but it needs to at least convey the backup name and still be readable
-	clonedClusterName := helpers.CleanName(fmt.Sprintf("%s-%s", cnpgClusterName, backup.GetFullName()))
-	if len(clonedClusterName) > 40 { // Max length that CNPG allows for cloned cluster names, see https://github.com/cloudnative-pg/cloudnative-pg/pull/6755
-		clonedClusterName = helpers.CleanName(helpers.TruncateString(backup.GetFullName(), 40, ""))
-	}
-
 	if backupOptions.CloneClusterOptions.CleanupTimeout == 0 {
 		backupOptions.CloneClusterOptions.CleanupTimeout = backupOptions.CleanupTimeout
 	}
 
-	clonedCluster, err := vw.kubernetesClient.CloneCluster(ctx.Child(), namespace, cnpgClusterName,
-		clonedClusterName, servingCertIssuerName, clientCertIssuerName,
-		backupOptions.CloneClusterOptions)
+	// 1. Take the CNPG base backup first. Postgres can only be recovered forward from its base
+	// backup, so for cross-resource PITR the base backup must be the earliest capture in the event:
+	// its consistency point then precedes the filesystem/DR captures below, and the clone can be
+	// recovered forward from it to line up with them.
+	ctx.Log.Step().Info("Backing up the CNPG cluster")
+	cnpgBackup, err := vw.kubernetesClient.CreateClusterBackup(ctx.Child(), namespace, cnpgClusterName, backupOptions.CloneClusterOptions)
 	if err != nil {
-		return backup, trace.Wrap(err, "failed to clone cluster %q", cnpgClusterName)
+		return backup, trace.Wrap(err, "failed to back up cluster %q", cnpgClusterName)
 	}
-	defer cleanup.To(clonedCluster.Delete).WithErrMessage("failed to cleanup cloned cluster %q resources", clonedClusterName).WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(backupOptions.CleanupTimeout.MaxWait(10 * time.Minute)).Run()
+	// The backup, and the volume snapshots it owns, must outlive the clone recovery below, so it is
+	// only deleted at the very end of the event.
+	defer cleanup.To(func(ctx *contexts.Context) error {
+		return vw.kubernetesClient.CNPG().DeleteBackup(ctx, namespace, cnpgBackup.Name)
+	}).WithErrMessage("failed to cleanup CNPG backup %q", helpers.FullNameStr(namespace, cnpgBackup.Name)).WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(backupOptions.CleanupTimeout.MaxWait(time.Minute)).Run()
 
-	// 2. Snapshot/clone PVC containing data directory
+	// 2. Snapshot/clone the PVC containing the data directory. The clone freezes the filesystem; its
+	// creation time is T_dr, the instant the DB is recovered forward to so it aligns with the frozen
+	// filesystem.
 	ctx.Log.Step().Info("Cloning data PVC")
 	clonedPVC, err := vw.kubernetesClient.ClonePVC(ctx.Child(), namespace, dataPVC, clonepvc.ClonePVCOptions{DestPvcNamePrefix: backup.GetFullName(), CleanupTimeout: backupOptions.CleanupTimeout, ForceBind: true})
 	if err != nil {
@@ -129,7 +125,26 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 		return backup, trace.Wrap(err, "failed to ensure backup volume exists")
 	}
 
-	// 4. Spawn a new tool instance with the cloned PVC attached, and DR mount and secrets attached
+	// 4. Create the cloned CNPG cluster from the base backup, recovering forward to the data PVC
+	// clone time (T_dr) so the database lines up with the frozen filesystem. If the source was idle
+	// between the base backup and T_dr, CloneClusterFromBackup transparently falls back to the
+	// backup's consistency point.
+	ctx.Log.Step().Info("Cloning CNPG cluster")
+	backupOptions.CloneClusterOptions.RecoveryTargetTime = clonedPVC.CreationTimestamp.Format(time.RFC3339)
+	// Try and come up with the most useful name for the cloned cluster fitting CNPG requirements.
+	// More info is better, but it needs to at least convey the backup name and still be readable.
+	clonedClusterName := helpers.CleanName(fmt.Sprintf("%s-%s", cnpgClusterName, backup.GetFullName()))
+	if len(clonedClusterName) > 40 { // Max length that CNPG allows for cloned cluster names, see https://github.com/cloudnative-pg/cloudnative-pg/pull/6755
+		clonedClusterName = helpers.CleanName(helpers.TruncateString(backup.GetFullName(), 40, ""))
+	}
+
+	clonedCluster, err := vw.kubernetesClient.CloneClusterFromBackup(ctx.Child(), namespace, cnpgClusterName, clonedClusterName, servingCertIssuerName, clientCertIssuerName, cnpgBackup, backupOptions.CloneClusterOptions)
+	if err != nil {
+		return backup, trace.Wrap(err, "failed to clone cluster %q", cnpgClusterName)
+	}
+	defer cleanup.To(clonedCluster.Delete).WithErrMessage("failed to cleanup cloned cluster %q resources", clonedClusterName).WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(backupOptions.CleanupTimeout.MaxWait(10 * time.Minute)).Run()
+
+	// 5. Spawn a new tool instance with the cloned PVC attached, and DR mount and secrets attached
 	ctx.Log.Step().Info("Creating backup tool instance")
 	drVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "dr")
 	clonedVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "data")
@@ -154,7 +169,7 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 	defer cleanup.To(btInstance.Delete).WithErrMessage("failed to cleanup backup tool instance %q resources", backup.GetFullName()).
 		WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(backupOptions.CleanupTimeout.MaxWait(time.Minute)).Run()
 
-	// 5. Sync the data directory to the DR volume
+	// 6. Sync the data directory to the DR volume
 	ctx.Log.Step().Info("Syncing data directory to DR volume")
 	backupToolClient, err := btInstance.GetGRPCClient(ctx.Child())
 	if err != nil {
@@ -167,7 +182,7 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 		return backup, trace.Wrap(err, "failed to sync data directory files at %q to the disaster recovery volume at %q", clonedVolumeMountPath, drDataVolPath)
 	}
 
-	// 6. Perform a CNPG logical backup
+	// 7. Perform a CNPG logical backup
 	ctx.Log.Step().Info("Performing Postgres logical backup")
 	podSQLFilePath := filepath.Join(drVolumeMountPath, vaultwardenSQLFileName)
 	clusterCredentials := clonedCluster.GetCredentials(servingCertVolumeMountPath, clientCertVolumeMountPath)
@@ -176,7 +191,7 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 		return backup, trace.Wrap(err, "failed to dump logical backup for postgres server at %q", postgres.GetServerAddress(clusterCredentials))
 	}
 
-	// 7. Snapshot the backup PVC
+	// 8. Snapshot the backup PVC
 	ctx.Log.Step().Info("Snapshotting the DR volume")
 	snapshot, err := vw.kubernetesClient.ES().SnapshotVolume(ctx.Child(), namespace, drPVC.Name, externalsnapshotter.SnapshotVolumeOptions{Name: helpers.CleanName(backup.GetFullName()), SnapshotClass: backupOptions.BackupSnapshot.SnapshotClass})
 	if err != nil {

@@ -22,6 +22,7 @@ type ClientInterface interface {
 	WaitForReadyCluster(ctx *contexts.Context, namespace, name string, opts WaitForReadyClusterOpts) (*apiv1.Cluster, error)
 	GetCluster(ctx *contexts.Context, namespace, name string) (*apiv1.Cluster, error)
 	DeleteCluster(ctx *contexts.Context, namespace, name string) error
+	WaitForClusterDeleted(ctx *contexts.Context, namespace, name string, opts WaitForClusterDeletedOpts) error
 }
 
 type Client struct {

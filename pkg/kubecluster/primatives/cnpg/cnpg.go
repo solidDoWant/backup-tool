@@ -308,6 +308,21 @@ func (cnpgc *Client) DeleteCluster(ctx *contexts.Context, namespace, name string
 	return trace.Wrap(err, "failed to delete CNPG cluster %q", helpers.FullNameStr(namespace, name))
 }
 
+type WaitForClusterDeletedOpts struct {
+	helpers.MaxWaitTime
+}
+
+// WaitForClusterDeleted blocks until the named cluster no longer exists, or the timeout elapses.
+// It is used after DeleteCluster when a cluster must be recreated under the same name (the recovery
+// fallback), since CNPG cluster deletion is asynchronous (finalizers tear down pods/PVCs first).
+func (cnpgc *Client) WaitForClusterDeleted(ctx *contexts.Context, namespace, name string, opts WaitForClusterDeletedOpts) (err error) {
+	ctx.Log.With("name", name).Info("Waiting for cluster to be deleted")
+	defer ctx.Log.Info("Finished waiting for cluster to be deleted", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
+	err = helpers.WaitForResourceDeletion[*apiv1.Cluster](ctx.Child(), opts.MaxWait(10*time.Minute), cnpgc.cnpgClient.PostgresqlV1().Clusters(namespace), name)
+	return trace.Wrap(err, "failed waiting for cluster %q to be deleted", helpers.FullNameStr(namespace, name))
+}
+
 type KubernetesSecretCredentials struct {
 	Host                         string
 	Port                         string

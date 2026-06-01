@@ -4,6 +4,7 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
@@ -16,6 +17,8 @@ type ClientInterface interface {
 	CreatePod(ctx *contexts.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) // TODO see if this can be refined further
 	WaitForReadyPod(ctx *contexts.Context, namespace, name string, opts WaitForReadyPodOpts) (*corev1.Pod, error)
 	DeletePod(ctx *contexts.Context, namespace, name string) error
+	// Jobs
+	WaitForJobCompletion(ctx *contexts.Context, namespace, name string, opts WaitForJobCompletionOpts) (*batchv1.Job, error)
 	// PVCs
 	CreatePVC(ctx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error)
 	GetPVC(ctx *contexts.Context, namespace, name string) (*corev1.PersistentVolumeClaim, error)

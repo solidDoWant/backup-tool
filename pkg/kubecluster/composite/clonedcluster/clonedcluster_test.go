@@ -15,10 +15,12 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -147,7 +149,7 @@ func TestGetCredentials(t *testing.T) {
 
 func TestNewClonedCluster(t *testing.T) {
 	t.Run("returns new ClonedCluster with client reference set", func(t *testing.T) {
-		p := NewProvider(nil, nil, nil, nil)
+		p := NewProvider(nil, nil, nil, nil, nil)
 		cc := newClonedCluster(p)
 		casted := cc.(*ClonedCluster)
 
@@ -386,16 +388,14 @@ func TestCloneCluster(t *testing.T) {
 				},
 			}
 
-			// Setup parameters for mocks that may vary depending on the test
+			// Setup parameters for mocks that may vary depending on the test. The test source cluster
+			// uses the in-tree path (no barman-cloud plugin), so no recoveryTarget is set: recovery from
+			// the backup object stops at the consistency point on its own (regardless of any
+			// RecoveryTargetTime), and CNPG rejects a recoveryTarget here without a backupID.
 			clusterOpts := cnpg.CreateClusterOptions{
 				BackupName:   createdBackup.Name,
 				StorageClass: "specified-storage-class",
 				ImageName:    existingCluster.Spec.ImageName,
-			}
-			if tt.opts.RecoveryTargetTime != "" {
-				clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{
-					TargetTime: tt.opts.RecoveryTargetTime,
-				}
 			}
 
 			errorExpected := th.ErrExpected(
@@ -428,24 +428,18 @@ func TestCloneCluster(t *testing.T) {
 					return
 				}
 
-				// 0. Setup
-				if errorExpected {
+				// 0. Setup. The cloned cluster object is only created (and thus only cleaned up) once
+				// the base backup has succeeded, so a Delete is expected only for failures after that.
+				clusterCreated := !tt.simulateBackupError && !tt.simulateWaitingForBackupError
+				if errorExpected && clusterCreated {
 					p.clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
 						require.NotEqual(t, ctx, cleanupCtx) // This should be a different context with a timeout
 						return th.ErrIfTrue(tt.simulateErrorOnClusterCleanup)
 					})
 				}
 
-				p.cnpgClient.EXPECT().GetCluster(mock.Anything, namespace, existingCluster.Name).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*apiv1.Cluster, error) {
-						assert.True(t, calledCtx.IsChildOf(ctx))
-						return th.ErrOr1Val(existingCluster, tt.simulateGetExistingClusterError)
-					})
-				if tt.simulateGetExistingClusterError {
-					return
-				}
-
-				// 1.
+				// 1. Back up the existing cluster (this now happens before the existing cluster is read,
+				// so the consistency point precedes any other captures the caller may take in between).
 				p.cnpgClient.EXPECT().CreateBackup(mock.Anything, namespace, createdBackup.Name, existingCluster.Name, cnpg.CreateBackupOptions{GenerateName: true}).
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, name, clusterName string, opts cnpg.CreateBackupOptions) (*apiv1.Backup, error) {
 						assert.True(t, calledCtx.IsChildOf(ctx))
@@ -462,6 +456,16 @@ func TestCloneCluster(t *testing.T) {
 						return th.ErrOr1Val(createdBackup, tt.simulateWaitingForBackupError)
 					})
 				if tt.simulateWaitingForBackupError {
+					return
+				}
+
+				// 2. Read the existing cluster
+				p.cnpgClient.EXPECT().GetCluster(mock.Anything, namespace, existingCluster.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*apiv1.Cluster, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrOr1Val(existingCluster, tt.simulateGetExistingClusterError)
+					})
+				if tt.simulateGetExistingClusterError {
 					return
 				}
 
@@ -613,7 +617,8 @@ func TestCloneCluster(t *testing.T) {
 				}
 
 				p.clonedCluster.EXPECT().setCluster(newCluster).Return()
-				p.cnpgClient.EXPECT().WaitForReadyCluster(mock.Anything, namespace, newCluster.Name, cnpg.WaitForReadyClusterOpts{MaxWaitTime: tt.opts.WaitForClusterTimeout}).
+				// waitForCloneRecovery computes the wait timeout (gate / remaining budget), so don't pin it.
+				p.cnpgClient.EXPECT().WaitForReadyCluster(mock.Anything, namespace, newCluster.Name, mock.Anything).
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts cnpg.WaitForReadyClusterOpts) (*apiv1.Cluster, error) {
 						assert.True(t, calledCtx.IsChildOf(ctx))
 						return th.ErrOr1Val(newCluster, tt.simulateWaitForClusterError)
@@ -704,7 +709,6 @@ func TestConfigureWALRecovery(t *testing.T) {
 			plugins: []apiv1.PluginConfiguration{barmanCloudPlugin(map[string]string{"barmanObjectName": "store", "serverName": "custom-server"}, true)},
 			backup:  snapshotBackup(dataElement),
 			expectedOptions: cnpg.CreateClusterOptions{
-				RecoveryTarget: &apiv1.RecoveryTarget{TargetImmediate: new(true)},
 				VolumeSnapshotRecovery: &cnpg.VolumeSnapshotRecovery{
 					DataSnapshotName: "snap-data",
 					WALSource:        pluginWALSource("custom-server"),
@@ -716,7 +720,6 @@ func TestConfigureWALRecovery(t *testing.T) {
 			plugins: []apiv1.PluginConfiguration{barmanCloudPlugin(map[string]string{"barmanObjectName": "store", "serverName": "custom-server"}, true)},
 			backup:  snapshotBackup(dataElement, walElement),
 			expectedOptions: cnpg.CreateClusterOptions{
-				RecoveryTarget: &apiv1.RecoveryTarget{TargetImmediate: new(true)},
 				VolumeSnapshotRecovery: &cnpg.VolumeSnapshotRecovery{
 					DataSnapshotName: "snap-data",
 					WALSnapshotName:  "snap-wal",
@@ -731,7 +734,6 @@ func TestConfigureWALRecovery(t *testing.T) {
 			objectStore:    &barmancloudv1.ObjectStore{Spec: barmancloudv1.ObjectStoreSpec{Configuration: barmanapi.BarmanObjectStoreConfiguration{ServerName: "store-server"}}},
 			expectGetStore: true,
 			expectedOptions: cnpg.CreateClusterOptions{
-				RecoveryTarget: &apiv1.RecoveryTarget{TargetImmediate: new(true)},
 				VolumeSnapshotRecovery: &cnpg.VolumeSnapshotRecovery{
 					DataSnapshotName: "snap-data",
 					WALSource: apiv1.ExternalCluster{
@@ -751,7 +753,6 @@ func TestConfigureWALRecovery(t *testing.T) {
 			objectStore:    &barmancloudv1.ObjectStore{Spec: barmancloudv1.ObjectStoreSpec{Configuration: barmanapi.BarmanObjectStoreConfiguration{}}},
 			expectGetStore: true,
 			expectedOptions: cnpg.CreateClusterOptions{
-				RecoveryTarget: &apiv1.RecoveryTarget{TargetImmediate: new(true)},
 				VolumeSnapshotRecovery: &cnpg.VolumeSnapshotRecovery{
 					DataSnapshotName: "snap-data",
 					WALSource:        pluginWALSource(clusterName),
@@ -798,7 +799,7 @@ func TestConfigureWALRecovery(t *testing.T) {
 			}
 
 			clusterOpts := cnpg.CreateClusterOptions{}
-			err := p.configureWALRecovery(ctx, namespace, sourceCluster, tt.backup, &clusterOpts)
+			isPluginRecovery, err := p.configureWALRecovery(ctx, namespace, sourceCluster, tt.backup, &clusterOpts)
 
 			if tt.expectErr {
 				require.Error(t, err)
@@ -806,6 +807,8 @@ func TestConfigureWALRecovery(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedOptions, clusterOpts)
+			// The plugin path is exactly the one that recovers from volume snapshots.
+			assert.Equal(t, tt.expectedOptions.VolumeSnapshotRecovery != nil, isPluginRecovery)
 		})
 	}
 }
@@ -827,7 +830,9 @@ func TestClonedClusterWhenFailToParseExistingClusterStorageSize(t *testing.T) {
 		})
 	p.clonedCluster.EXPECT().Delete(mock.Anything).Return(nil)
 
-	clonedCluster, err := p.CloneCluster(ctx, "test-ns", "existing-cluster", "new-cluster", "issuer-1", "issuer-2", CloneClusterOptions{})
+	// Call CloneClusterFromBackup directly so the test focuses on the storage-size parse failure
+	// without needing to drive the base backup creation that CloneCluster performs first.
+	clonedCluster, err := p.CloneClusterFromBackup(ctx, "test-ns", "existing-cluster", "new-cluster", "issuer-1", "issuer-2", &apiv1.Backup{}, CloneClusterOptions{})
 	require.Error(t, err)
 	require.Nil(t, clonedCluster)
 }
@@ -1371,4 +1376,65 @@ func TestClonedClusterGetStreamingReplicaUserCert(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func readyCluster(name string) *apiv1.Cluster {
+	return &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test-ns"},
+		Status: apiv1.ClusterStatus{
+			Conditions: []metav1.Condition{{
+				Type:   string(apiv1.ConditionClusterReady),
+				Status: metav1.ConditionTrue,
+			}},
+		},
+	}
+}
+
+func TestWaitForCloneRecovery(t *testing.T) {
+	namespace := "test-ns"
+	clusterName := "new-cluster"
+	targetOpts := CloneClusterOptions{RecoveryTargetTime: time.Now().Format(time.RFC3339)}
+
+	t.Run("no target time waits for ready", func(t *testing.T) {
+		p := newMockProvider(t)
+		ctx := th.NewTestContext()
+		want := readyCluster(clusterName)
+		p.cnpgClient.EXPECT().WaitForReadyCluster(mock.Anything, namespace, clusterName, mock.Anything).Return(want, nil)
+
+		got, err := p.waitForCloneRecovery(ctx, namespace, clusterName, false, CloneClusterOptions{})
+		require.NoError(t, err)
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("target time, recovery job completes then cluster becomes ready", func(t *testing.T) {
+		p := newMockProvider(t)
+		ctx := th.NewTestContext()
+		want := readyCluster(clusterName)
+		// The recovery Job is selected (by an empty name) via the cluster + jobRole labels.
+		p.coreClient.EXPECT().WaitForJobCompletion(mock.Anything, namespace, "", core.WaitForJobCompletionOpts{LabelSelector: "cnpg.io/cluster=new-cluster,cnpg.io/jobRole"}).Return(&batchv1.Job{}, nil)
+		p.cnpgClient.EXPECT().WaitForReadyCluster(mock.Anything, namespace, clusterName, mock.Anything).Return(want, nil)
+
+		got, err := p.waitForCloneRecovery(ctx, namespace, clusterName, true, targetOpts)
+		require.NoError(t, err)
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("target time, recovery job fails returns ErrRecoveryTargetNotReached", func(t *testing.T) {
+		p := newMockProvider(t)
+		ctx := th.NewTestContext()
+		p.coreClient.EXPECT().WaitForJobCompletion(mock.Anything, namespace, mock.Anything, mock.Anything).Return(nil, core.ErrJobFailed)
+
+		_, err := p.waitForCloneRecovery(ctx, namespace, clusterName, true, targetOpts)
+		assert.ErrorIs(t, err, ErrRecoveryTargetNotReached)
+	})
+
+	t.Run("target time, recovery job wait error propagates", func(t *testing.T) {
+		p := newMockProvider(t)
+		ctx := th.NewTestContext()
+		p.coreClient.EXPECT().WaitForJobCompletion(mock.Anything, namespace, mock.Anything, mock.Anything).Return(nil, assert.AnError)
+
+		_, err := p.waitForCloneRecovery(ctx, namespace, clusterName, true, targetOpts)
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, ErrRecoveryTargetNotReached)
+	})
 }

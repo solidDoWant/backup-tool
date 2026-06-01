@@ -340,6 +340,55 @@ func (_c *MockClientInterface_SetCommonLabels_Call) RunAndReturn(run func(map[st
 	return _c
 }
 
+// WaitForClusterDeleted provides a mock function with given fields: ctx, namespace, name, opts
+func (_m *MockClientInterface) WaitForClusterDeleted(ctx *contexts.Context, namespace string, name string, opts WaitForClusterDeletedOpts) error {
+	ret := _m.Called(ctx, namespace, name, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WaitForClusterDeleted")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForClusterDeletedOpts) error); ok {
+		r0 = rf(ctx, namespace, name, opts)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClientInterface_WaitForClusterDeleted_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForClusterDeleted'
+type MockClientInterface_WaitForClusterDeleted_Call struct {
+	*mock.Call
+}
+
+// WaitForClusterDeleted is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - name string
+//   - opts WaitForClusterDeletedOpts
+func (_e *MockClientInterface_Expecter) WaitForClusterDeleted(ctx interface{}, namespace interface{}, name interface{}, opts interface{}) *MockClientInterface_WaitForClusterDeleted_Call {
+	return &MockClientInterface_WaitForClusterDeleted_Call{Call: _e.mock.On("WaitForClusterDeleted", ctx, namespace, name, opts)}
+}
+
+func (_c *MockClientInterface_WaitForClusterDeleted_Call) Run(run func(ctx *contexts.Context, namespace string, name string, opts WaitForClusterDeletedOpts)) *MockClientInterface_WaitForClusterDeleted_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(WaitForClusterDeletedOpts))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_WaitForClusterDeleted_Call) Return(_a0 error) *MockClientInterface_WaitForClusterDeleted_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClientInterface_WaitForClusterDeleted_Call) RunAndReturn(run func(*contexts.Context, string, string, WaitForClusterDeletedOpts) error) *MockClientInterface_WaitForClusterDeleted_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // WaitForReadyBackup provides a mock function with given fields: ctx, namespace, name, opts
 func (_m *MockClientInterface) WaitForReadyBackup(ctx *contexts.Context, namespace string, name string, opts WaitForReadyBackupOpts) (*v1.Backup, error) {
 	ret := _m.Called(ctx, namespace, name, opts)

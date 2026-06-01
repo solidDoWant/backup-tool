@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	toolswatch "k8s.io/client-go/tools/watch"
-	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -99,24 +98,47 @@ type ListerWatcher[TList runtime.Object] interface {
 }
 
 // Callback for determining if a provided k8s object (`T`, such as corev1.Pod) matches an awaited condition.
-// The function returns result `V` (can be `nil`/`interface{}` type if not needed), whether or not the object
+// The function returns result `V` (can be `nil`/`any` type if not needed), whether or not the object
 // matches the condition, and an error if one occurred during processing.
-type WaitEventProcessor[T runtime.Object, V interface{}] func(*contexts.Context, T) (V, bool, error)
+type WaitEventProcessor[T runtime.Object, V any] func(*contexts.Context, T) (V, bool, error)
 
-// Wait for a check to pass on a given resource, optionally returning a value when the condition passes.
-// Will not return until the condition is met, or an error occurs.
-func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interface{}](ctx *contexts.Context, timeout time.Duration, client ListerWatcher[TList], name string, processEvent WaitEventProcessor[T, V]) (result V, err error) {
+// Wait for a check to pass on the single named resource, optionally returning a value when the
+// condition passes. Will not return until the condition is met, or an error occurs.
+func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V any](ctx *contexts.Context, timeout time.Duration, client ListerWatcher[TList], name string, processEvent WaitEventProcessor[T, V]) (result V, err error) {
 	ctx.Log.With("name", name, "timeout", timeout).Debug("Waiting for resource condition")
 	defer ctx.Log.Debug("Finished waiting for resource condition", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err), "result", result)
 
+	return waitForResourceCondition(ctx, timeout, client, func(options *metav1.ListOptions) {
+		options.FieldSelector = fields.OneTermEqualSelector(metav1.ObjectNameField, name).String()
+	}, processEvent)
+}
+
+// WaitForResourceConditionByLabel is like WaitForResourceCondition but matches resources by label
+// selector instead of name, so it can wait on a resource whose name isn't known ahead of time (such
+// as a generate-named Job). The condition is checked against every matched resource and the wait
+// returns as soon as any of them satisfies it.
+func WaitForResourceConditionByLabel[T runtime.Object, TList runtime.Object, V any](ctx *contexts.Context, timeout time.Duration, client ListerWatcher[TList], labelSelector string, processEvent WaitEventProcessor[T, V]) (result V, err error) {
+	ctx.Log.With("labelSelector", labelSelector, "timeout", timeout).Debug("Waiting for resource condition by label")
+	defer ctx.Log.Debug("Finished waiting for resource condition by label", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err), "result", result)
+
+	return waitForResourceCondition(ctx, timeout, client, func(options *metav1.ListOptions) {
+		options.LabelSelector = labelSelector
+	}, processEvent)
+}
+
+// waitForResourceCondition List+Watches a resource (selected by setSelector) and runs processEvent
+// against the current state and every subsequent change until the condition is met or an error
+// occurs. The initial List is checked across all matched items, so it works for both single-name and
+// label-selected waits.
+func waitForResourceCondition[T runtime.Object, TList runtime.Object, V any](ctx *contexts.Context, timeout time.Duration, client ListerWatcher[TList], setSelector func(*metav1.ListOptions), processEvent WaitEventProcessor[T, V]) (result V, err error) {
 	// Setup a timeout context for processing events
 	eventCtx, cancel := ctx.Child().WithTimeout(timeout)
 	defer cancel()
 
 	// Setup the k8s API calls
 	setCommonOpts := func(options *metav1.ListOptions) {
-		options.FieldSelector = fields.OneTermEqualSelector(metav1.ObjectNameField, name).String()
-		options.TimeoutSeconds = ptr.To(int64(math.Floor(timeout.Seconds())))
+		setSelector(options)
+		options.TimeoutSeconds = new(int64(math.Floor(timeout.Seconds())))
 	}
 
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
@@ -136,24 +158,18 @@ func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interfac
 		eventCtx.Log.Debug("Checking initial resource condition")
 		defer eventCtx.Log.Debug("Initial condition check results", "matched", matched, contexts.ErrorKeyvals(&err))
 
-		items := store.List()
-		if len(items) > 1 {
-			return false, trace.Errorf("expected at most one item, matched %d", len(items))
-		}
+		for _, item := range store.List() {
+			castedItem, ok := item.(T)
+			if !ok {
+				return false, trace.Errorf("failed to cast item to %T", objType)
+			}
 
-		if len(items) == 0 {
-			return false, nil
+			result, matched, err = processEvent(eventCtx.Child(), castedItem)
+			if matched || err != nil {
+				return matched, trace.Wrap(err, "failed while processing initial precondition event")
+			}
 		}
-
-		item := items[0]
-		castedItem, ok := item.(T)
-		if !ok {
-			return false, trace.Errorf("failed to cast item to %T", objType)
-		}
-		eventCtx.Log.With("item", item)
-
-		result, matched, err = processEvent(eventCtx.Child(), castedItem)
-		return matched, trace.Wrap(err, "failed while processing initial precondition event")
+		return false, nil
 	}
 
 	// Handles casting the event object to `T`, and the boilerplate logic for calling/returning values from `processEvent`.
@@ -168,7 +184,7 @@ func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interfac
 		eventCtx.Log.With("item", castedItem)
 
 		result, matched, err = processEvent(eventCtx.Child(), castedItem)
-		return matched, trace.Wrap(err, "failed while processing initial precondition event")
+		return matched, trace.Wrap(err, "failed while processing event")
 	}
 
 	_, err = toolswatch.UntilWithSync(
@@ -180,6 +196,53 @@ func WaitForResourceCondition[T runtime.Object, TList runtime.Object, V interfac
 	)
 
 	return result, trace.Wrap(err, "failed while waiting for condition to become true")
+}
+
+// WaitForResourceDeletion waits until the named resource no longer exists, returning immediately if it
+// is already gone. Like WaitForResourceCondition it List+Watches (rather than polling) for consistency
+// with the rest of the project; WaitForResourceCondition itself can't be reused here because it treats
+// an empty initial list as "keep waiting" and never surfaces the delete event to its callback.
+func WaitForResourceDeletion[T runtime.Object, TList runtime.Object](ctx *contexts.Context, timeout time.Duration, client ListerWatcher[TList], name string) (err error) {
+	ctx.Log.With("name", name, "timeout", timeout).Debug("Waiting for resource deletion")
+	defer ctx.Log.Debug("Finished waiting for resource deletion", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
+	eventCtx, cancel := ctx.Child().WithTimeout(timeout)
+	defer cancel()
+
+	setCommonOpts := func(options *metav1.ListOptions) {
+		options.FieldSelector = fields.OneTermEqualSelector(metav1.ObjectNameField, name).String()
+		options.TimeoutSeconds = new(int64(math.Floor(timeout.Seconds())))
+	}
+	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
+		setCommonOpts(&options)
+		return client.List(eventCtx, options)
+	}
+	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
+		options.Watch = true
+		setCommonOpts(&options)
+		return client.Watch(eventCtx, options)
+	}
+
+	var objType T
+
+	// Already deleted if the initial list turns up nothing.
+	initialCheck := func(store cache.Store) (bool, error) {
+		return len(store.List()) == 0, nil
+	}
+	// Otherwise, done once the delete event arrives.
+	processEvent := func(event watch.Event) (bool, error) {
+		return event.Type == watch.Deleted, nil
+	}
+
+	_, err = toolswatch.UntilWithSync(
+		eventCtx,
+		&cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc},
+		objType,
+		initialCheck,
+		processEvent,
+	)
+
+	return trace.Wrap(err, "failed while waiting for resource %q to be deleted", name)
 }
 
 // Do a best-effort cleanup of the provided value to make it a valid k8s generated resource name.

@@ -355,6 +355,159 @@ func TestWaitForResourceCondition(t *testing.T) {
 	}
 }
 
+func TestWaitForResourceConditionByLabel(t *testing.T) {
+	namespace := "test-ns"
+	labelSelector := "app=target"
+
+	matching := func(name string, ready bool) *corev1.Pod {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name, Labels: map[string]string{"app": "target"}},
+		}
+		if ready {
+			pod.Status.PodIP = "1.2.3.4"
+		}
+		return pod
+	}
+
+	processEvent := func(_ *contexts.Context, pod *corev1.Pod) (string, bool, error) {
+		if pod.Status.PodIP == "" {
+			return "", false, nil
+		}
+		return pod.Status.PodIP, true, nil
+	}
+
+	tests := []struct {
+		desc                string
+		initialResources    []runtime.Object
+		afterStartedWaiting func(*testing.T, *contexts.Context, k8s.Interface)
+		expectedResult      string
+		wantErr             bool
+	}{
+		{
+			desc:             "a matched resource already satisfies the condition",
+			initialResources: []runtime.Object{matching("pod-a", true)},
+			expectedResult:   "1.2.3.4",
+		},
+		{
+			desc:             "one of several matched resources satisfies the condition",
+			initialResources: []runtime.Object{matching("pod-a", false), matching("pod-b", true)},
+			expectedResult:   "1.2.3.4",
+		},
+		{
+			desc:           "a matching resource appears and satisfies the condition later",
+			expectedResult: "1.2.3.4",
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
+				_, err := client.CoreV1().Pods(namespace).Create(ctx, matching("pod-late", true), metav1.CreateOptions{})
+				require.NoError(t, err)
+			},
+		},
+		{
+			desc:    "no matching resource times out",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			client := fake.NewClientset(tt.initialResources...)
+			ctx := th.NewTestContext()
+
+			lw := NewMockListerWatcher[*corev1.PodList](t)
+			lw.EXPECT().List(mock.Anything, mock.Anything).RunAndReturn(client.CoreV1().Pods(namespace).List)
+			lw.EXPECT().Watch(mock.Anything, mock.Anything).RunAndReturn(client.CoreV1().Pods(namespace).Watch).Maybe()
+
+			var wg sync.WaitGroup
+			var result string
+			var waitErr error
+			wg.Add(1)
+			go func() {
+				result, waitErr = WaitForResourceConditionByLabel(ctx, time.Second, lw, labelSelector, processEvent)
+				wg.Done()
+			}()
+
+			if tt.afterStartedWaiting != nil {
+				time.Sleep(10 * time.Millisecond) // Ensure that watcher has been setup
+				tt.afterStartedWaiting(t, ctx, client)
+			}
+
+			wg.Wait()
+
+			if tt.wantErr {
+				assert.Error(t, waitErr)
+				return
+			}
+			assert.NoError(t, waitErr)
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
+
+func TestWaitForResourceDeletion(t *testing.T) {
+	namespace := "test-ns"
+	resourceName := "test-resource"
+
+	existingPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: resourceName},
+	}
+
+	tests := []struct {
+		desc                string
+		initialResources    []runtime.Object
+		afterStartedWaiting func(*testing.T, *contexts.Context, k8s.Interface)
+		wantErr             bool
+	}{
+		{
+			desc: "resource already absent returns immediately",
+		},
+		{
+			desc:             "resource is deleted while waiting",
+			initialResources: []runtime.Object{existingPod},
+			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
+				err := client.CoreV1().Pods(namespace).Delete(ctx, resourceName, metav1.DeleteOptions{})
+				require.NoError(t, err)
+			},
+		},
+		{
+			desc:             "resource never deleted times out",
+			initialResources: []runtime.Object{existingPod},
+			wantErr:          true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			client := fake.NewClientset(tt.initialResources...)
+			ctx := th.NewTestContext()
+
+			lw := NewMockListerWatcher[*corev1.PodList](t)
+			lw.EXPECT().List(mock.Anything, mock.Anything).RunAndReturn(client.CoreV1().Pods(namespace).List)
+			// Watch is only set up when the resource still exists after the initial list.
+			lw.EXPECT().Watch(mock.Anything, mock.Anything).RunAndReturn(client.CoreV1().Pods(namespace).Watch).Maybe()
+
+			var wg sync.WaitGroup
+			var waitErr error
+			wg.Add(1)
+			go func() {
+				waitErr = WaitForResourceDeletion[*corev1.Pod](ctx, time.Second, lw, resourceName)
+				wg.Done()
+			}()
+
+			if tt.afterStartedWaiting != nil {
+				time.Sleep(10 * time.Millisecond) // Ensure that watcher has been setup
+				tt.afterStartedWaiting(t, ctx, client)
+			}
+
+			wg.Wait()
+
+			if tt.wantErr {
+				assert.Error(t, waitErr)
+				return
+			}
+			assert.NoError(t, waitErr)
+		})
+	}
+}
+
 func TestCleanName(t *testing.T) {
 	tests := []struct {
 		desc  string

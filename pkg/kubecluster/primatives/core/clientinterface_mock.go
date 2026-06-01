@@ -5,6 +5,7 @@ package core
 import (
 	contexts "github.com/solidDoWant/backup-tool/pkg/contexts"
 	mock "github.com/stretchr/testify/mock"
+	batchv1 "k8s.io/api/batch/v1"
 
 	resource "k8s.io/apimachinery/pkg/api/resource"
 
@@ -620,6 +621,67 @@ func (_c *MockClientInterface_SetCommonLabels_Call) Return() *MockClientInterfac
 
 func (_c *MockClientInterface_SetCommonLabels_Call) RunAndReturn(run func(map[string]string)) *MockClientInterface_SetCommonLabels_Call {
 	_c.Run(run)
+	return _c
+}
+
+// WaitForJobCompletion provides a mock function with given fields: ctx, namespace, name, opts
+func (_m *MockClientInterface) WaitForJobCompletion(ctx *contexts.Context, namespace string, name string, opts WaitForJobCompletionOpts) (*batchv1.Job, error) {
+	ret := _m.Called(ctx, namespace, name, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WaitForJobCompletion")
+	}
+
+	var r0 *batchv1.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForJobCompletionOpts) (*batchv1.Job, error)); ok {
+		return rf(ctx, namespace, name, opts)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForJobCompletionOpts) *batchv1.Job); ok {
+		r0 = rf(ctx, namespace, name, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*batchv1.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, WaitForJobCompletionOpts) error); ok {
+		r1 = rf(ctx, namespace, name, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_WaitForJobCompletion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForJobCompletion'
+type MockClientInterface_WaitForJobCompletion_Call struct {
+	*mock.Call
+}
+
+// WaitForJobCompletion is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - name string
+//   - opts WaitForJobCompletionOpts
+func (_e *MockClientInterface_Expecter) WaitForJobCompletion(ctx interface{}, namespace interface{}, name interface{}, opts interface{}) *MockClientInterface_WaitForJobCompletion_Call {
+	return &MockClientInterface_WaitForJobCompletion_Call{Call: _e.mock.On("WaitForJobCompletion", ctx, namespace, name, opts)}
+}
+
+func (_c *MockClientInterface_WaitForJobCompletion_Call) Run(run func(ctx *contexts.Context, namespace string, name string, opts WaitForJobCompletionOpts)) *MockClientInterface_WaitForJobCompletion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(WaitForJobCompletionOpts))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_WaitForJobCompletion_Call) Return(_a0 *batchv1.Job, _a1 error) *MockClientInterface_WaitForJobCompletion_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_WaitForJobCompletion_Call) RunAndReturn(run func(*contexts.Context, string, string, WaitForJobCompletionOpts) (*batchv1.Job, error)) *MockClientInterface_WaitForJobCompletion_Call {
+	_c.Call.Return(run)
 	return _c
 }
 

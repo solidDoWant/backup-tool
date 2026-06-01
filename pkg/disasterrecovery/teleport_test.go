@@ -200,9 +200,6 @@ func TestTeleportBackup(t *testing.T) {
 
 				mockCoreCNPGBackup.EXPECT().Configure(mockClient, namespace, coreClusterName, servingIssuerName, clientIssuerName, backupName, "backup-core.sql", mock.Anything).
 					RunAndReturn(func(kubeClient kubecluster.ClientInterface, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, drVolName, backupFileRelPath string, opts cnpgbackup.CNPGBackupOptions) error {
-						assert.NotEmpty(t, opts.CloningOpts.RecoveryTargetTime)
-						backupOpts.CloningOpts.RecoveryTargetTime = opts.CloningOpts.RecoveryTargetTime
-
 						assert.Equal(t, backupOpts, opts)
 
 						return th.ErrIfTrue(tt.simulateConfigureCoreBackupError)
@@ -215,9 +212,6 @@ func TestTeleportBackup(t *testing.T) {
 				if tt.opts.AuditCluster.Enabled {
 					mockAuditCNPGBackup.EXPECT().Configure(mockClient, namespace, auditClusterName, servingIssuerName, clientIssuerName, backupName, "backup-audit.sql", mock.Anything).
 						RunAndReturn(func(kubeClient kubecluster.ClientInterface, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, drVolName, backupFileRelPath string, opts cnpgbackup.CNPGBackupOptions) error {
-							assert.NotEmpty(t, opts.CloningOpts.RecoveryTargetTime)
-							backupOpts.CloningOpts.RecoveryTargetTime = opts.CloningOpts.RecoveryTargetTime
-
 							assert.Equal(t, backupOpts, opts)
 
 							return th.ErrIfTrue(tt.simulateConfigureAuditBackupError)

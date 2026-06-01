@@ -1,6 +1,7 @@
 package clonedcluster
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -15,9 +16,16 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	postgres "github.com/solidDoWant/backup-tool/pkg/postgres"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
+
+// ErrRecoveryTargetNotReached indicates a targetTime recovery's Job exhausted its retries without
+// reaching the target, so the source had no WAL at or after the target (an idle database) and the
+// target is unreachable from archived WAL. The clone should instead be recovered to the backup's
+// consistency point (targetImmediate).
+var ErrRecoveryTargetNotReached = errors.New("recovery target not reachable from archived WAL")
 
 type ClonedClusterInterface interface {
 	GetCredentials(servingCertMountDirectory, clientCertMountDirectory string) postgres.Credentials
@@ -90,13 +98,96 @@ func newClonedCluster(p providerInterfaceInternal) ClonedClusterInterface {
 
 // Clone an existing CNPG cluster, with separate certificates for authentication.
 // It is assumed that all required resources for approving certificats (such as Certificate Request Policies) are already in place.
+// This takes the base backup and creates the recovering clone in a single call. Callers that need the
+// backup's consistency point fixed before other (non-DB) captures — so the clone can recover forward
+// to a shared wall-clock instant — should instead drive CreateClusterBackup and CloneClusterFromBackup
+// directly.
 func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
+	// Validate up front so an invalid name doesn't waste a base backup.
 	if len(newClusterName) > 40 { // Max length that CNPG allows for cloned cluster names, see https://github.com/cloudnative-pg/cloudnative-pg/pull/6755
 		return nil, trace.Errorf("newClusterName must be 40 characters or less")
 	}
 
 	ctx.Log.With("existingCluster", existingClusterName, "newCluster", newClusterName).Info("Cloning CNPG cluster")
 	defer ctx.Log.Info("Finished cloning CNPG cluster", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
+	backup, err := p.CreateClusterBackup(ctx.Child(), namespace, existingClusterName, opts)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to back up existing cluster %q", helpers.FullNameStr(namespace, existingClusterName))
+	}
+	defer cleanup.To(func(ctx *contexts.Context) error {
+		// A child context is not passed here because this is mostly just a wrapper for DeleteBackup.
+		cleanupErr := p.cnpgClient.DeleteBackup(ctx, namespace, backup.Name)
+		if cleanupErr == nil {
+			return nil
+		}
+
+		// If backup deletion failed, treat the entire operation as a failure. This includes deleting the cluster, and setting the return value to nil.
+		if cluster != nil {
+			if deleteErr := cluster.Delete(ctx); deleteErr != nil {
+				cleanupErr = trace.NewAggregate(cleanupErr, deleteErr)
+			}
+			cluster = nil
+		}
+		return trace.Wrap(cleanupErr, "failed to delete backup %q", helpers.FullName(backup))
+	}).WithErrMessage("cleanup failed").WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(time.Minute)).Run()
+
+	cluster, err = p.CloneClusterFromBackup(ctx.Child(), namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName, backup, opts)
+	if err != nil {
+		// CloneClusterFromBackup already cleans up its own resources on failure. Return an explicit nil
+		// so the deferred backup cleanup above doesn't try to tear down a half-built clone.
+		return nil, trace.Wrap(err, "failed to clone cluster %q from backup %q", newClusterName, helpers.FullName(backup))
+	}
+	return cluster, nil
+}
+
+// CreateClusterBackup takes a volume-snapshot backup of an existing cluster and waits for it to
+// complete. The returned backup marks the consistency point. The caller owns the backup's lifecycle
+// and must DeleteBackup it once the recovering clone has been created — the recovery volume snapshots
+// are owned by the backup, so deleting it earlier would remove them.
+func (p *Provider) CreateClusterBackup(ctx *contexts.Context, namespace, existingClusterName string, opts CloneClusterOptions) (backup *apiv1.Backup, err error) {
+	backupNamePrefix := existingClusterName + "-cloned"
+	ctx.Log.With("existingCluster", existingClusterName).Info("Creating a backup of the existing cluster", "backupName", backupNamePrefix)
+	defer ctx.Log.Info("Finished backing up the existing cluster", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
+	backup, err = p.cnpgClient.CreateBackup(ctx.Child(), namespace, backupNamePrefix, existingClusterName, cnpg.CreateBackupOptions{GenerateName: true})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create backup of existing cluster %q", helpers.FullNameStr(namespace, existingClusterName))
+	}
+
+	// If waiting for the backup fails, delete the backup we just created so it isn't leaked (on
+	// success the caller owns it).
+	createdBackupName := backup.Name
+	defer func() {
+		if err == nil {
+			return
+		}
+		cleanup.To(func(ctx *contexts.Context) error {
+			return p.cnpgClient.DeleteBackup(ctx, namespace, createdBackupName)
+		}).WithErrMessage("failed to delete backup %q", helpers.FullNameStr(namespace, createdBackupName)).WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(time.Minute)).Run()
+	}()
+
+	readyBackup, err := p.cnpgClient.WaitForReadyBackup(ctx.Child(), namespace, backup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: opts.WaitForBackupTimeout})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to wait for backup %q to be ready", helpers.FullNameStr(namespace, createdBackupName))
+	}
+
+	return readyBackup, nil
+}
+
+// CloneClusterFromBackup creates a new cluster that recovers from a previously-created (ready) backup,
+// with its own short-lived certificates. When the source uses the barman-cloud plugin and a
+// RecoveryTargetTime is supplied, the clone recovers forward to that wall-clock instant
+// (recoveryTarget.targetTime); if the source had no WAL at/after the target (an idle database), it
+// falls back to the backup's consistency point. In every other case it recovers to the consistency
+// point directly.
+func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, readyBackup *apiv1.Backup, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
+	if len(newClusterName) > 40 { // Max length that CNPG allows for cloned cluster names, see https://github.com/cloudnative-pg/cloudnative-pg/pull/6755
+		return nil, trace.Errorf("newClusterName must be 40 characters or less")
+	}
+
+	ctx.Log.With("existingCluster", existingClusterName, "newCluster", newClusterName).Info("Creating cloned cluster from backup")
+	defer ctx.Log.Info("Finished creating cloned cluster from backup", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
 
 	cluster = p.newClonedCluster()
 
@@ -111,7 +202,6 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 			Run()
 	}
 
-	// Perform as many read-only operations as possible now to reduce the number of changes that need to be reverted in case of a failure
 	ctx.Log.Info("Collecting information about the existing cluster")
 	existingCluster, err := p.cnpgClient.GetCluster(ctx.Child(), namespace, existingClusterName)
 	if err != nil {
@@ -121,30 +211,6 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 	clusterVolumeSize, err := resource.ParseQuantity(existingCluster.Spec.StorageConfiguration.Size)
 	if err != nil {
 		return errHandler(err, "failed to parse the existing cluster %q storage volume size %q", helpers.FullName(existingCluster), existingCluster.Spec.StorageConfiguration.Size)
-	}
-
-	// 1. Create a backup of the current cluster
-	backupNamePrefix := existingClusterName + "-cloned"
-	ctx.Log.Step().Info("Creating a backup of the existing cluster", "backupName", backupNamePrefix)
-	backup, err := p.cnpgClient.CreateBackup(ctx.Child(), namespace, backupNamePrefix, existingClusterName, cnpg.CreateBackupOptions{GenerateName: true})
-	if err != nil {
-		return errHandler(err, "failed to create backup of existing cluster %q", helpers.FullNameStr(namespace, existingClusterName))
-	}
-	defer cleanup.To(func(ctx *contexts.Context) error {
-		// A child context is not passed here because this is mostly just a wrapper for DeleteBackup.
-		cleanupErr := p.cnpgClient.DeleteBackup(ctx, namespace, backup.Name)
-		if cleanupErr == nil {
-			return nil
-		}
-
-		// If backup deletion failed, treat the entire operation as a failure. This includes deleting the cluster, and setting the return value to nil.
-		cluster, cleanupErr = errHandler(cleanupErr, "failed to delete backup %q", helpers.FullName(backup))
-		return cleanupErr
-	}).WithErrMessage("cleanup failed").WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(time.Minute)).Run()
-
-	readyBackup, err := p.cnpgClient.WaitForReadyBackup(ctx.Child(), namespace, backup.Name, cnpg.WaitForReadyBackupOpts{MaxWaitTime: opts.WaitForBackupTimeout})
-	if err != nil {
-		return errHandler(err, "failed to wait for backup %q to be ready", helpers.FullName(backup))
 	}
 
 	// 2. Create the serving certificate (short lived)
@@ -266,12 +332,6 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 		clusterOpts.StorageClass = *existingCluster.Spec.StorageConfiguration.StorageClass
 	}
 
-	if opts.RecoveryTargetTime != "" {
-		clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{
-			TargetTime: opts.RecoveryTargetTime,
-		}
-	}
-
 	if existingCluster.Spec.Bootstrap != nil {
 		if existingCluster.Spec.Bootstrap.InitDB != nil {
 			clusterOpts.DatabaseName = existingCluster.Spec.Bootstrap.InitDB.Database
@@ -285,58 +345,141 @@ func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingCluste
 		}
 	}
 
-	// Configure how the new cluster sources WAL during recovery, matching the WAL archiving method
+	// Configure where the new cluster sources WAL during recovery, matching the WAL archiving method
 	// used by the source cluster (the barman-cloud plugin, or the deprecated in-tree barman support).
-	if err := p.configureWALRecovery(ctx.Child(), namespace, existingCluster, readyBackup, &clusterOpts); err != nil {
+	isPluginRecovery, err := p.configureWALRecovery(ctx.Child(), namespace, existingCluster, readyBackup, &clusterOpts)
+	if err != nil {
 		return errHandler(err, "failed to configure WAL recovery for new cluster %q", helpers.FullNameStr(namespace, newClusterName))
 	}
 
-	newCluster, err := p.cnpgClient.CreateCluster(ctx.Child(), namespace, newClusterName, clusterVolumeSize, readyServingCert.Name, readyClientCACert.Name, replicationUserCert.GetCertificate().Name, clusterOpts)
-	if err != nil {
-		return errHandler(err, "failed to create new cluster %q from backup %q with serving certificate %q and client certificate %q",
-			helpers.FullNameStr(namespace, newClusterName), helpers.FullName(readyBackup), helpers.FullName(readyServingCert), helpers.FullName(readyClientCACert))
+	// Choose how far to recover. A wall-clock target (recoveryTarget.targetTime) is only honored on the
+	// plugin path's recovery.source, so set one only when the plugin path is in use and a target is
+	// supplied; otherwise the plugin path recovers to the backup's consistency point (targetImmediate).
+	// The in-tree recovery.backup path is left with no recoveryTarget at all: it already stops at the
+	// consistency point, and CNPG's webhook rejects a recoveryTarget there unless it carries a backupID
+	// (which this path doesn't supply).
+	useTargetTime := false
+	if isPluginRecovery {
+		clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{TargetImmediate: new(true)}
+		if opts.RecoveryTargetTime != "" {
+			clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{TargetTime: opts.RecoveryTargetTime}
+			useTargetTime = true
+		}
 	}
-	cluster.setCluster(newCluster)
 
-	readyCluster, err := p.cnpgClient.WaitForReadyCluster(ctx.Child(), namespace, newClusterName, cnpg.WaitForReadyClusterOpts{MaxWaitTime: opts.WaitForClusterTimeout})
+	createClone := func(ctx *contexts.Context) error {
+		newCluster, createErr := p.cnpgClient.CreateCluster(ctx.Child(), namespace, newClusterName, clusterVolumeSize, readyServingCert.Name, readyClientCACert.Name, replicationUserCert.GetCertificate().Name, clusterOpts)
+		if createErr != nil {
+			return trace.Wrap(createErr, "failed to create new cluster %q from backup %q with serving certificate %q and client certificate %q",
+				helpers.FullNameStr(namespace, newClusterName), helpers.FullName(readyBackup), helpers.FullName(readyServingCert), helpers.FullName(readyClientCACert))
+		}
+
+		cluster.setCluster(newCluster)
+		return nil
+	}
+
+	if err := createClone(ctx.Child()); err != nil {
+		return errHandler(err)
+	}
+
+	readyCluster, err := p.waitForCloneRecovery(ctx.Child(), namespace, newClusterName, useTargetTime, opts)
 	if err != nil {
-		return errHandler(err, "failed to wait for new cluster %q to become ready", helpers.FullNameStr(namespace, newClusterName))
+		if !errors.Is(err, ErrRecoveryTargetNotReached) {
+			return errHandler(err, "failed to wait for new PITR cluster %q to become ready", helpers.FullNameStr(namespace, newClusterName))
+		}
+
+		// The source had no WAL at or after the target (an idle database), so recovering forward to
+		// the wall-clock target is impossible. Recovering to the consistency point is data-identical
+		// (nothing changed after it), so tear the clone down and recreate it with targetImmediate.
+		ctx.Log.Info("Recovery target unreachable from archived WAL (idle source); falling back to the consistency point", "recoveryTargetTime", opts.RecoveryTargetTime)
+		if deleteErr := p.cnpgClient.DeleteCluster(ctx.Child(), namespace, newClusterName); deleteErr != nil {
+			return errHandler(deleteErr, "failed to delete cluster %q before recovery fallback", newClusterName)
+		}
+
+		if deleteErr := p.cnpgClient.WaitForClusterDeleted(ctx.Child(), namespace, newClusterName, cnpg.WaitForClusterDeletedOpts{MaxWaitTime: opts.WaitForClusterTimeout}); deleteErr != nil {
+			return errHandler(deleteErr, "failed waiting for cluster %q deletion before recovery fallback", newClusterName)
+		}
+
+		clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{TargetImmediate: new(true)}
+		if createErr := createClone(ctx.Child()); createErr != nil {
+			return errHandler(createErr)
+		}
+
+		readyCluster, err = p.cnpgClient.WaitForReadyCluster(ctx.Child(), namespace, newClusterName, cnpg.WaitForReadyClusterOpts{MaxWaitTime: opts.WaitForClusterTimeout})
+		if err != nil {
+			return errHandler(err, "failed to wait for new cluster %q to become ready", helpers.FullNameStr(namespace, newClusterName))
+		}
 	}
 	cluster.setCluster(readyCluster)
 
 	return cluster, nil
 }
 
+// waitForCloneRecovery waits for the cloned cluster to become ready, watching the API server rather
+// than polling. When recovering to a wall-clock target, recovery may not reach it (an idle source),
+// so it watches the recovery Job to its terminal outcome:
+//   - The Job retries (its backoffLimit window) long enough to wait out the source's archive_timeout,
+//     so it completes once an attempt reaches the target; the instance is then promoted and the
+//     cluster becomes ready.
+//   - It fails once it has exhausted its retries without reaching the target, meaning the target is
+//     unreachable from archived WAL (an idle source), so this returns ErrRecoveryTargetNotReached and
+//     the caller falls back to the consistency point.
+//
+// Watching the Job's terminal condition is unambiguous — a completed Job promoted, a failed Job gave
+// up — unlike the cluster status (which doesn't surface the reason) or a one-shot pod check (which
+// can't tell an idle retry from a slow replay). The terminal state is observed even if CNPG garbage
+// collects the Job afterwards, since the delete watch event still carries the Job's final state.
+func (p *Provider) waitForCloneRecovery(ctx *contexts.Context, namespace, newClusterName string, useTargetTime bool, opts CloneClusterOptions) (*apiv1.Cluster, error) {
+	if useTargetTime {
+		// The recovery Job's name isn't known ahead of time, so select it by the cluster + jobRole labels.
+		jobSelector := fmt.Sprintf("%s=%s,%s", utils.ClusterLabelName, newClusterName, utils.JobRoleLabelName)
+		_, err := p.coreClient.WaitForJobCompletion(ctx.Child(), namespace, "", core.WaitForJobCompletionOpts{MaxWaitTime: opts.WaitForClusterTimeout, LabelSelector: jobSelector})
+		if err != nil {
+			// A failed recovery Job means the target wasn't reachable from archived WAL.
+			if errors.Is(err, core.ErrJobFailed) {
+				return nil, ErrRecoveryTargetNotReached
+			}
+
+			return nil, trace.Wrap(err, "failed waiting for the recovery job of cluster %q", helpers.FullNameStr(namespace, newClusterName))
+		}
+	}
+
+	return p.cnpgClient.WaitForReadyCluster(ctx.Child(), namespace, newClusterName, cnpg.WaitForReadyClusterOpts{MaxWaitTime: opts.WaitForClusterTimeout})
+}
+
 // configureWALRecovery sets the recovery source on clusterOpts based on how the source cluster
-// archives write-ahead logs. Source clusters using the barman-cloud plugin recover from the
-// backup's volume snapshots, fetching WAL via an external cluster that references the same object
-// store. Source clusters using the deprecated in-tree barman support recover from the Backup
-// object directly, which carries the WAL archive location.
-func (p *Provider) configureWALRecovery(ctx *contexts.Context, namespace string, sourceCluster *apiv1.Cluster, backup *apiv1.Backup, clusterOpts *cnpg.CreateClusterOptions) error {
+// archives write-ahead logs, and reports whether the plugin (recovery.source) path is in use. Source
+// clusters using the barman-cloud plugin recover from the backup's volume snapshots, fetching WAL via
+// an external cluster that references the same object store; this path honors a wall-clock
+// recoveryTarget.targetTime. Source clusters using the deprecated in-tree barman support recover from
+// the Backup object directly (recovery.backup), which carries the WAL archive location but stops at
+// the backup's consistency point regardless of any target. The recovery target itself is chosen by
+// the caller; this only configures the source.
+func (p *Provider) configureWALRecovery(ctx *contexts.Context, namespace string, sourceCluster *apiv1.Cluster, backup *apiv1.Backup, clusterOpts *cnpg.CreateClusterOptions) (isPluginRecovery bool, err error) {
 	walArchiverPlugin := findBarmanCloudWALArchiver(sourceCluster)
 	if walArchiverPlugin == nil {
 		// No barman-cloud plugin: the source uses the deprecated in-tree barman WAL archiving, which
 		// records the WAL archive location on the Backup object itself, so recover straight from it.
 		ctx.Log.Debug("Source cluster uses in-tree barman WAL archiving; recovering from backup object", "backup", backup.Name)
 		clusterOpts.BackupName = backup.Name
-		return nil
+		return false, nil
 	}
 
 	ctx.Log.Debug("Source cluster uses the barman-cloud plugin; recovering from volume snapshots", "plugin", walArchiverPlugin.Name)
 
 	objectStoreName := walArchiverPlugin.Parameters["barmanObjectName"]
 	if objectStoreName == "" {
-		return trace.Errorf("barman-cloud plugin on cluster %q is missing the %q parameter", helpers.FullName(sourceCluster), "barmanObjectName")
+		return false, trace.Errorf("barman-cloud plugin on cluster %q is missing the %q parameter", helpers.FullName(sourceCluster), "barmanObjectName")
 	}
 
 	serverName, err := p.resolveBarmanServerName(ctx, namespace, sourceCluster.Name, walArchiverPlugin, objectStoreName)
 	if err != nil {
-		return trace.Wrap(err, "failed to resolve barman server name for cluster %q", helpers.FullName(sourceCluster))
+		return false, trace.Wrap(err, "failed to resolve barman server name for cluster %q", helpers.FullName(sourceCluster))
 	}
 
 	dataSnapshotName, walSnapshotName := getBackupSnapshotNames(backup)
 	if dataSnapshotName == "" {
-		return trace.Errorf("backup %q did not report a PG_DATA volume snapshot to recover from", helpers.FullName(backup))
+		return false, trace.Errorf("backup %q did not report a PG_DATA volume snapshot to recover from", helpers.FullName(backup))
 	}
 
 	clusterOpts.VolumeSnapshotRecovery = &cnpg.VolumeSnapshotRecovery{
@@ -354,21 +497,7 @@ func (p *Provider) configureWALRecovery(ctx *contexts.Context, namespace string,
 		},
 	}
 
-	// Recover to the backup's consistency point (targetImmediate) rather than the caller's wall-clock
-	// RecoveryTargetTime. This matches the deprecated in-tree path: CNPG's volume-snapshot recovery
-	// from a Backup object (recovery.backup) ignores recoveryTarget.targetTime and stops at the
-	// consistency point, so honoring a wall-clock target here would both diverge from in-tree and, on
-	// a quiescent source, fail outright ("recovery ended before configured recovery target was
-	// reached", because no transaction commits at/after the target). WAL is still replayed from the
-	// source's object store, up to the consistency point, via the plugin external cluster configured
-	// above; it just isn't carried past the backup.
-	//
-	// Known limitation: the consistency point is the instant this CNPG base backup completed, which is
-	// not aligned with the filesystem/S3 captures elsewhere in the DR event, so a restore is not
-	// guaranteed to be point-in-time consistent across resources. Aligning them (true PITR on the
-	// plugin path) is a separate work item; see docs/cross-resource-pitr-consistency.md.
-	clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{TargetImmediate: new(true)}
-	return nil
+	return true, nil
 }
 
 // resolveBarmanServerName determines the server name (the folder under which the source cluster's
