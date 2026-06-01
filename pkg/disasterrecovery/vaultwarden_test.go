@@ -201,8 +201,26 @@ func TestVaultWardenBackup(t *testing.T) {
 
 			// Setup mocks
 			func() {
-				// Step 1
 				var fullBackupName string
+
+				// Step 1
+				mockClient.EXPECT().CloneCluster(mock.Anything, namespace, clusterName, mock.Anything, servingIssuerName, clientIssuerName, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
+						assert.True(t, calledCtx.IsChildOf(rootCtx))
+						assert.Contains(t, newClusterName, helpers.CleanName(backupName))
+						assert.LessOrEqual(t, len(newClusterName), 40)
+
+						return th.ErrOr1Val(clonedCluster, tt.simulateCloneClusterErr)
+					})
+				if tt.simulateCloneClusterErr {
+					return
+				}
+				clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
+					require.NotEqual(t, rootCtx, cleanupCtx)
+					return th.ErrIfTrue(tt.simulateCloneClusterCleanupErr)
+				})
+
+				// Step 2
 				mockClient.EXPECT().ClonePVC(mock.Anything, namespace, dataPVC, mock.Anything).
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, dataPVC string, opts clonepvc.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error) {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
@@ -220,7 +238,7 @@ func TestVaultWardenBackup(t *testing.T) {
 					return th.ErrIfTrue(tt.simulatePVCCleanupError)
 				})
 
-				// Step 2
+				// Step 3
 				mockCoreClient.EXPECT().EnsurePVCExists(mock.Anything, namespace, backupName, mock.Anything, core.CreatePVCOptions{StorageClassName: tt.backupOptions.VolumeStorageClass}).
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts core.CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
@@ -231,23 +249,6 @@ func TestVaultWardenBackup(t *testing.T) {
 				if tt.simulateEnsurePVCError {
 					return
 				}
-
-				// Step 3
-				mockClient.EXPECT().CloneCluster(mock.Anything, namespace, clusterName, mock.Anything, servingIssuerName, clientIssuerName, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.True(t, strings.Contains(newClusterName, helpers.CleanName(fullBackupName)))
-						assert.LessOrEqual(t, len(newClusterName), 40)
-
-						return th.ErrOr1Val(clonedCluster, tt.simulateCloneClusterErr)
-					})
-				if tt.simulateCloneClusterErr {
-					return
-				}
-				clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
-					require.NotEqual(t, rootCtx, cleanupCtx)
-					return th.ErrIfTrue(tt.simulateCloneClusterCleanupErr)
-				})
 
 				// Step 4
 				clonedCluster.EXPECT().GetServingCert().Return(&servingCert)
