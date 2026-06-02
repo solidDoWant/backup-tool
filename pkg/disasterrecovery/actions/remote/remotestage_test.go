@@ -2,13 +2,48 @@ package remote
 
 import (
 	"testing"
+	"time"
 
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
+
+// fakeProducerConsumer is a test action that implements both the optional PreConsistencyPointAction and
+// ConsistencyPointConsumer capabilities (like the CNPG backup action), on top of a mocked RemoteAction.
+type fakeProducerConsumer struct {
+	*MockCleanupAction
+	preErr           error
+	preCalled        bool
+	consistencyPoint time.Time
+	setCalled        bool
+}
+
+func (f *fakeProducerConsumer) BeforeConsistencyPoint(_ *contexts.Context) error {
+	f.preCalled = true
+	return f.preErr
+}
+
+func (f *fakeProducerConsumer) SetConsistencyPoint(c time.Time) {
+	f.setCalled = true
+	f.consistencyPoint = c
+}
+
+// fakeConsumer is a test action that only consumes the consistency point (like the S3 sync action).
+type fakeConsumer struct {
+	*MockCleanupAction
+	consistencyPoint time.Time
+	setCalled        bool
+}
+
+func (f *fakeConsumer) SetConsistencyPoint(c time.Time) {
+	f.setCalled = true
+	f.consistencyPoint = c
+}
 
 func TestNewNamedRemoteAction(t *testing.T) {
 	name := "test-action"
@@ -25,7 +60,7 @@ func TestNewRemoteStage(t *testing.T) {
 	namespace := "test-namespace"
 	eventName := "test-event"
 	opts := RemoteStageOptions{
-		CleanupTimeout:              helpers.MaxWaitTime(5),
+		CleanupTimeout: helpers.MaxWaitTime(5),
 	}
 
 	stage := NewRemoteStage(kubeClient, namespace, eventName, opts).(*RemoteStage)
@@ -140,6 +175,69 @@ func TestCleanupFunc(t *testing.T) {
 			assert.NoError(t, outerErr)
 		})
 	}
+}
+
+func TestSetup(t *testing.T) {
+	t.Run("runs pre-steps, establishes the consistency point, distributes it, then sets up every action", func(t *testing.T) {
+		ctx := th.NewTestContext()
+
+		// Two pre-consistency-point actions (e.g. CNPG base backups).
+		coreMock := NewMockCleanupAction(t)
+		coreMock.EXPECT().Setup(mock.Anything, mock.Anything).Return(nil)
+		core := &fakeProducerConsumer{MockCleanupAction: coreMock}
+
+		auditMock := NewMockCleanupAction(t)
+		auditMock.EXPECT().Setup(mock.Anything, mock.Anything).Return(nil)
+		audit := &fakeProducerConsumer{MockCleanupAction: auditMock}
+
+		// A consumer-only action (e.g. S3) that receives the consistency point but has no pre-step.
+		s3Mock := NewMockCleanupAction(t)
+		s3Mock.EXPECT().Setup(mock.Anything, mock.Anything).Return(nil)
+		s3 := &fakeConsumer{MockCleanupAction: s3Mock}
+
+		stage := &RemoteStage{
+			eventName: "test-event",
+			actions: []namedRemoteAction{
+				newNamedRemoteAction("core", core),
+				newNamedRemoteAction("audit", audit),
+				newNamedRemoteAction("s3", s3),
+			},
+		}
+
+		before := time.Now()
+		_, err := stage.setup(ctx)
+		require.NoError(t, err)
+		after := time.Now()
+
+		assert.True(t, core.preCalled)
+		assert.True(t, audit.preCalled)
+
+		// The consistency point is stamped once and handed identically to every consumer; it is the
+		// instant after the pre-steps ran.
+		assert.True(t, s3.setCalled)
+		c := s3.consistencyPoint
+		assert.Equal(t, c, core.consistencyPoint)
+		assert.Equal(t, c, audit.consistencyPoint)
+		assert.False(t, c.Before(before))
+		assert.False(t, c.After(after))
+	})
+
+	t.Run("returns an error and skips setup when a pre-step fails", func(t *testing.T) {
+		ctx := th.NewTestContext()
+
+		// No Setup expectation: phase 3 must not run once a pre-step fails.
+		failing := &fakeProducerConsumer{MockCleanupAction: NewMockCleanupAction(t), preErr: assert.AnError}
+
+		stage := &RemoteStage{
+			eventName: "test-event",
+			actions:   []namedRemoteAction{newNamedRemoteAction("core", failing)},
+		}
+
+		_, err := stage.setup(ctx)
+		assert.Error(t, err)
+		assert.True(t, failing.preCalled)
+		assert.False(t, failing.setCalled)
+	})
 }
 
 func TestValidate(t *testing.T) {

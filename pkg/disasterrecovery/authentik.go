@@ -78,10 +78,6 @@ func (a *Authentik) Backup(ctx *contexts.Context, namespace, backupName, cluster
 		CleanupTimeout: opts.CleanupTimeout,
 	})
 
-	// No wall-clock recovery target: the cloned cluster is created in Setup, before the media S3 capture
-	// in Execute, so the alignment instant isn't known yet. The base backup still precedes the S3 capture
-	// (consistency point before the non-DB capture — the safe direction); recovering forward to the S3
-	// instant needs the Setup/Execute split and is a separate work item.
 	backupOpts := cnpgbackup.CNPGBackupOptions{
 		CloningOpts:    opts.CloneClusterOptions,
 		CleanupTimeout: opts.CleanupTimeout,

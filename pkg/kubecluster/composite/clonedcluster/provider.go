@@ -11,8 +11,7 @@ import (
 )
 
 type ProviderInterface interface {
-	CloneCluster(ctx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error)
-	// CreateClusterBackup and CloneClusterFromBackup are the two halves of CloneCluster, exposed so
+	// CreateClusterBackup and CloneClusterFromBackup are the two halves of cloning a cluster, split so
 	// callers that need a wall-clock recovery target can take the base backup early (before the other
 	// captures, which fixes the consistency point) and create the recovering clone later (once the
 	// target time is known). The caller owns the returned backup's lifecycle and must DeleteBackup it

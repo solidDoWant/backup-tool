@@ -25,6 +25,27 @@ type CleanupAction interface {
 	Cleanup(ctx *contexts.Context) error
 }
 
+// PreConsistencyPointAction is an optional capability of a RemoteAction that has work to do before the
+// stage establishes the event's shared consistency point — the single instant the whole DR event is made
+// recoverable to. The canonical example is a database capture taking its base backup, which must complete
+// before the non-database captures so the database's recoverable state precedes them. The stage runs
+// BeforeConsistencyPoint on every such action first; once they all finish it stamps the consistency point
+// (the current time) and hands it to each ConsistencyPointConsumer. Any future action needing a
+// pre-consistency-point step can implement this without changing the stage.
+type PreConsistencyPointAction interface {
+	RemoteAction
+	BeforeConsistencyPoint(ctx *contexts.Context) error
+}
+
+// ConsistencyPointConsumer is an optional capability of a RemoteAction that needs the event's shared
+// consistency point in order to align to it (a cloned cluster recovers forward to it; a non-DB capture is
+// taken as of it). The stage calls SetConsistencyPoint after every PreConsistencyPointAction has run and
+// before Setup. Unlike PreConsistencyPointAction this is a value sink rather than a lifecycle step the
+// stage runs, so it is a plain capability and does not embed RemoteAction.
+type ConsistencyPointConsumer interface {
+	SetConsistencyPoint(c time.Time)
+}
+
 type namedRemoteAction struct {
 	name         string
 	remoteAction RemoteAction
@@ -104,6 +125,32 @@ func (rs *RemoteStage) setup(ctx *contexts.Context) (bti.CreateBackupToolInstanc
 		CleanupTimeout: rs.opts.CleanupTimeout,
 	}
 
+	// Phase 1: every action with pre-consistency-point work (e.g. a CNPG base backup) runs it now,
+	// before any clone is created and before the shared instant is fixed.
+	for _, action := range rs.actions {
+		preAction, ok := action.remoteAction.(PreConsistencyPointAction)
+		if !ok {
+			continue
+		}
+
+		if err := preAction.BeforeConsistencyPoint(ctx.Child()); err != nil {
+			return bti.CreateBackupToolInstanceOptions{}, trace.Wrap(err, fmt.Sprintf("failed to run pre-consistency-point step for %s", action.name))
+		}
+	}
+
+	// Phase 2: the consistency point is the instant after all pre-step work completed — every capture in
+	// the event is made recoverable to it. Hand it to each action that aligns to it (cloned clusters
+	// recover forward to it; non-DB captures are taken as of it). Today every consumer is also a
+	// pre-step action, so when nothing produced a consistency point this loop has nothing to hand it to.
+	consistencyPoint := time.Now()
+	for _, action := range rs.actions {
+		if consumer, ok := action.remoteAction.(ConsistencyPointConsumer); ok {
+			consumer.SetConsistencyPoint(consistencyPoint)
+		}
+	}
+
+	// Phase 3: set up each action — CNPG actions create their clones (recovering forward to C), and
+	// every action contributes its volumes/secrets to the tool pod.
 	for _, action := range rs.actions {
 		if err := action.remoteAction.Setup(ctx.Child(), &btiOpts); err != nil {
 			return bti.CreateBackupToolInstanceOptions{}, trace.Wrap(err, fmt.Sprintf("failed to setup %s resources", action.name))

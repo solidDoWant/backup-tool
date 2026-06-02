@@ -115,11 +115,6 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 		CleanupTimeout: opts.CleanupTimeout,
 	})
 
-	// No wall-clock recovery target: the cloned clusters are created in Setup, before the S3 capture in
-	// Execute, so the alignment instant isn't known yet. The base backup still precedes the S3 capture
-	// (consistency point before the non-DB capture — the safe direction); recovering forward to the S3
-	// instant needs the Setup/Execute split and is a separate work item.
-
 	backupOpts := cnpgbackup.CNPGBackupOptions{
 		CloningOpts:    opts.CloneClusterOptions,
 		CleanupTimeout: opts.CleanupTimeout,

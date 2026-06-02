@@ -96,51 +96,6 @@ func newClonedCluster(p providerInterfaceInternal) ClonedClusterInterface {
 	return &ClonedCluster{p: p}
 }
 
-// Clone an existing CNPG cluster, with separate certificates for authentication.
-// It is assumed that all required resources for approving certificats (such as Certificate Request Policies) are already in place.
-// This takes the base backup and creates the recovering clone in a single call. Callers that need the
-// backup's consistency point fixed before other (non-DB) captures — so the clone can recover forward
-// to a shared wall-clock instant — should instead drive CreateClusterBackup and CloneClusterFromBackup
-// directly.
-func (p *Provider) CloneCluster(ctx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
-	// Validate up front so an invalid name doesn't waste a base backup.
-	if len(newClusterName) > 40 { // Max length that CNPG allows for cloned cluster names, see https://github.com/cloudnative-pg/cloudnative-pg/pull/6755
-		return nil, trace.Errorf("newClusterName must be 40 characters or less")
-	}
-
-	ctx.Log.With("existingCluster", existingClusterName, "newCluster", newClusterName).Info("Cloning CNPG cluster")
-	defer ctx.Log.Info("Finished cloning CNPG cluster", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
-
-	backup, err := p.CreateClusterBackup(ctx.Child(), namespace, existingClusterName, opts)
-	if err != nil {
-		return nil, trace.Wrap(err, "failed to back up existing cluster %q", helpers.FullNameStr(namespace, existingClusterName))
-	}
-	defer cleanup.To(func(ctx *contexts.Context) error {
-		// A child context is not passed here because this is mostly just a wrapper for DeleteBackup.
-		cleanupErr := p.cnpgClient.DeleteBackup(ctx, namespace, backup.Name)
-		if cleanupErr == nil {
-			return nil
-		}
-
-		// If backup deletion failed, treat the entire operation as a failure. This includes deleting the cluster, and setting the return value to nil.
-		if cluster != nil {
-			if deleteErr := cluster.Delete(ctx); deleteErr != nil {
-				cleanupErr = trace.NewAggregate(cleanupErr, deleteErr)
-			}
-			cluster = nil
-		}
-		return trace.Wrap(cleanupErr, "failed to delete backup %q", helpers.FullName(backup))
-	}).WithErrMessage("cleanup failed").WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(time.Minute)).Run()
-
-	cluster, err = p.CloneClusterFromBackup(ctx.Child(), namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName, backup, opts)
-	if err != nil {
-		// CloneClusterFromBackup already cleans up its own resources on failure. Return an explicit nil
-		// so the deferred backup cleanup above doesn't try to tear down a half-built clone.
-		return nil, trace.Wrap(err, "failed to clone cluster %q from backup %q", newClusterName, helpers.FullName(backup))
-	}
-	return cluster, nil
-}
-
 // CreateClusterBackup takes a volume-snapshot backup of an existing cluster and waits for it to
 // complete. The returned backup marks the consistency point. The caller owns the backup's lifecycle
 // and must DeleteBackup it once the recovering clone has been created — the recovery volume snapshots

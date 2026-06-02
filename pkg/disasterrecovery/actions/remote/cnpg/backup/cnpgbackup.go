@@ -29,8 +29,14 @@ type CNPGBackupOptions struct {
 	CleanupTimeout helpers.MaxWaitTime               `yaml:"cleanupTimeout,omitempty"`
 }
 
+// CNPGBackupInterface is a RemoteStage action. Beyond the base RemoteAction/CleanupAction contract it
+// participates in the stage's cross-resource consistency-point protocol: as a PreConsistencyPointAction
+// it takes its own base backup before the shared consistency point is established, and as a
+// ConsistencyPointConsumer it receives that point so its clone recovers forward to it.
 type CNPGBackupInterface interface {
 	remote.CleanupAction
+	remote.PreConsistencyPointAction
+	remote.ConsistencyPointConsumer
 	Configure(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, drVolName, backupFileRelPath string, opts CNPGBackupOptions) error
 }
 
@@ -109,6 +115,52 @@ func (vs *validateState) Validate(ctx *contexts.Context) (err error) {
 	return nil
 }
 
+// baseBackupState takes this cluster's base backup before the shared consistency point is established,
+// and receives that point once the stage has stamped it.
+type baseBackupState struct {
+	validateState
+	baseBackup       *apiv1.Backup
+	consistencyPoint time.Time // The shared consistency point the clone should recover forward to (zero until set).
+	isBaseBackedUp   bool
+}
+
+// BeforeConsistencyPoint takes the base backup that fixes this cluster's recoverable state. It runs
+// before the stage establishes the event's shared consistency point, so that point lands after this
+// backup completes and the clone can recover forward to it. The base backup is owned by this action and
+// torn down in Cleanup; it must outlive clone creation, since the clone's recovery volume snapshots are
+// owned by it. Implements remote.PreConsistencyPointAction.
+func (bs *baseBackupState) BeforeConsistencyPoint(ctx *contexts.Context) (err error) {
+	bs.ctxLogWith(ctx).Info("Taking base backup for CNPG backup")
+	defer ctx.Log.Info("CNPG base backup complete", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
+	if !bs.isValidated {
+		return trace.Errorf("attempted to create base backup without validating")
+	}
+
+	if bs.isBaseBackedUp {
+		return trace.Errorf("attempted to create base backup multiple times")
+	}
+
+	if bs.opts.CloningOpts.CleanupTimeout == 0 {
+		bs.opts.CloningOpts.CleanupTimeout = bs.opts.CleanupTimeout
+	}
+
+	backup, err := bs.kubeClusterClient.CreateClusterBackup(ctx.Child(), bs.namespace, bs.clusterName, bs.opts.CloningOpts)
+	if err != nil {
+		return trace.Wrap(err, "failed to back up cluster %q", bs.clusterName)
+	}
+
+	bs.baseBackup = backup
+	bs.isBaseBackedUp = true
+	return nil
+}
+
+// SetConsistencyPoint records the shared consistency point established by the stage. Implements
+// remote.ConsistencyPointConsumer.
+func (bs *baseBackupState) SetConsistencyPoint(c time.Time) {
+	bs.consistencyPoint = c
+}
+
 type setupStateMountPaths struct {
 	drVolume    string
 	servingCert string
@@ -116,7 +168,7 @@ type setupStateMountPaths struct {
 }
 
 type setupState struct {
-	validateState
+	baseBackupState
 	clonedCluster clonedcluster.ClonedClusterInterface
 	mountPaths    setupStateMountPaths
 	isSetup       bool
@@ -126,8 +178,8 @@ func (ss *setupState) Setup(ctx *contexts.Context, btiOpts *backuptoolinstance.C
 	ss.ctxLogWith(ctx).Info("Setting up for CNPG backup")
 	defer ctx.Log.Info("CNPG backup setup complete", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
 
-	if !ss.isValidated {
-		return trace.Errorf("attempted to setup without validating")
+	if !ss.isBaseBackedUp {
+		return trace.Errorf("attempted to setup without creating a base backup")
 	}
 
 	if ss.isSetup {
@@ -135,12 +187,17 @@ func (ss *setupState) Setup(ctx *contexts.Context, btiOpts *backuptoolinstance.C
 	}
 
 	clonedClusterName := helpers.CleanName(helpers.TruncateString(fmt.Sprintf("%s-%s-cloned-%s", constants.ToolShortName, ss.uid, ss.clusterName), 40, ""))
-	if ss.opts.CloningOpts.CleanupTimeout == 0 {
-		ss.opts.CloningOpts.CleanupTimeout = ss.opts.CleanupTimeout
+
+	// Recover the clone forward to the shared consistency point. If the source had no WAL at/after it (an
+	// idle database), CloneClusterFromBackup falls back to the backup's own consistency point. When no
+	// point was established (the action ran outside the stage's protocol), recover straight to the backup.
+	cloneOpts := ss.opts.CloningOpts
+	if !ss.consistencyPoint.IsZero() {
+		cloneOpts.RecoveryTargetTime = ss.consistencyPoint.Format(time.RFC3339)
 	}
 
-	clonedCluster, err := ss.kubeClusterClient.CloneCluster(ctx.Child(), ss.namespace, ss.clusterName,
-		clonedClusterName, ss.servingCertIssuerName, ss.clientCertIssuerName, ss.opts.CloningOpts)
+	clonedCluster, err := ss.kubeClusterClient.CloneClusterFromBackup(ctx.Child(), ss.namespace, ss.clusterName,
+		clonedClusterName, ss.servingCertIssuerName, ss.clientCertIssuerName, ss.baseBackup, cloneOpts)
 	if err != nil {
 		return trace.Wrap(err, "failed to clone cluster")
 	}
@@ -165,16 +222,33 @@ func (ss *setupState) Setup(ctx *contexts.Context, btiOpts *backuptoolinstance.C
 	return nil
 }
 
+// Cleanup tears down whatever this action created, tolerating partial state (e.g. a base backup taken
+// but the clone never created because another action failed first). The clone is deleted before the base
+// backup it recovered from. The base backup is deleted only here, at the end of the event, so it outlives
+// clone creation.
 func (ss *setupState) Cleanup(ctx *contexts.Context) error {
-	if !ss.isSetup {
-		return nil
+	cleanupErrs := make([]error, 0, 2)
+
+	if ss.clonedCluster != nil {
+		if err := cleanup.To(ss.clonedCluster.Delete).
+			WithErrMessage("failed to cleanup cloned cluster resources").
+			WithParentCtx(ctx).WithTimeout(ss.opts.CleanupTimeout.MaxWait(10 * time.Minute)).
+			Run(); err != nil {
+			cleanupErrs = append(cleanupErrs, err)
+		}
 	}
 
-	err := cleanup.To(ss.clonedCluster.Delete).
-		WithErrMessage("failed to cleanup cloned cluster resources").
-		WithParentCtx(ctx).WithTimeout(ss.opts.CleanupTimeout.MaxWait(10 * time.Minute)).
-		Run()
-	return trace.Wrap(err, "failed to cleanup CNPG backup resources")
+	if ss.baseBackup != nil {
+		if err := cleanup.To(func(ctx *contexts.Context) error {
+			return ss.kubeClusterClient.CNPG().DeleteBackup(ctx, ss.namespace, ss.baseBackup.Name)
+		}).WithErrMessage("failed to cleanup base backup %q", helpers.FullNameStr(ss.namespace, ss.baseBackup.Name)).
+			WithParentCtx(ctx).WithTimeout(ss.opts.CleanupTimeout.MaxWait(time.Minute)).
+			Run(); err != nil {
+			cleanupErrs = append(cleanupErrs, err)
+		}
+	}
+
+	return trace.Wrap(trace.NewAggregate(cleanupErrs...), "failed to cleanup CNPG backup resources")
 }
 
 type executeState struct {

@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
@@ -299,19 +300,121 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestSetup(t *testing.T) {
+func TestBeforeConsistencyPoint(t *testing.T) {
 	tests := []struct {
-		desc                      string
-		hasBeenNotBeenValidated   bool
-		isAlreadySetup            bool
-		simulateCloneClusterError bool
+		desc              string
+		notValidated      bool
+		alreadyBackedUp   bool
+		simulateBackupErr bool
 	}{
 		{
 			desc: "succeeds",
 		},
 		{
-			desc:                    "fails because not validated first",
-			hasBeenNotBeenValidated: true,
+			desc:         "fails because not validated first",
+			notValidated: true,
+		},
+		{
+			desc:            "fails if called multiple times",
+			alreadyBackedUp: true,
+		},
+		{
+			desc:              "fails to create the base backup",
+			simulateBackupErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			mockClient := kubecluster.NewMockClientInterface(t)
+
+			currentState := &baseBackupState{
+				validateState: validateState{
+					configureState: configureState{
+						uid:                   "uid",
+						isConfigured:          true,
+						kubeClusterClient:     mockClient,
+						namespace:             "namespace",
+						clusterName:           "clusterName",
+						servingCertIssuerName: "servingCertIssuerName",
+						clientCertIssuerName:  "clientCertIssuerName",
+						drVolName:             "drVolName",
+						backupFileRelPath:     "backupFileRelPath",
+						opts: CNPGBackupOptions{
+							CloningOpts: clonedcluster.CloneClusterOptions{
+								Certificates: clonedcluster.CloneClusterOptionsCertificates{
+									ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
+										IssuerKind: "ClusterIssuer",
+									},
+								},
+							},
+							CleanupTimeout: helpers.ShortWaitTime,
+						},
+					},
+					isValidated: !tt.notValidated,
+					cluster:     &apiv1.Cluster{},
+				},
+				isBaseBackedUp: tt.alreadyBackedUp,
+			}
+
+			baseBackup := &apiv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "base-backup"}}
+
+			ctx := th.NewTestContext()
+
+			if !tt.notValidated && !tt.alreadyBackedUp {
+				// The action's cleanup timeout is defaulted onto the cloning options before backing up.
+				expectedCloningOpts := currentState.opts.CloningOpts
+				expectedCloningOpts.CleanupTimeout = currentState.opts.CleanupTimeout
+
+				mockClient.EXPECT().CreateClusterBackup(mock.Anything, currentState.namespace, currentState.clusterName, expectedCloningOpts).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName string, opts clonedcluster.CloneClusterOptions) (*apiv1.Backup, error) {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+
+						return th.ErrOr1Val(baseBackup, tt.simulateBackupErr)
+					})
+			}
+
+			err := currentState.BeforeConsistencyPoint(ctx)
+			if th.ErrExpected(tt.notValidated, tt.alreadyBackedUp, tt.simulateBackupErr) {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, baseBackup, currentState.baseBackup)
+			assert.True(t, currentState.isBaseBackedUp)
+		})
+	}
+}
+
+func TestSetConsistencyPoint(t *testing.T) {
+	consistencyPoint := time.Date(2026, 1, 1, 10, 5, 0, 0, time.UTC)
+
+	state := &baseBackupState{}
+	state.SetConsistencyPoint(consistencyPoint)
+	assert.Equal(t, consistencyPoint, state.consistencyPoint)
+}
+
+func TestSetup(t *testing.T) {
+	establishedPoint := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		desc                      string
+		hasNotBeenBaseBackedUp    bool
+		isAlreadySetup            bool
+		recoverForwardToTarget    bool
+		simulateCloneClusterError bool
+	}{
+		{
+			desc: "succeeds recovering to the consistency point",
+		},
+		{
+			desc:                   "succeeds recovering forward to C",
+			recoverForwardToTarget: true,
+		},
+		{
+			desc:                   "fails because no base backup taken first",
+			hasNotBeenBaseBackedUp: true,
 		},
 		{
 			desc:           "fails if called multiple times",
@@ -341,31 +444,45 @@ func TestSetup(t *testing.T) {
 				},
 			}
 
+			baseBackup := &apiv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "base-backup"}}
+
+			// With a shared consistency point set, the clone recovers forward to it; with none set (e.g.
+			// the action run outside the stage's protocol) it recovers straight to the backup.
+			var consistencyPoint time.Time
+			if tt.recoverForwardToTarget {
+				consistencyPoint = establishedPoint
+			}
+
 			currentState := &setupState{
-				validateState: validateState{
-					configureState: configureState{
-						uid:                   "uid",
-						isConfigured:          true,
-						kubeClusterClient:     mockClient,
-						namespace:             "namespace",
-						clusterName:           "clusterName",
-						servingCertIssuerName: "servingCertIssuerName",
-						clientCertIssuerName:  "clientCertIssuerName",
-						drVolName:             "drVolName",
-						backupFileRelPath:     "backupFileRelPath",
-						opts: CNPGBackupOptions{
-							CloningOpts: clonedcluster.CloneClusterOptions{
-								Certificates: clonedcluster.CloneClusterOptionsCertificates{
-									ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
-										IssuerKind: "ClusterIssuer",
+				baseBackupState: baseBackupState{
+					validateState: validateState{
+						configureState: configureState{
+							uid:                   "uid",
+							isConfigured:          true,
+							kubeClusterClient:     mockClient,
+							namespace:             "namespace",
+							clusterName:           "clusterName",
+							servingCertIssuerName: "servingCertIssuerName",
+							clientCertIssuerName:  "clientCertIssuerName",
+							drVolName:             "drVolName",
+							backupFileRelPath:     "backupFileRelPath",
+							opts: CNPGBackupOptions{
+								CloningOpts: clonedcluster.CloneClusterOptions{
+									Certificates: clonedcluster.CloneClusterOptionsCertificates{
+										ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
+											IssuerKind: "ClusterIssuer",
+										},
 									},
 								},
+								CleanupTimeout: helpers.ShortWaitTime,
 							},
-							CleanupTimeout: helpers.ShortWaitTime,
 						},
+						isValidated: true,
+						cluster:     &apiv1.Cluster{},
 					},
-					isValidated: !tt.hasBeenNotBeenValidated,
-					cluster:     &apiv1.Cluster{},
+					baseBackup:       baseBackup,
+					consistencyPoint: consistencyPoint,
+					isBaseBackedUp:   !tt.hasNotBeenBaseBackedUp,
 				},
 				isSetup: tt.isAlreadySetup,
 			}
@@ -373,21 +490,22 @@ func TestSetup(t *testing.T) {
 			ctx := th.NewTestContext()
 
 			func() {
-				if tt.hasBeenNotBeenValidated || currentState.isSetup {
+				if tt.hasNotBeenBaseBackedUp || currentState.isSetup {
 					return
 				}
 
-				mockClient.EXPECT().CloneCluster(mock.Anything, currentState.namespace, currentState.clusterName, mock.Anything, currentState.servingCertIssuerName, currentState.clientCertIssuerName, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerNAme, clientCertIssuerName string, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
+				mockClient.EXPECT().CloneClusterFromBackup(mock.Anything, currentState.namespace, currentState.clusterName, mock.Anything, currentState.servingCertIssuerName, currentState.clientCertIssuerName, baseBackup, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, backup *apiv1.Backup, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
 						assert.True(t, calledCtx.IsChildOf(ctx))
 						assert.Contains(t, newClusterName, currentState.uid)
 						assert.LessOrEqual(t, len(newClusterName), 50)
 
-						if currentState.opts.CloningOpts.CleanupTimeout == 0 {
-							assert.Equal(t, currentState.opts.CleanupTimeout, opts.CleanupTimeout)
-							opts.CleanupTimeout = currentState.opts.CleanupTimeout
+						// The clone recovers forward to the shared consistency point only when one was set.
+						expectedCloningOpts := currentState.opts.CloningOpts
+						if tt.recoverForwardToTarget {
+							expectedCloningOpts.RecoveryTargetTime = consistencyPoint.Format(time.RFC3339)
 						}
-						assert.Equal(t, currentState.opts.CloningOpts, opts)
+						assert.Equal(t, expectedCloningOpts, opts)
 
 						return th.ErrOr1Val(mockCloneCluster, tt.simulateCloneClusterError)
 					})
@@ -402,7 +520,7 @@ func TestSetup(t *testing.T) {
 
 			btiOpts := &backuptoolinstance.CreateBackupToolInstanceOptions{}
 			err := currentState.Setup(ctx, btiOpts)
-			if th.ErrExpected(tt.hasBeenNotBeenValidated, tt.isAlreadySetup, tt.simulateCloneClusterError) {
+			if th.ErrExpected(tt.hasNotBeenBaseBackedUp, tt.isAlreadySetup, tt.simulateCloneClusterError) {
 				assert.Error(t, err)
 				return
 			}
@@ -450,67 +568,69 @@ func TestSetup(t *testing.T) {
 func TestCleanup(t *testing.T) {
 	tests := []struct {
 		desc                           string
-		hasNotBeenSetup                bool
+		nothingCreated                 bool
 		simulateClonedClusterDeleteErr bool
+		simulateBaseBackupDeleteErr    bool
 	}{
 		{
 			desc: "succeeds",
 		},
 		{
-			desc:            "succeeds and does nothing if not setup first",
-			hasNotBeenSetup: true,
+			desc:           "succeeds and does nothing if nothing was created",
+			nothingCreated: true,
 		},
 		{
 			desc:                           "fails to cleanup cloned cluster",
 			simulateClonedClusterDeleteErr: true,
+		},
+		{
+			desc:                        "fails to delete the base backup",
+			simulateBaseBackupDeleteErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			mockClient := kubecluster.NewMockClientInterface(t)
+			mockCNPGClient := cnpg.NewMockClientInterface(t)
 			mockCloneCluster := clonedcluster.NewMockClonedClusterInterface(t)
 
 			currentState := &setupState{
-				validateState: validateState{
-					configureState: configureState{
-						uid:                   "uid",
-						isConfigured:          true,
-						kubeClusterClient:     mockClient,
-						namespace:             "namespace",
-						clusterName:           "clusterName",
-						servingCertIssuerName: "servingCertIssuerName",
-						clientCertIssuerName:  "clientCertIssuerName",
-						drVolName:             "drVolName",
-						backupFileRelPath:     "backupFileRelPath",
-						opts: CNPGBackupOptions{
-							CloningOpts: clonedcluster.CloneClusterOptions{
-								Certificates: clonedcluster.CloneClusterOptionsCertificates{
-									ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
-										IssuerKind: "ClusterIssuer",
-									},
-								},
+				baseBackupState: baseBackupState{
+					validateState: validateState{
+						configureState: configureState{
+							uid:                   "uid",
+							isConfigured:          true,
+							kubeClusterClient:     mockClient,
+							namespace:             "namespace",
+							clusterName:           "clusterName",
+							servingCertIssuerName: "servingCertIssuerName",
+							clientCertIssuerName:  "clientCertIssuerName",
+							drVolName:             "drVolName",
+							backupFileRelPath:     "backupFileRelPath",
+							opts: CNPGBackupOptions{
+								CleanupTimeout: helpers.ShortWaitTime,
 							},
-							CleanupTimeout: helpers.ShortWaitTime,
 						},
-					},
-					isValidated: true,
-					cluster: &apiv1.Cluster{
-						Status: apiv1.ClusterStatus{
-							WriteService: "write-service",
-						},
+						isValidated: true,
 					},
 				},
-				clonedCluster: mockCloneCluster,
-				isSetup:       !tt.hasNotBeenSetup,
 			}
 
-			if !tt.hasNotBeenSetup {
+			// Cleanup tolerates partial state: only delete what was actually created.
+			if !tt.nothingCreated {
+				currentState.baseBackup = &apiv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "base-backup"}}
+				currentState.clonedCluster = mockCloneCluster
+
 				mockCloneCluster.EXPECT().Delete(mock.Anything).Return(th.ErrIfTrue(tt.simulateClonedClusterDeleteErr))
+
+				mockClient.EXPECT().CNPG().Return(mockCNPGClient)
+				mockCNPGClient.EXPECT().DeleteBackup(mock.Anything, currentState.namespace, currentState.baseBackup.Name).
+					Return(th.ErrIfTrue(tt.simulateBaseBackupDeleteErr))
 			}
 
 			err := currentState.Cleanup(th.NewTestContext())
-			if tt.simulateClonedClusterDeleteErr {
+			if tt.simulateClonedClusterDeleteErr || tt.simulateBaseBackupDeleteErr {
 				assert.Error(t, err)
 				return
 			}
@@ -549,32 +669,34 @@ func TestExecute(t *testing.T) {
 
 			currentState := &executeState{
 				setupState: setupState{
-					validateState: validateState{
-						configureState: configureState{
-							uid:                   "uid",
-							isConfigured:          true,
-							kubeClusterClient:     mockClient,
-							namespace:             "namespace",
-							clusterName:           "clusterName",
-							servingCertIssuerName: "servingCertIssuerName",
-							clientCertIssuerName:  "clientCertIssuerName",
-							drVolName:             "drVolName",
-							backupFileRelPath:     "backupFileRelPath",
-							opts: CNPGBackupOptions{
-								CloningOpts: clonedcluster.CloneClusterOptions{
-									Certificates: clonedcluster.CloneClusterOptionsCertificates{
-										ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
-											IssuerKind: "ClusterIssuer",
+					baseBackupState: baseBackupState{
+						validateState: validateState{
+							configureState: configureState{
+								uid:                   "uid",
+								isConfigured:          true,
+								kubeClusterClient:     mockClient,
+								namespace:             "namespace",
+								clusterName:           "clusterName",
+								servingCertIssuerName: "servingCertIssuerName",
+								clientCertIssuerName:  "clientCertIssuerName",
+								drVolName:             "drVolName",
+								backupFileRelPath:     "backupFileRelPath",
+								opts: CNPGBackupOptions{
+									CloningOpts: clonedcluster.CloneClusterOptions{
+										Certificates: clonedcluster.CloneClusterOptionsCertificates{
+											ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
+												IssuerKind: "ClusterIssuer",
+											},
 										},
 									},
+									CleanupTimeout: helpers.ShortWaitTime,
 								},
-								CleanupTimeout: helpers.ShortWaitTime,
 							},
-						},
-						isValidated: true,
-						cluster: &apiv1.Cluster{
-							Status: apiv1.ClusterStatus{
-								WriteService: "write-service",
+							isValidated: true,
+							cluster: &apiv1.Cluster{
+								Status: apiv1.ClusterStatus{
+									WriteService: "write-service",
+								},
 							},
 						},
 					},
