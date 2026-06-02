@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
@@ -265,6 +266,7 @@ func TestExecute(t *testing.T) {
 			mockGRPC := clients.NewMockClientInterface(t)
 			mockGRPC.EXPECT().S3().Return(mockS3Runtime).Maybe()
 
+			consistencyPoint := time.Date(2026, time.June, 2, 12, 0, 0, 0, time.UTC)
 			currentState := &executeState{
 				setupState: setupState{
 					validateState: validateState{
@@ -279,6 +281,7 @@ func TestExecute(t *testing.T) {
 							credentials:       s3.NewMockCredentialsInterface(t),
 							direction:         tt.direction,
 							opts:              S3SyncOptions{},
+							consistencyPoint:  consistencyPoint,
 						},
 						isValidated: true,
 					},
@@ -295,12 +298,16 @@ func TestExecute(t *testing.T) {
 				backupPath := filepath.Join(currentState.mountPaths.drVolume, currentState.backupDirRelPath)
 				source := currentState.s3Path
 				destination := backupPath
+				// The consistency point is applied only when capturing the bucket (download); on upload it
+				// must not be propagated.
+				expectedAsOf := consistencyPoint
 				if currentState.direction == DirectionUpload {
 					source, destination = destination, source
+					expectedAsOf = time.Time{}
 				}
 
-				mockS3Runtime.EXPECT().Sync(mock.Anything, currentState.credentials, source, destination).
-					RunAndReturn(func(calledCtx *contexts.Context, creds s3.CredentialsInterface, src, dst string) error {
+				mockS3Runtime.EXPECT().Sync(mock.Anything, currentState.credentials, source, destination, expectedAsOf).
+					RunAndReturn(func(calledCtx *contexts.Context, creds s3.CredentialsInterface, src, dst string, asOf time.Time) error {
 						assert.True(t, calledCtx.IsChildOf(ctx))
 						return th.ErrIfTrue(tt.simulateS3SyncErr)
 					})

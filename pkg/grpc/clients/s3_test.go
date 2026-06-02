@@ -2,6 +2,7 @@ package clients
 
 import (
 	"testing"
+	"time"
 
 	s3_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/s3/v1"
 	"github.com/solidDoWant/backup-tool/pkg/s3"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/utils/ptr"
 )
 
@@ -52,19 +54,24 @@ func TestS3Sync(t *testing.T) {
 		AccessKeyID:     "accessKeyID",
 		SecretAccessKey: "secretAccessKey",
 	}
-	request := s3_v1.SyncRequest_builder{
-		Credentials: encodedS3Credentials(credentials),
-		Source:      ptr.To(src),
-		Dest:        ptr.To(dest),
-	}.Build()
+	asOf := time.Date(2026, time.June, 2, 12, 0, 0, 0, time.UTC)
 
 	tests := []struct {
 		desc         string
+		asOf         time.Time
+		expectedAsOf *timestamppb.Timestamp // expected as_of field on the request the client builds
 		returnValues []interface{}
 		errFunc      assert.ErrorAssertionFunc
 	}{
 		{
 			desc:         "successful",
+			returnValues: []interface{}{s3_v1.SyncResponse_builder{}.Build(), nil},
+			errFunc:      assert.NoError,
+		},
+		{
+			desc:         "encodes the consistency point when set",
+			asOf:         asOf,
+			expectedAsOf: timestamppb.New(asOf),
 			returnValues: []interface{}{s3_v1.SyncResponse_builder{}.Build(), nil},
 			errFunc:      assert.NoError,
 		},
@@ -77,12 +84,19 @@ func TestS3Sync(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
+			request := s3_v1.SyncRequest_builder{
+				Credentials: encodedS3Credentials(credentials),
+				Source:      ptr.To(src),
+				Dest:        ptr.To(dest),
+				AsOf:        tt.expectedAsOf,
+			}.Build()
+
 			mockClient := s3_v1.NewMockS3Client()
 			mockClient.OnSync(mock.Anything, request, mock.Anything).
 				Return(tt.returnValues...)
 
 			s3c := &S3Client{client: mockClient}
-			err := s3c.Sync(th.NewTestContext(), credentials, src, dest)
+			err := s3c.Sync(th.NewTestContext(), credentials, src, dest, tt.asOf)
 
 			tt.errFunc(t, err)
 			mockClient.AssertExpectations(t)

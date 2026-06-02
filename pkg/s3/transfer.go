@@ -2,6 +2,7 @@ package s3
 
 import (
 	"context"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/gravitational/trace"
@@ -15,7 +16,9 @@ type syncManager interface {
 
 type newSyncManagerFunc func(session *session.Session, options ...s3sync.Option) syncManager
 
-func (lr *LocalRuntime) Sync(ctx *contexts.Context, credentials CredentialsInterface, src string, dest string) (err error) {
+// asOf carries the event's shared consistency point. Point-in-time, as-of-asOf capture is implemented in
+// a later step; for now the sync is always latest-state regardless of asOf.
+func (lr *LocalRuntime) Sync(ctx *contexts.Context, credentials CredentialsInterface, src string, dest string, asOf time.Time) (err error) {
 	ctx.Log.With("src", src, "dest", dest).Info("Copying files")
 	defer ctx.Log.Info("Finished copying files", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
 

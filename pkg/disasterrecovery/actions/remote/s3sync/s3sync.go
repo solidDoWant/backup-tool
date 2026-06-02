@@ -2,10 +2,12 @@ package s3sync
 
 import (
 	"path/filepath"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
@@ -33,11 +35,13 @@ const (
 
 type S3SyncOptions struct{}
 
+// S3SyncInterface is a RemoteStage action. Beyond the base RemoteAction contract it implements
+// remote.ConsistencyPointConsumer: it receives the event's shared consistency point so a download
+// captures the bucket as of that instant rather than its latest state.
 type S3SyncInterface interface {
+	remote.RemoteAction
+	remote.ConsistencyPointConsumer
 	Configure(kubeClusterClient kubecluster.ClientInterface, namespace, drVolName, backupDirRelPath, s3Path string, credentials s3.CredentialsInterface, direction Direction, opts S3SyncOptions) error
-	Validate(ctx *contexts.Context) error
-	Setup(ctx *contexts.Context, btiOpts *backuptoolinstance.CreateBackupToolInstanceOptions) error
-	Execute(ctx *contexts.Context, backupToolClient clients.ClientInterface) error
 }
 
 type configureState struct {
@@ -51,6 +55,15 @@ type configureState struct {
 	credentials       s3.CredentialsInterface
 	direction         Direction
 	opts              S3SyncOptions
+	// consistencyPoint is the event's shared consistency point, supplied by the stage via
+	// SetConsistencyPoint (zero until set). On a download it is the instant the bucket is captured as of.
+	consistencyPoint time.Time
+}
+
+// SetConsistencyPoint records the event's shared consistency point established by the stage. Implements
+// remote.ConsistencyPointConsumer.
+func (cs *configureState) SetConsistencyPoint(c time.Time) {
+	cs.consistencyPoint = c
 }
 
 func (cs *configureState) Configure(kubeClusterClient kubecluster.ClientInterface, namespace, drVolName, backupDirRelPath, s3Path string, credentials s3.CredentialsInterface, direction Direction, opts S3SyncOptions) error {
@@ -154,7 +167,15 @@ func (es *executeState) Execute(ctx *contexts.Context, backupToolClient clients.
 		source, destination = destination, source
 	}
 
-	err = backupToolClient.S3().Sync(ctx.Child(), es.credentials, source, destination)
+	// The consistency point only governs how the bucket is captured (download): the bucket is read as of
+	// that instant. On upload (restore) the already-as-of-C directory is pushed back as-is, so no
+	// point-in-time selection applies — leave it zero.
+	asOf := time.Time{}
+	if es.direction == DirectionDownload {
+		asOf = es.consistencyPoint
+	}
+
+	err = backupToolClient.S3().Sync(ctx.Child(), es.credentials, source, destination, asOf)
 	return trace.Wrap(err, "failed to sync files from %q to %q", source, destination)
 }
 

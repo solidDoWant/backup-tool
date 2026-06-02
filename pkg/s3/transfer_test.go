@@ -2,6 +2,7 @@ package s3
 
 import (
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -41,7 +42,7 @@ func TestSync(t *testing.T) {
 				return syncManager
 			}
 
-			err := runtime.Sync(ctx, creds, src, dest)
+			err := runtime.Sync(ctx, creds, src, dest, time.Time{})
 			if test.shouldSyncFail {
 				assert.Error(t, err)
 			} else {

@@ -3,11 +3,15 @@ edition = "2023";
 option go_package = "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/s3/v1;s3_v1";
 
 import "s3_credentials.proto";
+import "google/protobuf/timestamp.proto";
 
 message SyncRequest {
   Credentials credentials = 1;
   string source = 2;
   string dest = 3;
+  // as_of is the event's shared consistency point: the instant the bucket should be captured as of.
+  // Unset means "no consistency point".
+  google.protobuf.Timestamp as_of = 4;
 }
 
 message SyncResponse {}

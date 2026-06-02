@@ -2,6 +2,7 @@ package servers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	s3_v1 "github.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/s3/v1"
@@ -9,6 +10,7 @@ import (
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/utils/ptr"
 )
 
@@ -40,13 +42,22 @@ func TestDecodeS3Credentials(t *testing.T) {
 }
 
 func TestS3Sync(t *testing.T) {
+	asOf := time.Date(2026, time.June, 2, 12, 0, 0, 0, time.UTC)
+
 	tests := []struct {
-		desc        string
-		returnValue error
-		shouldError bool
+		desc         string
+		asOf         *timestamppb.Timestamp // as_of carried on the request
+		expectedAsOf time.Time              // what the handler should decode and pass to the runtime
+		returnValue  error
+		shouldError  bool
 	}{
 		{
-			desc: "successful",
+			desc: "successful without a consistency point",
+		},
+		{
+			desc:         "decodes the consistency point when set",
+			asOf:         timestamppb.New(asOf),
+			expectedAsOf: asOf,
 		},
 		{
 			desc:        "failure",
@@ -69,12 +80,13 @@ func TestS3Sync(t *testing.T) {
 				SecretAccessKey: ptr.To("secretAccessKey"),
 			}.Build()
 
-			runtime.EXPECT().Sync(contexts.UnwrapHandlerContext(ctx), decodeS3Credentials(credentials), src, dest).Return(tt.returnValue)
+			runtime.EXPECT().Sync(contexts.UnwrapHandlerContext(ctx), decodeS3Credentials(credentials), src, dest, tt.expectedAsOf).Return(tt.returnValue)
 
 			resp, err := server.Sync(ctx, s3_v1.SyncRequest_builder{
 				Credentials: credentials,
 				Source:      &src,
 				Dest:        &dest,
+				AsOf:        tt.asOf,
 			}.Build())
 			if tt.shouldError {
 				assert.Error(t, err)

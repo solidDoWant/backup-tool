@@ -2,6 +2,7 @@ package servers
 
 import (
 	"context"
+	"time"
 
 	"github.com/gravitational/trace/trail"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
@@ -30,7 +31,14 @@ func decodeS3Credentials(encodedCredentials *s3_v1.Credentials) *s3.Credentials 
 
 func (s3s *S3Server) Sync(ctx context.Context, req *s3_v1.SyncRequest) (*s3_v1.SyncResponse, error) {
 	grpcCtx := contexts.UnwrapHandlerContext(ctx)
-	err := s3s.runtime.Sync(grpcCtx, decodeS3Credentials(req.GetCredentials()), req.GetSource(), req.GetDest())
+
+	// An unset as_of means "no consistency point" -> zero time -> latest-state sync.
+	var asOf time.Time
+	if ts := req.GetAsOf(); ts != nil {
+		asOf = ts.AsTime()
+	}
+
+	err := s3s.runtime.Sync(grpcCtx, decodeS3Credentials(req.GetCredentials()), req.GetSource(), req.GetDest(), asOf)
 	if err != nil {
 		return nil, trail.Send(grpcCtx, err)
 	}
