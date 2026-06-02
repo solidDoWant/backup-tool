@@ -90,7 +90,7 @@ func (rs *RemoteStage) WithAction(friendlyName string, action RemoteAction) Remo
 }
 
 func (rs *RemoteStage) cleanupFunc(ctx *contexts.Context, outerErr *error) func() {
-	cleanupFuncs := []func() error{}
+	cleanupFuncs := []func(){}
 
 	for _, action := range rs.actions {
 		if cleanupAction, ok := action.remoteAction.(CleanupAction); ok {
@@ -104,7 +104,7 @@ func (rs *RemoteStage) cleanupFunc(ctx *contexts.Context, outerErr *error) func(
 
 	return func() {
 		for _, cleanupFunc := range cleanupFuncs {
-			_ = cleanupFunc()
+			cleanupFunc()
 		}
 	}
 }

@@ -68,7 +68,7 @@ func (c *Cleanup) buildContext() (*contexts.Context, context.CancelFunc) {
 	return newCtx, cancel
 }
 
-func (c *Cleanup) Run() error {
+func (c *Cleanup) RunError() error {
 	if c.cleanupLogic == nil {
 		return nil
 	}
@@ -85,4 +85,14 @@ func (c *Cleanup) Run() error {
 	}
 
 	return aggregateErr
+}
+
+func (c *Cleanup) Run() {
+	_ = c.RunError()
+}
+
+func (c *Cleanup) RunPanic() {
+	if err := c.RunError(); err != nil {
+		panic(err)
+	}
 }

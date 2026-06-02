@@ -30,9 +30,9 @@ func (c *Client) SnapshotVolume(ctx *contexts.Context, namespace, pvcName string
 	}
 
 	if opts.Name == "" {
-		snapshot.ObjectMeta.GenerateName = helpers.CleanName(pvcName)
+		snapshot.GenerateName = helpers.CleanName(pvcName)
 	} else {
-		snapshot.ObjectMeta.Name = opts.Name
+		snapshot.Name = opts.Name
 	}
 
 	if opts.SnapshotClass != "" {

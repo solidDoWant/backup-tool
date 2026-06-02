@@ -26,13 +26,17 @@ func TestCreateCertificate(t *testing.T) {
 	issuer := "test-issuer"
 
 	standardCert := &certmanagerv1.Certificate{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       certmanagerv1.CertificateKind,
+			APIVersion: certmanagerv1.SchemeGroupVersion.Identifier(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 		},
 		Spec: certmanagerv1.CertificateSpec{
 			Duration:              &metav1.Duration{Duration: time.Hour},
 			EncodeUsagesInRequest: new(true),
-			IssuerRef: cmmeta.ObjectReference{
+			IssuerRef: cmmeta.IssuerReference{
 				Group: certmanager.GroupName,
 				Kind:  "Issuer",
 				Name:  issuer,
@@ -94,7 +98,7 @@ func TestCreateCertificate(t *testing.T) {
 					CommonName: "test.example.com",
 					DNSNames:   []string{"test1.example.com", "test2.example.com"},
 					Duration:   &metav1.Duration{Duration: 24 * time.Hour},
-					IssuerRef: cmmeta.ObjectReference{
+					IssuerRef: cmmeta.IssuerReference{
 						Kind: "ClusterIssuer",
 					},
 					SecretTemplate: &certmanagerv1.CertificateSecretTemplate{
@@ -145,12 +149,16 @@ func TestCreateCertificate(t *testing.T) {
 				return
 			}
 
+			// Drop fields that don't matter for comparison here
+			cert.ManagedFields = nil
+
 			expectedCert := standardCert.DeepCopy()
-			require.NoError(t, mergo.MergeWithOverwrite(expectedCert, tt.expected))
+			require.NoError(t, mergo.Merge(expectedCert, tt.expected, mergo.WithOverride))
 			assert.NoError(t, err)
 			assert.Equal(t, expectedCert, cert)
 
 			retrievedCert, err := client.client.CertmanagerV1().Certificates(namespace).Get(ctx, cert.Name, metav1.GetOptions{})
+			retrievedCert.ManagedFields = nil
 			assert.NoError(t, err)
 			assert.Equal(t, expectedCert, retrievedCert)
 		})
@@ -413,6 +421,10 @@ func TestGetCertificate(t *testing.T) {
 			var existingCert *certmanagerv1.Certificate
 			if tt.shouldSetupCert {
 				existingCert = &certmanagerv1.Certificate{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       certmanagerv1.CertificateKind,
+						APIVersion: certmanagerv1.SchemeGroupVersion.Identifier(),
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      certName,
 						Namespace: namespace,
@@ -494,6 +506,10 @@ func TestCreateIssuer(t *testing.T) {
 	caCertSecretName := "test-ca-secret"
 
 	standardIssuer := &certmanagerv1.Issuer{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       certmanagerv1.IssuerKind,
+			APIVersion: certmanagerv1.SchemeGroupVersion.Identifier(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 		},
@@ -558,11 +574,15 @@ func TestCreateIssuer(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, issuer)
 
+			// Ignore fields that are set by the API server and not relevant to the test
+			issuer.ManagedFields = nil
+
 			expectedIssuer := standardIssuer.DeepCopy()
-			require.NoError(t, mergo.MergeWithOverwrite(expectedIssuer, tt.expected))
+			require.NoError(t, mergo.Merge(expectedIssuer, tt.expected, mergo.WithOverride))
 			assert.Equal(t, expectedIssuer, issuer)
 
 			retrievedIssuer, err := client.client.CertmanagerV1().Issuers(namespace).Get(ctx, issuer.Name, metav1.GetOptions{})
+			retrievedIssuer.ManagedFields = nil
 			assert.NoError(t, err)
 			assert.Equal(t, expectedIssuer, retrievedIssuer)
 		})
@@ -741,6 +761,10 @@ func TestGetIssuer(t *testing.T) {
 			var existingIssuer *certmanagerv1.Issuer
 			if tt.shouldSetupIssuer {
 				existingIssuer = &certmanagerv1.Issuer{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       certmanagerv1.IssuerKind,
+						APIVersion: certmanagerv1.SchemeGroupVersion.Identifier(),
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      issuerName,
 						Namespace: namespace,
@@ -842,6 +866,10 @@ func TestGetClusterIssuer(t *testing.T) {
 			var existingIssuer *certmanagerv1.ClusterIssuer
 			if tt.shouldSetupIssuer {
 				existingIssuer = &certmanagerv1.ClusterIssuer{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       certmanagerv1.ClusterIssuerKind,
+						APIVersion: certmanagerv1.SchemeGroupVersion.Identifier(),
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: clusterIssuerName,
 					},

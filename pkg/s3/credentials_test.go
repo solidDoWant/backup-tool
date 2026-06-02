@@ -31,12 +31,12 @@ func TestNewCredentialsFromEnv(t *testing.T) {
 	region := "region"
 	s3ForcePathStyle := true
 
-	os.Setenv("AWS_ACCESS_KEY_ID", accesKeyId)
-	os.Setenv("AWS_SECRET_ACCESS_KEY", secretAccessKey)
-	os.Setenv("AWS_SESSION_TOKEN", sessionToken)
-	os.Setenv("AWS_ENDPOINT", endpoint)
-	os.Setenv("AWS_REGION", region)
-	os.Setenv("AWS_S3_FORCE_PATH_STYLE", fmt.Sprintf("%t", s3ForcePathStyle))
+	require.NoError(t, os.Setenv("AWS_ACCESS_KEY_ID", accesKeyId))
+	require.NoError(t, os.Setenv("AWS_SECRET_ACCESS_KEY", secretAccessKey))
+	require.NoError(t, os.Setenv("AWS_SESSION_TOKEN", sessionToken))
+	require.NoError(t, os.Setenv("AWS_ENDPOINT", endpoint))
+	require.NoError(t, os.Setenv("AWS_REGION", region))
+	require.NoError(t, os.Setenv("AWS_S3_FORCE_PATH_STYLE", fmt.Sprintf("%t", s3ForcePathStyle)))
 
 	credentials := NewCredentialsFromEnv()
 

@@ -202,7 +202,8 @@ func TestDeleteSnapshot(t *testing.T) {
 			ctx := th.NewTestContext()
 
 			if tt.initialSnapshot != nil {
-				mockES.SnapshotV1().VolumeSnapshots(namespace).Create(ctx, tt.initialSnapshot, metav1.CreateOptions{})
+				_, err := mockES.SnapshotV1().VolumeSnapshots(namespace).Create(ctx, tt.initialSnapshot, metav1.CreateOptions{})
+				require.NoError(t, err)
 			}
 
 			err := client.DeleteSnapshot(ctx, namespace, snapshotName)

@@ -20,6 +20,7 @@ func TestNewClient(t *testing.T) {
 }
 
 func createTestClient() (*Client, *fake.Clientset) {
+	// nolint:staticcheck // There is not yet a `NewClientset` function in the fake package due to a bug with how upstream is generating the clientset code
 	fakeClient := fake.NewSimpleClientset()
 	return &Client{
 		client: fakeClient,

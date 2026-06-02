@@ -57,7 +57,7 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 			WithOriginalErr(&originalErr).
 			WithParentCtx(ctx).
 			WithTimeout(opts.CleanupTimeout.MaxWait(10 * time.Minute)).
-			Run()
+			RunError()
 	}
 
 	probe := &corev1.Probe{

@@ -1,8 +1,6 @@
 package disasterrecovery
 
 import (
-	"os"
-
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
@@ -19,7 +17,6 @@ import (
 )
 
 const (
-	teleportBaseMountPath                 = string(os.PathSeparator) + "mnt"
 	teleportCoreSQLFileName               = "backup-core.sql"
 	teleportAuditSQLFileName              = "backup-audit.sql"
 	teleportAuditSessionLogsDirectoryName = "audit-session-logs"

@@ -233,7 +233,7 @@ func (ss *setupState) Cleanup(ctx *contexts.Context) error {
 		if err := cleanup.To(ss.clonedCluster.Delete).
 			WithErrMessage("failed to cleanup cloned cluster resources").
 			WithParentCtx(ctx).WithTimeout(ss.opts.CleanupTimeout.MaxWait(10 * time.Minute)).
-			Run(); err != nil {
+			RunError(); err != nil {
 			cleanupErrs = append(cleanupErrs, err)
 		}
 	}
@@ -243,7 +243,7 @@ func (ss *setupState) Cleanup(ctx *contexts.Context) error {
 			return ss.kubeClusterClient.CNPG().DeleteBackup(ctx, ss.namespace, ss.baseBackup.Name)
 		}).WithErrMessage("failed to cleanup base backup %q", helpers.FullNameStr(ss.namespace, ss.baseBackup.Name)).
 			WithParentCtx(ctx).WithTimeout(ss.opts.CleanupTimeout.MaxWait(time.Minute)).
-			Run(); err != nil {
+			RunError(); err != nil {
 			cleanupErrs = append(cleanupErrs, err)
 		}
 	}

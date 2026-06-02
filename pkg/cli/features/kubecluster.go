@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/cleanup"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/barmancloud"
@@ -56,7 +58,7 @@ func (kcc *KubeClusterCommand) ConfigureFlags(cmd *cobra.Command) {
 // key2="value2"
 // key3="value3"
 // ...
-func (kcc *KubeClusterCommand) getLabels() (map[string]string, error) {
+func (kcc *KubeClusterCommand) getLabels() (labels map[string]string, err error) {
 	if kcc.labelsFilePath == "" {
 		return nil, nil
 	}
@@ -69,14 +71,17 @@ func (kcc *KubeClusterCommand) getLabels() (map[string]string, error) {
 
 	labelsFile, err := os.Open(kcc.labelsFilePath)
 	if err != nil {
-		return nil, trace.Wrap(err, "failed to open labels file")
+		return nil, trace.Wrap(err, "failed to open labels file %q", kcc.labelsFilePath)
 	}
-	defer labelsFile.Close()
+	defer cleanup.To(func(_ *contexts.Context) error { return labelsFile.Close() }).
+		WithErrMessage("failed to close labels file %q", kcc.labelsFilePath).
+		WithOriginalErr(&err).
+		Run()
 
 	// Read file line by line, and split each line by the first '=' character.
 	// The first part is the key, and the second part is the value.
-	labels := make(map[string]string)
 	scanner := bufio.NewScanner(labelsFile)
+	labels = make(map[string]string)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {

@@ -63,7 +63,6 @@ func TestNewClient(t *testing.T) {
 
 			if tt.useServerAddr {
 				lis, grpcServer := setupServer(t)
-				defer lis.Close()
 				defer grpcServer.GracefulStop()
 				tt.addr = lis.Addr().String()
 

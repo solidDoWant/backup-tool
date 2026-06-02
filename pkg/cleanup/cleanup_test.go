@@ -84,7 +84,7 @@ func TestBuildContext(t *testing.T) {
 	}
 }
 
-func TestRun(t *testing.T) {
+func TestRunError(t *testing.T) {
 	tests := []struct {
 		name         string
 		cleanupLogic func(*contexts.Context) error
@@ -132,7 +132,7 @@ func TestRun(t *testing.T) {
 				cleanup.WithOriginalErr(&err)
 			}
 
-			result := cleanup.Run()
+			result := cleanup.RunError()
 
 			if !tt.shouldErr {
 				require.NoError(t, result)
@@ -146,6 +146,48 @@ func TestRun(t *testing.T) {
 
 			require.True(t, trace.IsAggregate(err))
 			require.Len(t, trace.Unwrap(err).(trace.Aggregate).Errors(), 2)
+		})
+	}
+}
+
+func TestRunPanic(t *testing.T) {
+	tests := []struct {
+		name         string
+		cleanupLogic func(*contexts.Context) error
+		panicFunc    assert.PanicAssertionFunc
+	}{
+		{
+			name: "nil cleanup logic does not panic",
+		},
+		{
+			name:         "successful cleanup does not panic",
+			cleanupLogic: func(*contexts.Context) error { return nil },
+		},
+		{
+			name:         "cleanup error panics",
+			cleanupLogic: func(*contexts.Context) error { return assert.AnError },
+			panicFunc:    assert.Panics,
+		},
+		{
+			name:         "original error and cleanup error panics",
+			cleanupLogic: func(*contexts.Context) error { return assert.AnError },
+			panicFunc:    assert.Panics,
+		},
+		{
+			name:         "original error and nil cleanup error does not panic",
+			cleanupLogic: func(*contexts.Context) error { return nil },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cleanup := To(tt.cleanupLogic)
+
+			if tt.panicFunc == nil {
+				tt.panicFunc = assert.NotPanics
+			}
+
+			tt.panicFunc(t, func() { cleanup.RunPanic() })
 		})
 	}
 }

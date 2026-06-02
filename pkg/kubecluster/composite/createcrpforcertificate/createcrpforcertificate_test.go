@@ -26,7 +26,7 @@ func TestCreateCRPForCertificate(t *testing.T) {
 			Name:      certName,
 		},
 		Spec: certmanagerv1.CertificateSpec{
-			IssuerRef: cmmeta.ObjectReference{
+			IssuerRef: cmmeta.IssuerReference{
 				Group: "test-group",
 				Kind:  "test-kind",
 				Name:  "test-name",

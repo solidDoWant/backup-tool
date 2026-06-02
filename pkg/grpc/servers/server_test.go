@@ -42,11 +42,12 @@ func TestStartServerListener(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
+			var listener net.Listener
 			if tt.createConflictingListener {
 				// Create listener to occupy port
 				l, err := net.Listen("tcp", fmt.Sprintf(":%d", tt.port))
 				assert.NoError(t, err)
-				defer l.Close()
+				t.Cleanup(func() { assert.NoError(t, l.Close()) })
 			}
 
 			listener, err := startServerListener(tt.port)
@@ -57,7 +58,7 @@ func TestStartServerListener(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.NotNil(t, listener)
-			defer listener.Close()
+			defer assert.NoError(t, listener.Close())
 
 			addr := listener.Addr().(*net.TCPAddr)
 			assert.Equal(t, tt.port, addr.Port)
@@ -155,7 +156,7 @@ func TestStartServer(t *testing.T) {
 			// Try connecting to verify server is running, and reportedly healthy
 			conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			require.NoError(t, err)
-			defer conn.Close()
+			t.Cleanup(func() { assert.NoError(t, conn.Close()) })
 
 			client := grpchealth_v1.NewHealthClient(conn)
 			resp, err := client.Check(context.Background(), &grpchealth_v1.HealthCheckRequest{Service: ""})

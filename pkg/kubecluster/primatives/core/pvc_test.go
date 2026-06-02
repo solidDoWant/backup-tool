@@ -104,7 +104,7 @@ func TestCreatePVC(t *testing.T) {
 				require.NoError(t, err)
 
 				expectedPVC := standardPVC.DeepCopy()
-				err := mergo.MergeWithOverwrite(expectedPVC, tt.expectedPVC)
+				err := mergo.Merge(expectedPVC, tt.expectedPVC, mergo.WithOverride)
 				require.NoError(t, err)
 
 				require.Equal(t, expectedPVC, pvc)

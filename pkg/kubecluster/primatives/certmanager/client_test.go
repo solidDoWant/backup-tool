@@ -19,7 +19,7 @@ func TestNewClient(t *testing.T) {
 }
 
 func createTestClient() (*Client, *cmfake.Clientset) {
-	fakeClient := cmfake.NewSimpleClientset()
+	fakeClient := cmfake.NewClientset()
 	return &Client{
 		client: fakeClient,
 	}, fakeClient

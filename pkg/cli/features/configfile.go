@@ -12,6 +12,8 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/invopop/jsonschema"
 	"github.com/jinzhu/copier"
+	"github.com/solidDoWant/backup-tool/pkg/cleanup"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/spf13/cobra"
 )
 
@@ -35,8 +37,12 @@ func NewConfigFileCommand[T interface{}]() *ConfigFileCommand[T] {
 func (cfc *ConfigFileCommand[T]) ConfigureFlags(cmd *cobra.Command) {
 	const flagName = "config-file"
 	cmd.Flags().StringVarP(&cfc.ConfigFilePath, flagName, "c", "", "Path to the configuration file to use for CLI requests.")
-	cmd.MarkFlagFilename(flagName)
-	cmd.MarkFlagRequired(flagName)
+	cleanup.To(func(_ *contexts.Context) error { return cmd.MarkFlagFilename(flagName) }).
+		WithErrMessage("failed to mark %q flag as a filename", flagName).
+		RunPanic()
+	cleanup.To(func(_ *contexts.Context) error { return cmd.MarkFlagRequired(flagName) }).
+		WithErrMessage("failed to mark %q flag as required", flagName).
+		RunPanic()
 }
 
 // TODO move the  translation logic to a separate package, or maybe a separate module. This could be useful

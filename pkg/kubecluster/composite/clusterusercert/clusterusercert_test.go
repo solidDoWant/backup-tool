@@ -133,7 +133,7 @@ func TestNewClusterUserCert(t *testing.T) {
 						assert.Equal(t, []certmanagerv1.KeyUsage{certmanagerv1.UsageClientAuth}, opts.Usages)
 						assert.Equal(t, opts.IssuerKind, tt.opts.IssuerKind)
 
-						createdCert.ObjectMeta.Name = certName
+						createdCert.Name = certName
 
 						return th.ErrOr1Val(createdCert, tt.simulateCreateCertError)
 					})

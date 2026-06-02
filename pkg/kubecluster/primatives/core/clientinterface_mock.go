@@ -4,8 +4,10 @@ package core
 
 import (
 	contexts "github.com/solidDoWant/backup-tool/pkg/contexts"
-	mock "github.com/stretchr/testify/mock"
 	batchv1 "k8s.io/api/batch/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+
+	mock "github.com/stretchr/testify/mock"
 
 	resource "k8s.io/apimachinery/pkg/api/resource"
 
@@ -472,23 +474,23 @@ func (_c *MockClientInterface_EnsurePVCExists_Call) RunAndReturn(run func(*conte
 }
 
 // GetEndpoint provides a mock function with given fields: ctx, namespace, name
-func (_m *MockClientInterface) GetEndpoint(ctx *contexts.Context, namespace string, name string) (*v1.Endpoints, error) {
+func (_m *MockClientInterface) GetEndpoint(ctx *contexts.Context, namespace string, name string) (*discoveryv1.EndpointSlice, error) {
 	ret := _m.Called(ctx, namespace, name)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetEndpoint")
 	}
 
-	var r0 *v1.Endpoints
+	var r0 *discoveryv1.EndpointSlice
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) (*v1.Endpoints, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) (*discoveryv1.EndpointSlice, error)); ok {
 		return rf(ctx, namespace, name)
 	}
-	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) *v1.Endpoints); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string) *discoveryv1.EndpointSlice); ok {
 		r0 = rf(ctx, namespace, name)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Endpoints)
+			r0 = ret.Get(0).(*discoveryv1.EndpointSlice)
 		}
 	}
 
@@ -521,12 +523,12 @@ func (_c *MockClientInterface_GetEndpoint_Call) Run(run func(ctx *contexts.Conte
 	return _c
 }
 
-func (_c *MockClientInterface_GetEndpoint_Call) Return(_a0 *v1.Endpoints, _a1 error) *MockClientInterface_GetEndpoint_Call {
+func (_c *MockClientInterface_GetEndpoint_Call) Return(_a0 *discoveryv1.EndpointSlice, _a1 error) *MockClientInterface_GetEndpoint_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClientInterface_GetEndpoint_Call) RunAndReturn(run func(*contexts.Context, string, string) (*v1.Endpoints, error)) *MockClientInterface_GetEndpoint_Call {
+func (_c *MockClientInterface_GetEndpoint_Call) RunAndReturn(run func(*contexts.Context, string, string) (*discoveryv1.EndpointSlice, error)) *MockClientInterface_GetEndpoint_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -686,23 +688,23 @@ func (_c *MockClientInterface_WaitForJobCompletion_Call) RunAndReturn(run func(*
 }
 
 // WaitForReadyEndpoint provides a mock function with given fields: ctx, namespace, name, opts
-func (_m *MockClientInterface) WaitForReadyEndpoint(ctx *contexts.Context, namespace string, name string, opts WaitForReadyEndpointOpts) (*v1.Endpoints, error) {
+func (_m *MockClientInterface) WaitForReadyEndpoint(ctx *contexts.Context, namespace string, name string, opts WaitForReadyEndpointOpts) (*discoveryv1.EndpointSlice, error) {
 	ret := _m.Called(ctx, namespace, name, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WaitForReadyEndpoint")
 	}
 
-	var r0 *v1.Endpoints
+	var r0 *discoveryv1.EndpointSlice
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyEndpointOpts) (*v1.Endpoints, error)); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyEndpointOpts) (*discoveryv1.EndpointSlice, error)); ok {
 		return rf(ctx, namespace, name, opts)
 	}
-	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyEndpointOpts) *v1.Endpoints); ok {
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, WaitForReadyEndpointOpts) *discoveryv1.EndpointSlice); ok {
 		r0 = rf(ctx, namespace, name, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Endpoints)
+			r0 = ret.Get(0).(*discoveryv1.EndpointSlice)
 		}
 	}
 
@@ -736,12 +738,12 @@ func (_c *MockClientInterface_WaitForReadyEndpoint_Call) Run(run func(ctx *conte
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyEndpoint_Call) Return(_a0 *v1.Endpoints, _a1 error) *MockClientInterface_WaitForReadyEndpoint_Call {
+func (_c *MockClientInterface_WaitForReadyEndpoint_Call) Return(_a0 *discoveryv1.EndpointSlice, _a1 error) *MockClientInterface_WaitForReadyEndpoint_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClientInterface_WaitForReadyEndpoint_Call) RunAndReturn(run func(*contexts.Context, string, string, WaitForReadyEndpointOpts) (*v1.Endpoints, error)) *MockClientInterface_WaitForReadyEndpoint_Call {
+func (_c *MockClientInterface_WaitForReadyEndpoint_Call) RunAndReturn(run func(*contexts.Context, string, string, WaitForReadyEndpointOpts) (*discoveryv1.EndpointSlice, error)) *MockClientInterface_WaitForReadyEndpoint_Call {
 	_c.Call.Return(run)
 	return _c
 }

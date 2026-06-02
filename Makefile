@@ -21,7 +21,7 @@ generate-protobuf-code: $(PROTOBUF_GEN_FILES)
 $(PROTOBUF_GEN_DIR)/%_grpc_mock.pb.go $(PROTOBUF_GEN_DIR)/%_grpc.pb.go $(PROTOBUF_GEN_DIR)/%.pb.go: $(PROTOBUF_SRC_DIR)/%.proto
 	@protoc $(PROTOC_FLAGS) -I $(dir $<) $<
 
-KUBE_CODEGEN_VERSION ?= kubernetes-1.32.0
+KUBE_CODEGEN_VERSION ?= kubernetes-1.36.1
 
 CNPG_VERSION := $(shell go list -f '{{ .Version }}' -m github.com/cloudnative-pg/cloudnative-pg)
 CNPG_CODEGEN_WORKING_DIR := $(WORKING_DIR)/cnpg-gen

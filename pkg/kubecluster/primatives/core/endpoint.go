@@ -6,14 +6,14 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
-	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *Client) GetEndpoint(ctx *contexts.Context, namespace, name string) (*corev1.Endpoints, error) {
+func (c *Client) GetEndpoint(ctx *contexts.Context, namespace, name string) (*discoveryv1.EndpointSlice, error) {
 	ctx.Log.With("name", name).Info("Getting endpoint")
 
-	endpoint, err := c.client.CoreV1().Endpoints(namespace).Get(ctx, name, metav1.GetOptions{})
+	endpoint, err := c.client.DiscoveryV1().EndpointSlices(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to get endpoint %q", helpers.FullNameStr(namespace, name))
 	}
@@ -27,14 +27,14 @@ type WaitForReadyEndpointOpts struct {
 }
 
 // Wait for at least one ready endpoint to be available.
-func (c *Client) WaitForReadyEndpoint(ctx *contexts.Context, namespace, name string, opts WaitForReadyEndpointOpts) (endpoints *corev1.Endpoints, err error) {
+func (c *Client) WaitForReadyEndpoint(ctx *contexts.Context, namespace, name string, opts WaitForReadyEndpointOpts) (endpoints *discoveryv1.EndpointSlice, err error) {
 	ctx.Log.With("name", name).Info("Waiting for endpoint to become ready")
 	defer ctx.Log.Info("Finished waiting for endpoint to become ready", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
 
-	processEvent := func(_ *contexts.Context, endpoint *corev1.Endpoints) (*corev1.Endpoints, bool, error) {
-		for _, subset := range endpoint.Subsets {
+	processEvent := func(_ *contexts.Context, endpoint *discoveryv1.EndpointSlice) (*discoveryv1.EndpointSlice, bool, error) {
+		for _, subset := range endpoint.Endpoints {
 			for _, address := range subset.Addresses {
-				if address.IP != "" {
+				if address != "" {
 					return endpoint, true, nil
 				}
 			}
@@ -42,7 +42,7 @@ func (c *Client) WaitForReadyEndpoint(ctx *contexts.Context, namespace, name str
 
 		return nil, false, nil
 	}
-	endpoints, err = helpers.WaitForResourceCondition(ctx.Child(), opts.MaxWait(5*time.Minute), c.client.CoreV1().Endpoints(namespace), name, processEvent)
+	endpoints, err = helpers.WaitForResourceCondition(ctx.Child(), opts.MaxWait(5*time.Minute), c.client.DiscoveryV1().EndpointSlices(namespace), name, processEvent)
 
 	if err != nil {
 		return nil, trace.Wrap(err, "failed waiting for endpoint to become ready")

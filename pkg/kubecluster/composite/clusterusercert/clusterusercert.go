@@ -59,7 +59,7 @@ func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username
 			WithOriginalErr(&originalErr).
 			WithParentCtx(ctx).
 			WithTimeout(opts.CleanupTimeout.MaxWait(10 * time.Minute)).
-			Run()
+			RunError()
 	}
 
 	// 1. Create the certificate itself

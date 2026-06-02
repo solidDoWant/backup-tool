@@ -50,7 +50,7 @@ func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name, iss
 				RotationPolicy: certmanagerv1.RotationPolicyAlways,
 			},
 			SecretName: name,
-			IssuerRef: cmmeta.ObjectReference{
+			IssuerRef: cmmeta.IssuerReference{
 				Group: certmanager.GroupName,
 				Kind:  "Issuer",
 				Name:  issuerName,

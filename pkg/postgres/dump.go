@@ -140,7 +140,7 @@ func (lr *LocalRuntime) DumpAll(ctx *contexts.Context, credentials Credentials, 
 			// the current line is not blank, and
 			len(sqlLine) >= 2 &&
 			// the current line is not a comment, and
-			!(sqlLine[0] == '-' && sqlLine[1] == '-') &&
+			(sqlLine[0] != '-' || sqlLine[1] != '-') &&
 			// the current line is not a psql command, and
 			sqlLine[0] != '\\' &&
 			// the current line is a statement line

@@ -154,7 +154,7 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 			WithOriginalErr(&originalErr).
 			WithParentCtx(ctx).
 			WithTimeout(opts.CleanupTimeout.MaxWait(10 * time.Minute)).
-			Run()
+			RunError()
 	}
 
 	ctx.Log.Info("Collecting information about the existing cluster")
@@ -416,6 +416,7 @@ func (p *Provider) configureWALRecovery(ctx *contexts.Context, namespace string,
 		// No barman-cloud plugin: the source uses the deprecated in-tree barman WAL archiving, which
 		// records the WAL archive location on the Backup object itself, so recover straight from it.
 		ctx.Log.Debug("Source cluster uses in-tree barman WAL archiving; recovering from backup object", "backup", backup.Name)
+		// nolint:staticcheck
 		clusterOpts.BackupName = backup.Name
 		return false, nil
 	}

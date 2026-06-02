@@ -109,7 +109,7 @@ Mocks are checked-in (`*_mock.go`, naming convention `<interface>_mock.go` lower
 
 - Volume mount paths and on-disk filenames inside DR PVCs (e.g. `vaultwardenDRVolPath = "data-vol"`, `vaultwardenSQLFileName = "dump.sql"`) are part of the on-disk format. Changing them breaks restore of older backups — the comments call this out and the constraint still holds.
 - Cloned CNPG cluster names are capped at 40 chars (CNPG limit); `helpers.CleanName` + truncation logic in `vaultwarden.go` is the established pattern.
-- `dario.cat/mergo.MergeWithOverwrite` is used to layer user-supplied `RemoteBackupToolOptions` over computed `CreateBackupToolInstanceOptions`; preserve this order when adding new options.
+- `dario.cat/mergo.Merge` is used to layer user-supplied `RemoteBackupToolOptions` over computed `CreateBackupToolInstanceOptions`; preserve this order when adding new options.
 - Postgres connections to cloned CNPG clusters use TLS client-cert auth (`require_auth=none`, `sslmode=verify-full`); credentials are file paths into the pod's mounted secret volumes, not env-var values for passwords.
 
 ## Maintaining this file

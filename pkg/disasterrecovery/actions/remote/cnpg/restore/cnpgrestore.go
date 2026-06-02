@@ -196,7 +196,7 @@ func (ss *setupState) Cleanup(ctx *contexts.Context) error {
 	err := cleanup.To(ss.postgresUserCert.Delete).
 		WithErrMessage("failed to cleanup postgres user CNPG cluster postgres user client cert resources").
 		WithParentCtx(ctx).WithTimeout(ss.opts.CleanupTimeout.MaxWait(time.Minute)).
-		Run()
+		RunError()
 	return trace.Wrap(err, "failed to cleanup CNPG restore resources")
 }
 

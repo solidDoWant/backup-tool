@@ -9,7 +9,7 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
@@ -31,16 +31,16 @@ func DeployTeleport() (features.Func, features.Func) {
 
 		// Wait for the Vaultwarden service to become ready, by checking for at least one endpoint
 		err = wait.For(func(ctx context.Context) (done bool, err error) {
-			endpoints := &corev1.Endpoints{}
+			endpoints := &discoveryv1.EndpointSlice{}
 			if err := cfg.Client().Resources().Get(ctx, "teleport", "default", endpoints); err != nil {
 				return false, trace.Wrap(err, "failed to get teleport service endpoints")
 			}
 
-			if len(endpoints.Subsets) == 0 {
+			if len(endpoints.Endpoints) == 0 {
 				return false, nil
 			}
 
-			for _, subset := range endpoints.Subsets {
+			for _, subset := range endpoints.Endpoints {
 				if len(subset.Addresses) > 0 {
 					return true, nil
 				}
@@ -152,16 +152,16 @@ func TestTeleport(t *testing.T) {
 
 			// Verify that the vaultwarden instance is running
 			err = wait.For(func(ctx context.Context) (done bool, err error) {
-				endpoints := &corev1.Endpoints{}
+				endpoints := &discoveryv1.EndpointSlice{}
 				if err := cfg.Client().Resources().Get(ctx, "teleport-restore", "default", endpoints); err != nil {
 					return false, trace.Wrap(err, "failed to get teleport-restore endpoints")
 				}
 
-				if len(endpoints.Subsets) == 0 {
+				if len(endpoints.Endpoints) == 0 {
 					return false, nil
 				}
 
-				for _, subset := range endpoints.Subsets {
+				for _, subset := range endpoints.Endpoints {
 					if len(subset.Addresses) > 0 {
 						return true, nil
 					}

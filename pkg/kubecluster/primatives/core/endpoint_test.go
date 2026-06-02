@@ -10,7 +10,7 @@ import (
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8s "k8s.io/client-go/kubernetes"
@@ -23,12 +23,12 @@ func TestGetEndpoint(t *testing.T) {
 
 	tests := []struct {
 		desc                string
-		endpoint            *corev1.Endpoints
+		endpoint            *discoveryv1.EndpointSlice
 		simulateClientError bool
 	}{
 		{
 			desc: "get endpoint successfully",
-			endpoint: &corev1.Endpoints{
+			endpoint: &discoveryv1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      endpointName,
 					Namespace: namespace,
@@ -47,7 +47,7 @@ func TestGetEndpoint(t *testing.T) {
 			ctx := th.NewTestContext()
 
 			if tt.endpoint != nil {
-				_, err := mockK8s.CoreV1().Endpoints(namespace).Create(ctx, tt.endpoint, metav1.CreateOptions{})
+				_, err := mockK8s.DiscoveryV1().EndpointSlices(namespace).Create(ctx, tt.endpoint, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
@@ -74,7 +74,7 @@ func TestWaitForReadyEndpoint(t *testing.T) {
 	endpointName := "test-endpoint"
 	namespace := "test-ns"
 
-	noSubsetEndpoint := &corev1.Endpoints{
+	noSubsetEndpoint := &discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      endpointName,
 			Namespace: namespace,
@@ -82,19 +82,19 @@ func TestWaitForReadyEndpoint(t *testing.T) {
 	}
 
 	emptySubsetEndpoint := noSubsetEndpoint.DeepCopy()
-	emptySubsetEndpoint.Subsets = []corev1.EndpointSubset{{}}
+	emptySubsetEndpoint.Endpoints = []discoveryv1.Endpoint{{}}
 
 	noIPEndpoint := emptySubsetEndpoint.DeepCopy()
-	noIPEndpoint.Subsets[0] = corev1.EndpointSubset{
-		Addresses: []corev1.EndpointAddress{{}},
+	noIPEndpoint.Endpoints[0] = discoveryv1.Endpoint{
+		Addresses: []string{},
 	}
 
 	readyEndpoint := noIPEndpoint.DeepCopy()
-	readyEndpoint.Subsets[0].Addresses[0].IP = "192.168.1.1"
+	readyEndpoint.Endpoints[0].Addresses = []string{"192.168.1.1"}
 
 	tests := []struct {
 		desc                string
-		initialEndpoint     *corev1.Endpoints
+		initialEndpoint     *discoveryv1.EndpointSlice
 		shouldError         bool
 		afterStartedWaiting func(*testing.T, *contexts.Context, k8s.Interface)
 	}{
@@ -125,7 +125,7 @@ func TestWaitForReadyEndpoint(t *testing.T) {
 			desc:            "endpoint becomes ready",
 			initialEndpoint: noIPEndpoint,
 			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
-				_, err := client.CoreV1().Endpoints(namespace).Update(ctx, readyEndpoint, metav1.UpdateOptions{})
+				_, err := client.DiscoveryV1().EndpointSlices(namespace).Update(ctx, readyEndpoint, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
 		},
@@ -137,18 +137,16 @@ func TestWaitForReadyEndpoint(t *testing.T) {
 			ctx := th.NewTestContext()
 
 			if tt.initialEndpoint != nil {
-				_, err := mockK8s.CoreV1().Endpoints(namespace).Create(ctx, tt.initialEndpoint, metav1.CreateOptions{})
+				_, err := mockK8s.DiscoveryV1().EndpointSlices(namespace).Create(ctx, tt.initialEndpoint, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
 			var wg sync.WaitGroup
 			var waitErr error
-			var endpoints *corev1.Endpoints
-			wg.Add(1)
-			go func() {
+			var endpoints *discoveryv1.EndpointSlice
+			wg.Go(func() {
 				endpoints, waitErr = c.WaitForReadyEndpoint(ctx, namespace, endpointName, WaitForReadyEndpointOpts{MaxWaitTime: helpers.ShortWaitTime})
-				wg.Done()
-			}()
+			})
 
 			if tt.afterStartedWaiting != nil {
 				time.Sleep(10 * time.Millisecond) // Ensure that watcher has been setup

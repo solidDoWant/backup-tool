@@ -103,7 +103,7 @@ func TestCreateBackup(t *testing.T) {
 			}
 
 			expectedBackup := standardBackupOptions.DeepCopy()
-			require.NoError(t, mergo.MergeWithOverwrite(expectedBackup, tt.expected))
+			require.NoError(t, mergo.Merge(expectedBackup, tt.expected, mergo.WithOverride))
 
 			require.NoError(t, err)
 			require.Equal(t, expectedBackup, createdBackup)
@@ -538,7 +538,7 @@ func TestCreateCluster(t *testing.T) {
 					},
 				},
 			}
-			require.NoError(t, mergo.MergeWithOverwrite(expectedCluster, tt.expected))
+			require.NoError(t, mergo.Merge(expectedCluster, tt.expected, mergo.WithOverride))
 
 			require.NoError(t, err)
 			require.Equal(t, expectedCluster, createdCluster)

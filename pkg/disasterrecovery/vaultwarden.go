@@ -161,7 +161,11 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 		},
 		CleanupTimeout: backupOptions.CleanupTimeout,
 	}
-	mergo.MergeWithOverwrite(&btOpts, backupOptions.RemoteBackupToolOptions)
+
+	if err := mergo.Merge(&btOpts, backupOptions.RemoteBackupToolOptions, mergo.WithOverride); err != nil {
+		return backup, trace.Wrap(err, "failed to merge backup tool options with defaults")
+	}
+
 	btInstance, err := vw.kubernetesClient.CreateBackupToolInstance(ctx.Child(), namespace, backup.GetFullName(), btOpts)
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to create %s instance", constants.ToolName)
@@ -309,7 +313,11 @@ func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, da
 		},
 		CleanupTimeout: opts.CleanupTimeout,
 	}
-	mergo.MergeWithOverwrite(&btOpts, opts.RemoteBackupToolOptions)
+
+	if err := mergo.Merge(&btOpts, opts.RemoteBackupToolOptions, mergo.WithOverride); err != nil {
+		return restore, trace.Wrap(err, "failed to merge backup tool options with defaults")
+	}
+
 	btInstance, err := vw.kubernetesClient.CreateBackupToolInstance(ctx.Child(), namespace, restore.GetFullName(), btOpts)
 	if err != nil {
 		return restore, trace.Wrap(err, "failed to create %s instance", constants.ToolName)

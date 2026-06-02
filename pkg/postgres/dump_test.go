@@ -209,6 +209,6 @@ func testDataToWriter(ctx context.Context, t *testing.T, contents string, conten
 		err = writer.(io.WriteCloser).Close()
 		require.NoError(t, err)
 
-		defer contentsReader.Close()
+		defer assert.NoError(t, contentsReader.Close())
 	}()
 }

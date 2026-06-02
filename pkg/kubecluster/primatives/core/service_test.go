@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -141,7 +142,7 @@ func TestWaitForReadyService(t *testing.T) {
 	readyClusterIPService.Spec.ClusterIP = "10.0.0.1"
 	readyClusterIPService.Status = corev1.ServiceStatus{}
 
-	notReadyEndpoints := &corev1.Endpoints{
+	notReadyEndpoints := &discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
@@ -149,18 +150,16 @@ func TestWaitForReadyService(t *testing.T) {
 	}
 
 	readyEndpoints := notReadyEndpoints.DeepCopy()
-	readyEndpoints.Subsets = []corev1.EndpointSubset{
+	readyEndpoints.Endpoints = []discoveryv1.Endpoint{
 		{
-			Addresses: []corev1.EndpointAddress{
-				{IP: "172.16.0.1"},
-			},
+			Addresses: []string{"172.16.0.1"},
 		},
 	}
 
 	tests := []struct {
 		desc                string
 		initialService      *corev1.Service
-		initialEndpoints    *corev1.Endpoints
+		initialEndpoints    *discoveryv1.EndpointSlice
 		shouldError         bool
 		afterStartedWaiting func(*testing.T, *contexts.Context, k8s.Interface)
 	}{
@@ -219,7 +218,7 @@ func TestWaitForReadyService(t *testing.T) {
 			afterStartedWaiting: func(t *testing.T, ctx *contexts.Context, client k8s.Interface) {
 				_, err := client.CoreV1().Services(namespace).Update(ctx, readyClusterIPService, metav1.UpdateOptions{})
 				require.NoError(t, err)
-				_, err = client.CoreV1().Endpoints(namespace).Update(ctx, readyEndpoints, metav1.UpdateOptions{})
+				_, err = client.DiscoveryV1().EndpointSlices(namespace).Update(ctx, readyEndpoints, metav1.UpdateOptions{})
 				require.NoError(t, err)
 			},
 		},
@@ -236,7 +235,7 @@ func TestWaitForReadyService(t *testing.T) {
 			}
 
 			if tt.initialEndpoints != nil {
-				_, err := mockK8s.CoreV1().Endpoints(namespace).Create(ctx, tt.initialEndpoints, metav1.CreateOptions{})
+				_, err := mockK8s.DiscoveryV1().EndpointSlices(namespace).Create(ctx, tt.initialEndpoints, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 

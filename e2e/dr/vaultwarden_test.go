@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 
 	"github.com/gravitational/trace"
 	"github.com/stretchr/testify/assert"
@@ -30,16 +30,16 @@ func DeployVaultWarden() (features.Func, features.Func) {
 
 		// Wait for the Vaultwarden service to become ready, by checking for at least one endpoint
 		err = wait.For(func(ctx context.Context) (done bool, err error) {
-			endpoints := &corev1.Endpoints{}
+			endpoints := &discoveryv1.EndpointSlice{}
 			if err := cfg.Client().Resources().Get(ctx, "vaultwarden", "default", endpoints); err != nil {
 				return false, trace.Wrap(err, "failed to get vaultwarden CNPG cluster")
 			}
 
-			if len(endpoints.Subsets) == 0 {
+			if len(endpoints.Endpoints) == 0 {
 				return false, nil
 			}
 
-			for _, subset := range endpoints.Subsets {
+			for _, subset := range endpoints.Endpoints {
 				if len(subset.Addresses) > 0 {
 					return true, nil
 				}
@@ -148,16 +148,16 @@ func TestVaultWarden(t *testing.T) {
 
 			// Verify that the vaultwarden instance is running
 			err = wait.For(func(ctx context.Context) (done bool, err error) {
-				endpoints := &corev1.Endpoints{}
+				endpoints := &discoveryv1.EndpointSlice{}
 				if err := cfg.Client().Resources().Get(ctx, "vaultwarden-restore", "default", endpoints); err != nil {
 					return false, trace.Wrap(err, "failed to get vaultwarden-restore endpoints")
 				}
 
-				if len(endpoints.Subsets) == 0 {
+				if len(endpoints.Endpoints) == 0 {
 					return false, nil
 				}
 
-				for _, subset := range endpoints.Subsets {
+				for _, subset := range endpoints.Endpoints {
 					if len(subset.Addresses) > 0 {
 						return true, nil
 					}

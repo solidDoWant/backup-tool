@@ -124,7 +124,7 @@ func TestCreateBackupToolInstance(t *testing.T) {
 
 						require.Len(t, pod.Spec.Containers, 1)
 						require.Equal(t, len(tt.opts.Volumes), len(pod.Spec.Volumes))
-						require.Contains(t, pod.ObjectMeta.Labels, "app.kubernetes.io/component")
+						require.Contains(t, pod.Labels, "app.kubernetes.io/component")
 
 						container := pod.Spec.Containers[0]
 						require.Equal(t, constants.ToolName, container.Name)

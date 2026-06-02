@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"golang.org/x/sync/errgroup"
 )
@@ -124,7 +125,7 @@ func (lr *LocalRuntime) download(ctx *contexts.Context, client s3API, src s3Path
 	// Prune files that should no longer be present: deleted from the bucket since the last backup, or
 	// (point-in-time) absent as of the consistency point. This keeps the destination an exact mirror,
 	// which matters when the DR volume is an incremental clone of a previous backup.
-	if err := removeExtraneousLocalFiles(ctx, destDir, keep); err != nil {
+	if err := removeExtraneousLocalFiles(destDir, keep); err != nil {
 		return trace.Wrap(err, "failed to prune stale files from %q", destDir)
 	}
 	return nil
@@ -151,7 +152,9 @@ func downloadObject(ctx *contexts.Context, client s3API, bucket string, obj remo
 	if err != nil {
 		return trace.Wrap(err, "failed to get object %q", obj.key)
 	}
-	defer out.Body.Close()
+	defer cleanup.To(func(_ *contexts.Context) error { return out.Body.Close() }).
+		WithErrMessage("failed to close response body for object %q", obj.key).
+		Run()
 
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return trace.Wrap(err, "failed to create parent directory for %q", target)
@@ -409,7 +412,7 @@ func relativeKey(prefix, key string) string {
 }
 
 // removeExtraneousLocalFiles deletes files under destDir whose relative path is not in keep.
-func removeExtraneousLocalFiles(ctx *contexts.Context, destDir string, keep map[string]struct{}) error {
+func removeExtraneousLocalFiles(destDir string, keep map[string]struct{}) error {
 	info, err := os.Stat(destDir)
 	if os.IsNotExist(err) {
 		return nil

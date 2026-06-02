@@ -6,6 +6,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -30,8 +31,8 @@ type ClientInterface interface {
 	WaitForReadyService(ctx *contexts.Context, namespace, name string, opts WaitForReadyServiceOpts) (*corev1.Service, error)
 	DeleteService(ctx *contexts.Context, namespace, name string) error
 	// Endpoints
-	GetEndpoint(ctx *contexts.Context, namespace, name string) (*corev1.Endpoints, error)
-	WaitForReadyEndpoint(ctx *contexts.Context, namespace, name string, opts WaitForReadyEndpointOpts) (*corev1.Endpoints, error)
+	GetEndpoint(ctx *contexts.Context, namespace, name string) (*discoveryv1.EndpointSlice, error)
+	WaitForReadyEndpoint(ctx *contexts.Context, namespace, name string, opts WaitForReadyEndpointOpts) (*discoveryv1.EndpointSlice, error)
 }
 
 type Client struct {
