@@ -163,8 +163,7 @@ type SyncRequest_builder struct {
 	Source      *string
 	Dest        *string
 	// as_of is the event's shared consistency point: the instant the bucket should be captured as of.
-	// When set (and the bucket is versioned), the handler reconstructs the bucket as of this time instead
-	// of syncing latest state. Unset means "no consistency point" -> latest-state sync.
+	// Unset means "no consistency point".
 	AsOf *timestamppb.Timestamp
 }
 
