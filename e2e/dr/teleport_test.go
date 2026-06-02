@@ -4,13 +4,9 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
-	"time"
 
-	"github.com/gravitational/trace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	discoveryv1 "k8s.io/api/discovery/v1"
-	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 	"sigs.k8s.io/e2e-framework/third_party/helm"
@@ -29,25 +25,8 @@ func DeployTeleport() (features.Func, features.Func) {
 		err = waitForCNPGClusterToBeReady(ctx, cfg, "teleport-audit")
 		require.NoError(t, err, "failed to wait for teleport-audit CNPG cluster to be ready")
 
-		// Wait for the Vaultwarden service to become ready, by checking for at least one endpoint
-		err = wait.For(func(ctx context.Context) (done bool, err error) {
-			endpoints := &discoveryv1.EndpointSlice{}
-			if err := cfg.Client().Resources().Get(ctx, "teleport", "default", endpoints); err != nil {
-				return false, trace.Wrap(err, "failed to get teleport service endpoints")
-			}
-
-			if len(endpoints.Endpoints) == 0 {
-				return false, nil
-			}
-
-			for _, subset := range endpoints.Endpoints {
-				if len(subset.Addresses) > 0 {
-					return true, nil
-				}
-			}
-
-			return false, nil
-		}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
+		// Wait for the Teleport service to become ready, by checking for at least one endpoint
+		err = waitForServiceEndpoints(ctx, cfg, "teleport")
 		require.NoError(t, err, "failed to wait for teleport service to be ready")
 
 		return ctx
@@ -150,25 +129,8 @@ func TestTeleport(t *testing.T) {
 			assert.NoError(t, err)
 			defer uninstallBTHelmChart(teleportRestoreReleaseName, namespace)(ctx, t, cfg)
 
-			// Verify that the vaultwarden instance is running
-			err = wait.For(func(ctx context.Context) (done bool, err error) {
-				endpoints := &discoveryv1.EndpointSlice{}
-				if err := cfg.Client().Resources().Get(ctx, "teleport-restore", "default", endpoints); err != nil {
-					return false, trace.Wrap(err, "failed to get teleport-restore endpoints")
-				}
-
-				if len(endpoints.Endpoints) == 0 {
-					return false, nil
-				}
-
-				for _, subset := range endpoints.Endpoints {
-					if len(subset.Addresses) > 0 {
-						return true, nil
-					}
-				}
-
-				return false, nil
-			}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
+			// Verify that the teleport instance is running
+			err = waitForServiceEndpoints(ctx, cfg, "teleport-restore")
 			assert.NoError(t, err, "teleport-restore endpoints are not ready")
 
 			// TODO run job to get backup instance CA endpoint, and verify that it's the same on the restored instance

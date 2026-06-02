@@ -5,14 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
-	discoveryv1 "k8s.io/api/discovery/v1"
-
-	"github.com/gravitational/trace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 	"sigs.k8s.io/e2e-framework/third_party/helm"
@@ -29,24 +24,7 @@ func DeployVaultWarden() (features.Func, features.Func) {
 		require.NoError(t, err, "failed to wait for vaultwarden CNPG cluster to be ready")
 
 		// Wait for the Vaultwarden service to become ready, by checking for at least one endpoint
-		err = wait.For(func(ctx context.Context) (done bool, err error) {
-			endpoints := &discoveryv1.EndpointSlice{}
-			if err := cfg.Client().Resources().Get(ctx, "vaultwarden", "default", endpoints); err != nil {
-				return false, trace.Wrap(err, "failed to get vaultwarden CNPG cluster")
-			}
-
-			if len(endpoints.Endpoints) == 0 {
-				return false, nil
-			}
-
-			for _, subset := range endpoints.Endpoints {
-				if len(subset.Addresses) > 0 {
-					return true, nil
-				}
-			}
-
-			return false, nil
-		}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
+		err = waitForServiceEndpoints(ctx, cfg, "vaultwarden")
 		require.NoError(t, err, "failed to wait for vaultwarden service to be ready")
 
 		return ctx
@@ -147,24 +125,7 @@ func TestVaultWarden(t *testing.T) {
 			defer uninstallBTHelmChart(vaultwardenRestoreReleaseName, namespace)(ctx, t, cfg)
 
 			// Verify that the vaultwarden instance is running
-			err = wait.For(func(ctx context.Context) (done bool, err error) {
-				endpoints := &discoveryv1.EndpointSlice{}
-				if err := cfg.Client().Resources().Get(ctx, "vaultwarden-restore", "default", endpoints); err != nil {
-					return false, trace.Wrap(err, "failed to get vaultwarden-restore endpoints")
-				}
-
-				if len(endpoints.Endpoints) == 0 {
-					return false, nil
-				}
-
-				for _, subset := range endpoints.Endpoints {
-					if len(subset.Addresses) > 0 {
-						return true, nil
-					}
-				}
-
-				return false, nil
-			}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
+			err = waitForServiceEndpoints(ctx, cfg, "vaultwarden-restore")
 			assert.NoError(t, err, "vaultwarden-restore endpoints are not ready")
 
 			return ctx

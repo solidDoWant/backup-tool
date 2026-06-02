@@ -4,13 +4,9 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
-	"time"
 
-	"github.com/gravitational/trace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	discoveryv1 "k8s.io/api/discovery/v1"
-	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 	"sigs.k8s.io/e2e-framework/third_party/helm"
@@ -27,24 +23,7 @@ func DeployAuthentik() (features.Func, features.Func) {
 		require.NoError(t, err, "failed to wait for authentik CNPG cluster to be ready")
 
 		// Wait for the Authentik service to become ready, by checking for at least one endpoint
-		err = wait.For(func(ctx context.Context) (done bool, err error) {
-			endpoints := &discoveryv1.EndpointSlice{}
-			if err := cfg.Client().Resources().Get(ctx, "authentik-server", "default", endpoints); err != nil {
-				return false, trace.Wrap(err, "failed to get authentik service endpoints")
-			}
-
-			if len(endpoints.Endpoints) == 0 {
-				return false, nil
-			}
-
-			for _, subset := range endpoints.Endpoints {
-				if len(subset.Addresses) > 0 {
-					return true, nil
-				}
-			}
-
-			return false, nil
-		}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
+		err = waitForServiceEndpoints(ctx, cfg, "authentik-server")
 		require.NoError(t, err, "failed to wait for authentik service to be ready")
 
 		return ctx
@@ -147,24 +126,7 @@ func TestAuthentik(t *testing.T) {
 			defer uninstallBTHelmChart(authentikRestoreReleaseName, namespace)(ctx, t, cfg)
 
 			// Verify that the authentik instance is running
-			err = wait.For(func(ctx context.Context) (done bool, err error) {
-				endpoints := &discoveryv1.EndpointSlice{}
-				if err := cfg.Client().Resources().Get(ctx, "ar-server", "default", endpoints); err != nil {
-					return false, trace.Wrap(err, "failed to get ar-server endpoints")
-				}
-
-				if len(endpoints.Endpoints) == 0 {
-					return false, nil
-				}
-
-				for _, subset := range endpoints.Endpoints {
-					if len(subset.Addresses) > 0 {
-						return true, nil
-					}
-				}
-
-				return false, nil
-			}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
+			err = waitForServiceEndpoints(ctx, cfg, "ar-server")
 			assert.NoError(t, err, "ar-server endpoints are not ready")
 			return ctx
 		}).

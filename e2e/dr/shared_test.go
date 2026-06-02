@@ -13,7 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/utils"
@@ -127,6 +129,32 @@ func waitForCNPGClusterToBeReady(ctx context.Context, cfg *envconf.Config, clust
 		return false, nil
 	}, wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
 	return trace.Wrap(err, "failed to wait for CNPG cluster to be ready")
+}
+
+// waitForServiceEndpoints blocks until the named Service has at least one ready endpoint address,
+// or the timeout elapses. It lists EndpointSlices by the kubernetes.io/service-name label rather
+// than fetching one by name: EndpointSlices are named <service>-<hash>, never the bare service
+// name, so a name-keyed Get would always return NotFound. A transient List error (e.g. the slices
+// not existing yet) is treated as "keep polling" rather than a fatal error.
+func waitForServiceEndpoints(ctx context.Context, cfg *envconf.Config, serviceName string) error {
+	err := wait.For(func(ctx context.Context) (done bool, err error) {
+		slices := &discoveryv1.EndpointSliceList{}
+		selector := resources.WithLabelSelector(fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serviceName))
+		if err := cfg.Client().Resources("default").List(ctx, slices, selector); err != nil {
+			return false, nil
+		}
+
+		for _, slice := range slices.Items {
+			for _, endpoint := range slice.Endpoints {
+				if len(endpoint.Addresses) > 0 {
+					return true, nil
+				}
+			}
+		}
+
+		return false, nil
+	}, wait.WithContext(ctx), wait.WithImmediate(), wait.WithInterval(10*time.Second), wait.WithTimeout(5*time.Minute))
+	return trace.Wrap(err, "failed to wait for %q service endpoints to be ready", serviceName)
 }
 
 func verifyCronJobIsDeployed(cronjobName, namespace string) func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
