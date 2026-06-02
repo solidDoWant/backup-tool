@@ -1,4 +1,5 @@
 ---
+fullnameOverride: seaweedfs
 master:
   data:
     type: persistentVolumeClaim

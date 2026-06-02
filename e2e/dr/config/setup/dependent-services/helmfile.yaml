@@ -45,7 +45,7 @@ releases:
       - ./openebs.values.yaml
   - name: seeweedfs
     chart: seaweedfs-charts/seaweedfs
-    version: 4.0.383
+    version: 4.30.0
     atomic: true
     needs:
       - openebs
