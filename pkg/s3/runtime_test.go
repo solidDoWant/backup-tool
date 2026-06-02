@@ -13,5 +13,5 @@ func TestLocalRuntime(t *testing.T) {
 func TestNewLocalRuntime(t *testing.T) {
 	runtime := NewLocalRuntime()
 	assert.NotNil(t, runtime)
-	assert.NotNil(t, runtime.newSyncManager)
+	assert.NotNil(t, runtime.newS3Client)
 }

@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -134,20 +135,27 @@ func TestAWSConfig(t *testing.T) {
 		WithS3ForcePathStyle(s3ForcePathStyle)
 
 	config := credentials.AWSConfig()
-	require.NotNil(t, config)
 	require.NotNil(t, config.Credentials)
 
-	credValues, err := config.Credentials.Get()
+	credValues, err := config.Credentials.Retrieve(context.Background())
 	require.NoError(t, err)
 
-	assert.Equal(t, credValues.AccessKeyID, accesKeyId)
-	assert.Equal(t, credValues.SecretAccessKey, secretAccessKey)
-	assert.Equal(t, credValues.SessionToken, sessionToken)
+	assert.Equal(t, accesKeyId, credValues.AccessKeyID)
+	assert.Equal(t, secretAccessKey, credValues.SecretAccessKey)
+	assert.Equal(t, sessionToken, credValues.SessionToken)
 
-	require.NotNil(t, config.Endpoint)
-	require.NotNil(t, config.Region)
+	// In the v2 SDK the endpoint and path-style settings are not part of aws.Config; they are applied as
+	// s3.Options at client construction time. Only the region lives on the config.
+	assert.Equal(t, region, config.Region)
+}
 
-	assert.Equal(t, *config.Endpoint, endpoint)
-	assert.Equal(t, *config.Region, region)
-	assert.Equal(t, *config.S3ForcePathStyle, s3ForcePathStyle)
+func TestAWSConfigRegionFallback(t *testing.T) {
+	// A custom endpoint with no region gets a placeholder region so SigV4 signing succeeds (S3-compatible
+	// stores ignore the region).
+	withEndpoint := NewCredentials("id", "secret").WithEndpoint("https://minio.example.com")
+	assert.Equal(t, "us-east-1", withEndpoint.AWSConfig().Region)
+
+	// With no endpoint and no region, the region is left empty for the SDK's normal resolution to apply.
+	bare := NewCredentials("id", "secret")
+	assert.Empty(t, bare.AWSConfig().Region)
 }

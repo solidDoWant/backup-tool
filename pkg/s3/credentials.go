@@ -3,8 +3,8 @@ package s3
 import (
 	"os"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 )
 
 type CredentialsInterface interface {
@@ -14,7 +14,10 @@ type CredentialsInterface interface {
 	GetRegion() string
 	GetEndpoint() string
 	GetS3ForcePathStyle() bool
-	AWSConfig() *aws.Config
+	// AWSConfig returns a v2 SDK config carrying the static credentials and region. The endpoint and
+	// path-style settings are not part of aws.Config in the v2 SDK; they are applied as s3.Options when
+	// the client is constructed (see LocalRuntime.Sync).
+	AWSConfig() aws.Config
 }
 
 type Credentials struct {
@@ -98,23 +101,20 @@ func (c *Credentials) GetS3ForcePathStyle() bool {
 	return c.S3ForcePathStyle
 }
 
-func (c *Credentials) AWSConfig() *aws.Config {
-	config := &aws.Config{
-		Credentials: credentials.NewStaticCredentials(
+func (c *Credentials) AWSConfig() aws.Config {
+	region := c.Region
+	if region == "" && c.Endpoint != "" {
+		// S3-compatible stores (e.g. MinIO, SeaweedFS) ignore the region, but SigV4 signing still
+		// requires one to be set. Supply a placeholder so requests to a custom endpoint can be signed.
+		region = "us-east-1"
+	}
+
+	return aws.Config{
+		Region: region,
+		Credentials: credentials.NewStaticCredentialsProvider(
 			c.AccessKeyID,
 			c.SecretAccessKey,
 			c.SessionToken,
 		),
-		S3ForcePathStyle: aws.Bool(c.S3ForcePathStyle),
 	}
-
-	if c.Endpoint != "" {
-		config.Endpoint = aws.String(c.Endpoint)
-	}
-
-	if c.Region != "" {
-		config.Region = aws.String(c.Region)
-	}
-
-	return config
 }

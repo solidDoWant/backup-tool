@@ -99,4 +99,4 @@ packages:
     interfaces:
       CredentialsInterface:
       Runtime:
-      syncManager:
+      s3API:

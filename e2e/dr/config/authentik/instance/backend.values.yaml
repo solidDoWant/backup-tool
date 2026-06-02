@@ -29,23 +29,24 @@ controllers:
               secretKeyRef:
                 name: seaweedfs-s3-secret
                 key: admin_secret_access_key
+  # Enable versioning on the media bucket so the DR backup exercises backup-tool's version-aware
+  # point-in-time capture path. Uses the MinIO client (mc) rather than s3cmd, which can't configure
+  # versioning. (Objects only ever have one version here; this just verifies the PIT path works.)
   authentik-media-bucket:
     type: job
     containers:
       create-bucket:
         image:
-          repository: d3fk/s3cmd
+          repository: minio/mc
           tag: latest
         command:
-          - s3cmd
+          - /bin/sh
+          - -c
         args:
-          - --access_key=$(AWS_ACCESS_KEY_ID)
-          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
-          - --host=seaweedfs-s3:8333
-          - --host-bucket=seaweedfs-s3:8333
-          - --no-ssl
-          - mb
-          - s3://authentik-media/
+          - |
+            mc alias set sw http://seaweedfs-s3:8333 "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" && \
+            mc mb --ignore-existing sw/authentik-media && \
+            mc version enable sw/authentik-media
         env:
           AWS_ACCESS_KEY_ID:
             valueFrom:

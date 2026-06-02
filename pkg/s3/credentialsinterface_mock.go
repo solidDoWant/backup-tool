@@ -3,7 +3,7 @@
 package s3
 
 import (
-	aws "github.com/aws/aws-sdk-go/aws"
+	aws "github.com/aws/aws-sdk-go-v2/aws"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -21,20 +21,18 @@ func (_m *MockCredentialsInterface) EXPECT() *MockCredentialsInterface_Expecter 
 }
 
 // AWSConfig provides a mock function with no fields
-func (_m *MockCredentialsInterface) AWSConfig() *aws.Config {
+func (_m *MockCredentialsInterface) AWSConfig() aws.Config {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for AWSConfig")
 	}
 
-	var r0 *aws.Config
-	if rf, ok := ret.Get(0).(func() *aws.Config); ok {
+	var r0 aws.Config
+	if rf, ok := ret.Get(0).(func() aws.Config); ok {
 		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*aws.Config)
-		}
+		r0 = ret.Get(0).(aws.Config)
 	}
 
 	return r0
@@ -57,12 +55,12 @@ func (_c *MockCredentialsInterface_AWSConfig_Call) Run(run func()) *MockCredenti
 	return _c
 }
 
-func (_c *MockCredentialsInterface_AWSConfig_Call) Return(_a0 *aws.Config) *MockCredentialsInterface_AWSConfig_Call {
+func (_c *MockCredentialsInterface_AWSConfig_Call) Return(_a0 aws.Config) *MockCredentialsInterface_AWSConfig_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockCredentialsInterface_AWSConfig_Call) RunAndReturn(run func() *aws.Config) *MockCredentialsInterface_AWSConfig_Call {
+func (_c *MockCredentialsInterface_AWSConfig_Call) RunAndReturn(run func() aws.Config) *MockCredentialsInterface_AWSConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -41,6 +41,14 @@ global:
     - name: AUTHENTIK_STORAGE__MEDIA__S3__CUSTOM_DOMAIN
       value: http://seaweedfs-s3:8333/ar-media
     # Authentik
+    # Bind the listeners to the IPv4 wildcard instead of authentik's defaults of [::] (IPv6). The e2e
+    # kind cluster runs on a Docker host with IPv6 disabled, so the worker's HTTP ([::]:9000) and metrics
+    # ([::]:9300) listeners otherwise crash with "Address family not supported by protocol (os error 97)".
+    # See goauthentik/authentik#16300.
+    - name: AUTHENTIK_LISTEN__HTTP
+      value: 0.0.0.0:9000
+    - name: AUTHENTIK_LISTEN__METRICS
+      value: 0.0.0.0:9300
     - name: AUTHENTIK_DISABLE_UPDATE_CHECK
       value: "true"
     ## Dummy values for testing purposes only
