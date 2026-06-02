@@ -31,9 +31,9 @@ RUN go install github.com/vektra/mockery/v2@v2.53.6 \
 # Misc. development tools
 COPY --from=registry.k8s.io/kubectl:v1.35.1 /bin/kubectl /usr/local/bin/kubectl
 COPY --from=registry.k8s.io/kustomize/kustomize:v5.0.0 /app/kustomize /usr/local/bin/kustomize
-COPY --from=ghcr.io/helmfile/helmfile:v1.0.0-rc.7 /usr/local/bin/helmfile /usr/local/bin/helmfile
+COPY --from=ghcr.io/helmfile/helmfile:v1.5.2 /usr/local/bin/helmfile /usr/local/bin/helmfile
 ENV HELM_DATA_HOME=/usr/local/share/helm
-COPY --from=alpine/helm:3.16.2 /usr/bin/helm /usr/local/bin/helm
+COPY --from=alpine/helm:4.2.0 /usr/bin/helm /usr/local/bin/helm
 # kind (e2e tests). The e2e-framework uses whatever "kind" is found on PATH; without a pinned
 # binary it go-installs its own (older) default. Pin it here, matched to the kindest/node image
 # in e2e/dr/config/setup/kind-config.yaml.
