@@ -74,8 +74,7 @@ func TestAuthentikBackup(t *testing.T) {
 					},
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
-				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{
-				},
+				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{},
 				BackupSnapshot: OptionsBackupSnapshot{
 					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
 					SnapshotClass: "custom-snapshot-class",
@@ -248,10 +247,9 @@ func TestAuthentikRestore(t *testing.T) {
 						Organizations: []string{"test-org"},
 					},
 				},
-				IssuerKind: "ClusterIssuer",
-				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{
-				},
-				CleanupTimeout:              helpers.MaxWaitTime(3 * time.Second),
+				IssuerKind:              "ClusterIssuer",
+				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{},
+				CleanupTimeout:          helpers.MaxWaitTime(3 * time.Second),
 			},
 		},
 	}
