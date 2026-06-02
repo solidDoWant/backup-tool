@@ -12,7 +12,6 @@ import (
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubetesting "k8s.io/client-go/testing"
@@ -93,18 +92,18 @@ func TestWaitForReadyCertificateRequestPolicy(t *testing.T) {
 	}
 
 	notReadyCRP := noConditionsCRP.DeepCopy()
-	notReadyCondition := policyv1alpha1.CertificateRequestPolicyCondition{Type: policyv1alpha1.CertificateRequestPolicyConditionReady, Status: corev1.ConditionFalse}
+	notReadyCondition := metav1.Condition{Type: policyv1alpha1.ConditionTypeReady, Status: metav1.ConditionFalse}
 	notReadyCRP.Status.Conditions = append(notReadyCRP.Status.Conditions, notReadyCondition)
 
 	readyCRP := notReadyCRP.DeepCopy()
 	readyCondition := notReadyCondition.DeepCopy()
-	readyCondition.Status = corev1.ConditionTrue
+	readyCondition.Status = metav1.ConditionTrue
 	readyCRP.Status.Conditions[0] = *readyCondition
 
 	multipleConditionsCRP := readyCRP.DeepCopy()
 	// CRP does not have multiple conditions (yet)
-	dummyCondition := policyv1alpha1.CertificateRequestPolicyCondition{Type: "DummyCondition", Status: corev1.ConditionFalse}
-	multipleConditionsCRP.Status.Conditions = []policyv1alpha1.CertificateRequestPolicyCondition{dummyCondition, *readyCondition}
+	dummyCondition := metav1.Condition{Type: "DummyCondition", Status: metav1.ConditionFalse}
+	multipleConditionsCRP.Status.Conditions = []metav1.Condition{dummyCondition, *readyCondition}
 
 	tests := []struct {
 		desc                string

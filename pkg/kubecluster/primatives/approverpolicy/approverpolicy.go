@@ -7,8 +7,7 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type CreateCertificateRequestPolicyOptions struct {
@@ -25,7 +24,7 @@ func (c *Client) CreateCertificateRequestPolicy(ctx *contexts.Context, name stri
 
 	opts.SetName(&policy.ObjectMeta, name)
 
-	policy, err := c.client.PolicyV1alpha1().CertificateRequestPolicies().Create(ctx, policy, v1.CreateOptions{})
+	policy, err := c.client.PolicyV1alpha1().CertificateRequestPolicies().Create(ctx, policy, metav1.CreateOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create certificate request policy %q", name)
 	}
@@ -45,12 +44,12 @@ func (c *Client) WaitForReadyCertificateRequestPolicy(ctx *contexts.Context, nam
 		ctx.Log.Debug("Policy conditions", "conditions", policy.Status.Conditions)
 		isReady := false
 		for _, condition := range policy.Status.Conditions {
-			if condition.Type != policyv1alpha1.CertificateRequestPolicyConditionReady {
+			if condition.Type != policyv1alpha1.ConditionTypeReady {
 				continue
 			}
 
 			// Upstream uses corev1 package, see https://github.com/solidDoWant/approver-policy/blob/20e3371bd325ecb8c9dbb9600720fb81969ae11a/pkg/internal/controllers/certificaterequestpolicies.go#L244
-			isReady = condition.Status == corev1.ConditionTrue
+			isReady = condition.Status == metav1.ConditionTrue
 			break
 		}
 
@@ -71,6 +70,6 @@ func (c *Client) WaitForReadyCertificateRequestPolicy(ctx *contexts.Context, nam
 func (c *Client) DeleteCertificateRequestPolicy(ctx *contexts.Context, name string) error {
 	ctx.Log.With("name", name).Info("Deleting certificate request policy")
 
-	err := c.client.PolicyV1alpha1().CertificateRequestPolicies().Delete(ctx.Child(), name, v1.DeleteOptions{})
+	err := c.client.PolicyV1alpha1().CertificateRequestPolicies().Delete(ctx.Child(), name, metav1.DeleteOptions{})
 	return trace.Wrap(err, "failed to delete certificate request policy %q", name)
 }
