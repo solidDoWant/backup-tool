@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"k8s.io/utils/ptr"
 )
 
 func TestNewS3Server(t *testing.T) {
@@ -23,12 +22,12 @@ func TestNewS3Server(t *testing.T) {
 
 func TestDecodeS3Credentials(t *testing.T) {
 	credentials := s3_v1.Credentials_builder{
-		AccessKeyId:      ptr.To("accessKeyID"),
-		SecretAccessKey:  ptr.To("secretAccessKey"),
-		SessionToken:     ptr.To("sessionToken"),
-		Region:           ptr.To("region"),
-		Endpoint:         ptr.To("endpoint"),
-		S3ForcePathStyle: ptr.To(true),
+		AccessKeyId:      new("accessKeyID"),
+		SecretAccessKey:  new("secretAccessKey"),
+		SessionToken:     new("sessionToken"),
+		Region:           new("region"),
+		Endpoint:         new("endpoint"),
+		S3ForcePathStyle: new(true),
 	}.Build()
 
 	decodedCredentials := decodeS3Credentials(credentials)
@@ -76,8 +75,8 @@ func TestS3Sync(t *testing.T) {
 			src := "src"
 			dest := "dest"
 			credentials := s3_v1.Credentials_builder{
-				AccessKeyId:     ptr.To("accessKeyID"),
-				SecretAccessKey: ptr.To("secretAccessKey"),
+				AccessKeyId:     new("accessKeyID"),
+				SecretAccessKey: new("secretAccessKey"),
 			}.Build()
 
 			runtime.EXPECT().Sync(contexts.UnwrapHandlerContext(ctx), decodeS3Credentials(credentials), src, dest, tt.expectedAsOf).Return(tt.returnValue)

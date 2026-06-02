@@ -14,7 +14,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/utils"
@@ -173,7 +172,7 @@ func verifyJobSucceeds(cronJobName, namespace string) func(ctx context.Context, 
 						Kind:       "CronJob",
 						Name:       cronjob.GetName(),
 						UID:        cronjob.GetUID(),
-						Controller: ptr.To(true),
+						Controller: new(true),
 					},
 				},
 			},

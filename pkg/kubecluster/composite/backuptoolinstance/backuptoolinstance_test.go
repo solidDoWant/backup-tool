@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 func TestNewBackupToolInstance(t *testing.T) {
@@ -73,7 +72,7 @@ func TestCreateBackupToolInstance(t *testing.T) {
 						VolumeSource: corev1.VolumeSource{
 							Secret: &corev1.SecretVolumeSource{
 								SecretName:  "secret1",
-								DefaultMode: ptr.To(int32(0765)),
+								DefaultMode: new(int32(0765)),
 							},
 						},
 					},

@@ -15,7 +15,6 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 type BackupToolInstanceInterface interface {
@@ -65,7 +64,7 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 		ProbeHandler: corev1.ProbeHandler{
 			GRPC: &corev1.GRPCAction{
 				Port:    grpc.GRPCPort,
-				Service: ptr.To(grpc.SystemService),
+				Service: new(grpc.SystemService),
 			},
 		},
 		TimeoutSeconds:   1,
@@ -108,7 +107,7 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 		Spec: corev1.PodSpec{
 			// This is not compatible with NFS mounts because the NFS client in the kernel (all versions)
 			// does not support idmap mounts (MOUNT_ATTR_IDMAP).
-			// HostUsers:       ptr.To(false), // Don't run as node root
+			// HostUsers:       new(false), // Don't run as node root
 			Containers:      []corev1.Container{container},
 			RestartPolicy:   corev1.RestartPolicyNever,
 			Volumes:         volumes,

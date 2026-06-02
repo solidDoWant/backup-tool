@@ -8,7 +8,6 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 const VolumeSnapshotKind = "VolumeSnapshot" // This is not exported by the external-snapshotter package
@@ -25,7 +24,7 @@ func (c *Client) SnapshotVolume(ctx *contexts.Context, namespace, pvcName string
 	snapshot := &volumesnapshotv1.VolumeSnapshot{
 		Spec: volumesnapshotv1.VolumeSnapshotSpec{
 			Source: volumesnapshotv1.VolumeSnapshotSource{
-				PersistentVolumeClaimName: ptr.To(pvcName),
+				PersistentVolumeClaimName: new(pvcName),
 			},
 		},
 	}

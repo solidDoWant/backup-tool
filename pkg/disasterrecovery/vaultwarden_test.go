@@ -32,7 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 func TestNewVaultWarden(t *testing.T) {
@@ -261,7 +260,7 @@ func TestVaultWardenBackup(t *testing.T) {
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts core.CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
 						require.Equal(t, backupName, pvcName)
-						require.GreaterOrEqual(t, size.AsFloat64Slow(), ptr.To(clonedPVC.Spec.Resources.Requests[corev1.ResourceStorage]).AsFloat64Slow())
+						require.GreaterOrEqual(t, size.AsFloat64Slow(), new(clonedPVC.Spec.Resources.Requests[corev1.ResourceStorage]).AsFloat64Slow())
 						return th.ErrOr1Val(clonedPVC, tt.simulateEnsurePVCError)
 					})
 				if tt.simulateEnsurePVCError {

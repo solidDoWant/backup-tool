@@ -15,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubetesting "k8s.io/client-go/testing"
-	"k8s.io/utils/ptr"
 )
 
 func TestSnapshotVolume(t *testing.T) {
@@ -79,14 +78,14 @@ func TestWaitForReadySnapshot(t *testing.T) {
 	noReadyToUseSnapshot.Status = &volumesnapshotv1.VolumeSnapshotStatus{}
 
 	notReadySnapshot := noReadyToUseSnapshot.DeepCopy()
-	notReadySnapshot.Status.ReadyToUse = ptr.To(false)
+	notReadySnapshot.Status.ReadyToUse = new(false)
 
 	readySnapshot := notReadySnapshot.DeepCopy()
-	readySnapshot.Status.ReadyToUse = ptr.To(true)
+	readySnapshot.Status.ReadyToUse = new(true)
 
 	failedSnapshot := noReadyToUseSnapshot.DeepCopy()
 	failedSnapshot.Status.Error = &volumesnapshotv1.VolumeSnapshotError{
-		Message: ptr.To("snapshot failed"),
+		Message: new("snapshot failed"),
 	}
 
 	tests := []struct {

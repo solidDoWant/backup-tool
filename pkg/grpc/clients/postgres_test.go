@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/durationpb"
-	"k8s.io/utils/ptr"
 )
 
 func TestNewPostgresClient(t *testing.T) {
@@ -81,16 +80,16 @@ func TestEncodePostgresCredentials(t *testing.T) {
 			want: postgres_v1.EnvironmentCredentials_builder{
 				Credentials: []*postgres_v1.EnvironmentCredentials_EnvironmentVariable{
 					postgres_v1.EnvironmentCredentials_EnvironmentVariable_builder{
-						Name:  ptr.To(postgres_v1.VarName_PGDATABASE),
-						Value: ptr.To("testdb"),
+						Name:  new(postgres_v1.VarName_PGDATABASE),
+						Value: new("testdb"),
 					}.Build(),
 					postgres_v1.EnvironmentCredentials_EnvironmentVariable_builder{
-						Name:  ptr.To(postgres_v1.VarName_PGHOST),
-						Value: ptr.To("localhost"),
+						Name:  new(postgres_v1.VarName_PGHOST),
+						Value: new("localhost"),
 					}.Build(),
 					postgres_v1.EnvironmentCredentials_EnvironmentVariable_builder{
-						Name:  ptr.To(postgres_v1.VarName_PGPORT),
-						Value: ptr.To("5432"),
+						Name:  new(postgres_v1.VarName_PGPORT),
+						Value: new("5432"),
 					}.Build(),
 				},
 			}.Build(),

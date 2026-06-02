@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8s "k8s.io/client-go/kubernetes"
 	kubetesting "k8s.io/client-go/testing"
-	"k8s.io/utils/ptr"
 )
 
 func TestCreatePod(t *testing.T) {
@@ -255,7 +254,7 @@ func TestNewSingleContainerSecret(t *testing.T) {
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
 						SecretName:  "test-secret",
-						DefaultMode: ptr.To(int32(0400)),
+						DefaultMode: new(int32(0400)),
 					},
 				},
 			},
@@ -268,7 +267,7 @@ func TestNewSingleContainerSecret(t *testing.T) {
 				{
 					Key:  "secret-key",
 					Path: "file-mount-path",
-					Mode: ptr.To(int32(0123)),
+					Mode: new(int32(0123)),
 				},
 			},
 			want: SingleContainerVolume{
@@ -277,12 +276,12 @@ func TestNewSingleContainerSecret(t *testing.T) {
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
 						SecretName:  "test-secret",
-						DefaultMode: ptr.To(int32(0400)),
+						DefaultMode: new(int32(0400)),
 						Items: []corev1.KeyToPath{
 							{
 								Key:  "secret-key",
 								Path: "file-mount-path",
-								Mode: ptr.To(int32(0123)),
+								Mode: new(int32(0123)),
 							},
 						},
 					},
@@ -331,12 +330,12 @@ func TestSingleContainerVolumeToVolume(t *testing.T) {
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
 						SecretName:  "test-secret",
-						DefaultMode: ptr.To(int32(0400)),
+						DefaultMode: new(int32(0400)),
 						Items: []corev1.KeyToPath{
 							{
 								Key:  "secret-key",
 								Path: "file-mount-path",
-								Mode: ptr.To(int32(0123)),
+								Mode: new(int32(0123)),
 							},
 						},
 					},
@@ -347,12 +346,12 @@ func TestSingleContainerVolumeToVolume(t *testing.T) {
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
 						SecretName:  "test-secret",
-						DefaultMode: ptr.To(int32(0400)),
+						DefaultMode: new(int32(0400)),
 						Items: []corev1.KeyToPath{
 							{
 								Key:  "secret-key",
 								Path: "file-mount-path",
-								Mode: ptr.To(int32(0123)),
+								Mode: new(int32(0123)),
 							},
 						},
 					},
@@ -466,7 +465,7 @@ func TestConvertSingleContainerVolumes(t *testing.T) {
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
 							SecretName:  "test-secret",
-							DefaultMode: ptr.To(int32(0400)),
+							DefaultMode: new(int32(0400)),
 						},
 					},
 				},
@@ -477,7 +476,7 @@ func TestConvertSingleContainerVolumes(t *testing.T) {
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
 							SecretName:  "test-secret",
-							DefaultMode: ptr.To(int32(0400)),
+							DefaultMode: new(int32(0400)),
 						},
 					},
 				},
@@ -541,7 +540,7 @@ func TestConvertSingleContainerVolumes(t *testing.T) {
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
 							SecretName:  "test-secret",
-							DefaultMode: ptr.To(int32(0400)),
+							DefaultMode: new(int32(0400)),
 						},
 					},
 				},
@@ -551,7 +550,7 @@ func TestConvertSingleContainerVolumes(t *testing.T) {
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
 							SecretName:  "test-secret",
-							DefaultMode: ptr.To(int32(0400)),
+							DefaultMode: new(int32(0400)),
 						},
 					},
 				},
@@ -562,7 +561,7 @@ func TestConvertSingleContainerVolumes(t *testing.T) {
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
 							SecretName:  "test-secret",
-							DefaultMode: ptr.To(int32(0400)),
+							DefaultMode: new(int32(0400)),
 						},
 					},
 				},

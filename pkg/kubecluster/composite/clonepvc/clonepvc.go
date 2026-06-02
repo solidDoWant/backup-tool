@@ -13,7 +13,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 type ClonePVCOptions struct {
@@ -82,7 +81,7 @@ func (p *Provider) ClonePVC(ctx *contexts.Context, namespace, pvcName string, op
 		GenerateName:     true,
 		StorageClassName: storageClassName,
 		Source: &corev1.TypedObjectReference{
-			APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+			APIGroup: new(volumesnapshotv1.SchemeGroupVersion.Group),
 			Kind:     externalsnapshotter.VolumeSnapshotKind,
 			Name:     readySnapshot.Name,
 		},

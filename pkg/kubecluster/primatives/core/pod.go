@@ -10,7 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/utils/ptr"
 )
 
 func (c *Client) CreatePod(ctx *contexts.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
@@ -118,7 +117,7 @@ func NewSingleContainerSecret(secretName, mountPath string, items ...corev1.KeyT
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
 				SecretName:  secretName,
-				DefaultMode: ptr.To(int32(0400)), // Read only by owner
+				DefaultMode: new(int32(0400)), // Read only by owner
 				Items:       items,
 			},
 		},
@@ -187,9 +186,9 @@ func ConvertSingleContainerVolumes(scvs []SingleContainerVolume) ([]corev1.Volum
 
 func RestrictedPodSecurityContext(uid, gid int64) *corev1.PodSecurityContext {
 	return &corev1.PodSecurityContext{
-		RunAsUser:    ptr.To(uid),
-		RunAsGroup:   ptr.To(gid),
-		RunAsNonRoot: ptr.To(true),
+		RunAsUser:    new(uid),
+		RunAsGroup:   new(gid),
+		RunAsNonRoot: new(true),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -201,12 +200,12 @@ func RestrictedContainerSecurityContext(uid, gid int64) *corev1.SecurityContext 
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
-		Privileged:               ptr.To(false),
-		RunAsUser:                ptr.To(uid),
-		RunAsGroup:               ptr.To(gid),
-		RunAsNonRoot:             ptr.To(true),
-		ReadOnlyRootFilesystem:   ptr.To(true),
-		AllowPrivilegeEscalation: ptr.To(false),
+		Privileged:               new(false),
+		RunAsUser:                new(uid),
+		RunAsGroup:               new(gid),
+		RunAsNonRoot:             new(true),
+		ReadOnlyRootFilesystem:   new(true),
+		AllowPrivilegeEscalation: new(false),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -215,9 +214,9 @@ func RestrictedContainerSecurityContext(uid, gid int64) *corev1.SecurityContext 
 
 func PrivilegedPodSecurityContext() *corev1.PodSecurityContext {
 	return &corev1.PodSecurityContext{
-		RunAsUser:    ptr.To(int64(0)),
-		RunAsGroup:   ptr.To(int64(0)),
-		RunAsNonRoot: ptr.To(false),
+		RunAsUser:    new(int64(0)),
+		RunAsGroup:   new(int64(0)),
+		RunAsNonRoot: new(false),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -226,12 +225,12 @@ func PrivilegedPodSecurityContext() *corev1.PodSecurityContext {
 
 func PrivilegedContainerSecurityContext() *corev1.SecurityContext {
 	return &corev1.SecurityContext{
-		Privileged:               ptr.To(true),
-		RunAsUser:                ptr.To(int64(0)),
-		RunAsGroup:               ptr.To(int64(0)),
-		RunAsNonRoot:             ptr.To(false),
-		ReadOnlyRootFilesystem:   ptr.To(true),
-		AllowPrivilegeEscalation: ptr.To(true),
+		Privileged:               new(true),
+		RunAsUser:                new(int64(0)),
+		RunAsGroup:               new(int64(0)),
+		RunAsNonRoot:             new(false),
+		ReadOnlyRootFilesystem:   new(true),
+		AllowPrivilegeEscalation: new(true),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},

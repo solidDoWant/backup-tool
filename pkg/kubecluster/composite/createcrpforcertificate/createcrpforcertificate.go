@@ -7,7 +7,6 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
-	"k8s.io/utils/ptr"
 )
 
 type CreateCRPForCertificateOpts struct {
@@ -76,7 +75,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 	if cert.Spec.CommonName != "" {
 		allowed.CommonName = &policyv1alpha1.CertificateRequestPolicyAllowedString{
 			Value:    &cert.Spec.CommonName,
-			Required: ptr.To(true),
+			Required: new(true),
 		}
 		allowedSet = true
 	}
@@ -84,7 +83,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 	if len(cert.Spec.DNSNames) > 0 {
 		allowed.DNSNames = &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
 			Values:   &cert.Spec.DNSNames,
-			Required: ptr.To(true),
+			Required: new(true),
 		}
 		allowedSet = true
 	}
@@ -92,7 +91,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 	if len(cert.Spec.IPAddresses) > 0 {
 		allowed.IPAddresses = &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
 			Values:   &cert.Spec.IPAddresses,
-			Required: ptr.To(true),
+			Required: new(true),
 		}
 		allowedSet = true
 	}
@@ -100,7 +99,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 	if len(cert.Spec.URIs) > 0 {
 		allowed.URIs = &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
 			Values:   &cert.Spec.URIs,
-			Required: ptr.To(true),
+			Required: new(true),
 		}
 		allowedSet = true
 	}
@@ -108,13 +107,13 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 	if len(cert.Spec.EmailAddresses) > 0 {
 		allowed.EmailAddresses = &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
 			Values:   &cert.Spec.EmailAddresses,
-			Required: ptr.To(true),
+			Required: new(true),
 		}
 		allowedSet = true
 	}
 
 	if cert.Spec.IsCA {
-		allowed.IsCA = ptr.To(true)
+		allowed.IsCA = new(true)
 		allowedSet = true
 	}
 
@@ -130,7 +129,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 		if len(cert.Spec.Subject.Organizations) > 0 {
 			subject.Organizations = &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
 				Values:   &cert.Spec.Subject.Organizations,
-				Required: ptr.To(true),
+				Required: new(true),
 			}
 			subjectSet = true
 		}
@@ -138,7 +137,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 		if len(cert.Spec.Subject.Countries) > 0 {
 			subject.Countries = &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
 				Values:   &cert.Spec.Subject.Countries,
-				Required: ptr.To(true),
+				Required: new(true),
 			}
 			subjectSet = true
 		}
@@ -146,7 +145,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 		if len(cert.Spec.Subject.OrganizationalUnits) > 0 {
 			subject.OrganizationalUnits = &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
 				Values:   &cert.Spec.Subject.OrganizationalUnits,
-				Required: ptr.To(true),
+				Required: new(true),
 			}
 			subjectSet = true
 		}
@@ -154,7 +153,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 		if len(cert.Spec.Subject.Localities) > 0 {
 			subject.Localities = &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
 				Values:   &cert.Spec.Subject.Localities,
-				Required: ptr.To(true),
+				Required: new(true),
 			}
 			subjectSet = true
 		}
@@ -162,7 +161,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 		if len(cert.Spec.Subject.Provinces) > 0 {
 			subject.Provinces = &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
 				Values:   &cert.Spec.Subject.Provinces,
-				Required: ptr.To(true),
+				Required: new(true),
 			}
 			subjectSet = true
 		}
@@ -170,7 +169,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 		if len(cert.Spec.Subject.StreetAddresses) > 0 {
 			subject.StreetAddresses = &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
 				Values:   &cert.Spec.Subject.StreetAddresses,
-				Required: ptr.To(true),
+				Required: new(true),
 			}
 			subjectSet = true
 		}
@@ -178,7 +177,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 		if len(cert.Spec.Subject.PostalCodes) > 0 {
 			subject.PostalCodes = &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
 				Values:   &cert.Spec.Subject.PostalCodes,
-				Required: ptr.To(true),
+				Required: new(true),
 			}
 			subjectSet = true
 		}
@@ -186,7 +185,7 @@ func (p *Provider) CreateCRPForCertificate(ctx *contexts.Context, cert *certmana
 		if cert.Spec.Subject.SerialNumber != "" {
 			subject.SerialNumber = &policyv1alpha1.CertificateRequestPolicyAllowedString{
 				Value:    &cert.Spec.Subject.SerialNumber,
-				Required: ptr.To(true),
+				Required: new(true),
 			}
 			subjectSet = true
 		}

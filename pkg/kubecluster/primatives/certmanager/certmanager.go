@@ -14,7 +14,6 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 )
 
 type CreateCertificateOptions struct {
@@ -44,7 +43,7 @@ func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name, iss
 			DNSNames:              opts.DNSNames,
 			Subject:               opts.Subject,
 			Usages:                opts.Usages,
-			EncodeUsagesInRequest: ptr.To(true),
+			EncodeUsagesInRequest: new(true),
 			PrivateKey: &certmanagerv1.CertificatePrivateKey{
 				Algorithm:      certmanagerv1.Ed25519KeyAlgorithm,
 				Encoding:       certmanagerv1.PKCS8,
@@ -64,7 +63,7 @@ func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name, iss
 	// Default cert duration to an hour, which is more inline with the needs of this tool than the cert-manager default (90 days)
 	certDuration := opts.Duration
 	if certDuration == nil {
-		certDuration = ptr.To(time.Hour)
+		certDuration = new(time.Hour)
 	}
 	certificate.Spec.Duration = &metav1.Duration{
 		Duration: *certDuration,

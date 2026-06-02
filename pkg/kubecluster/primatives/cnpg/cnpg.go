@@ -12,7 +12,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 const podMonitorCRDName = "podmonitors.monitoring.coreos.com"
@@ -42,9 +41,9 @@ func (cnpgc *Client) CreateBackup(ctx *contexts.Context, namespace, backupName, 
 			},
 			Method: apiv1.BackupMethodVolumeSnapshot,
 			Target: apiv1.DefaultBackupTarget,
-			Online: ptr.To(true),
+			Online: new(true),
 			OnlineConfiguration: &apiv1.OnlineConfiguration{
-				WaitForArchive: ptr.To(true), // Needed to ensure that backups are consistent
+				WaitForArchive: new(true), // Needed to ensure that backups are consistent
 			},
 		},
 	}

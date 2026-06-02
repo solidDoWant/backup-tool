@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubetesting "k8s.io/client-go/testing"
-	"k8s.io/utils/ptr"
 )
 
 func TestCreateBackup(t *testing.T) {
@@ -37,9 +36,9 @@ func TestCreateBackup(t *testing.T) {
 			Cluster: api.LocalObjectReference{
 				Name: clusterName,
 			},
-			Online: ptr.To(true),
+			Online: new(true),
 			OnlineConfiguration: &apiv1.OnlineConfiguration{
-				WaitForArchive: ptr.To(true),
+				WaitForArchive: new(true),
 			},
 		},
 	}
@@ -66,8 +65,8 @@ func TestCreateBackup(t *testing.T) {
 			name: "backup with all options",
 			opts: CreateBackupOptions{
 				GenerateName: true,
-				Method:       ptr.To(apiv1.BackupMethodBarmanObjectStore),
-				Target:       ptr.To(apiv1.BackupTargetPrimary),
+				Method:       new(apiv1.BackupMethodBarmanObjectStore),
+				Target:       new(apiv1.BackupTargetPrimary),
 			},
 			expected: &apiv1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
@@ -423,12 +422,12 @@ func TestCreateCluster(t *testing.T) {
 							Source: "source-server",
 							VolumeSnapshots: &apiv1.DataSource{
 								Storage: corev1.TypedLocalObjectReference{
-									APIGroup: ptr.To("snapshot.storage.k8s.io"),
+									APIGroup: new("snapshot.storage.k8s.io"),
 									Kind:     "VolumeSnapshot",
 									Name:     "snap-data",
 								},
 								WalStorage: &corev1.TypedLocalObjectReference{
-									APIGroup: ptr.To("snapshot.storage.k8s.io"),
+									APIGroup: new("snapshot.storage.k8s.io"),
 									Kind:     "VolumeSnapshot",
 									Name:     "snap-wal",
 								},
@@ -469,7 +468,7 @@ func TestCreateCluster(t *testing.T) {
 						},
 					},
 					StorageConfiguration: apiv1.StorageConfiguration{
-						StorageClass: ptr.To("test-class"),
+						StorageClass: new("test-class"),
 					},
 				},
 			},

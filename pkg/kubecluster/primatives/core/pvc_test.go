@@ -12,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubetesting "k8s.io/client-go/testing"
-	"k8s.io/utils/ptr"
 )
 
 func TestCreatePVC(t *testing.T) {
@@ -58,7 +57,7 @@ func TestCreatePVC(t *testing.T) {
 				GenerateName:     true,
 				StorageClassName: "custom-class",
 				Source: &corev1.TypedObjectReference{
-					APIGroup:  ptr.To("api-group"),
+					APIGroup:  new("api-group"),
 					Kind:      "some-kind",
 					Namespace: &namespace,
 					Name:      snapshotName,
@@ -69,9 +68,9 @@ func TestCreatePVC(t *testing.T) {
 					GenerateName: pvcName,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("custom-class"),
+					StorageClassName: new("custom-class"),
 					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup:  ptr.To("api-group"),
+						APIGroup:  new("api-group"),
 						Kind:      "some-kind",
 						Namespace: &namespace,
 						Name:      snapshotName,
@@ -258,7 +257,7 @@ func TestEnsurePVCExists(t *testing.T) {
 					Namespace:    namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("custom-class"),
+					StorageClassName: new("custom-class"),
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						corev1.ReadWriteOnce,
 					},

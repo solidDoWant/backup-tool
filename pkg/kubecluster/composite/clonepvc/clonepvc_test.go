@@ -15,7 +15,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 func TestClonePVC(t *testing.T) {
@@ -70,7 +69,7 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: size,
@@ -84,12 +83,12 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						corev1.ReadWriteOnce,
 					},
 					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						APIGroup: new(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},
@@ -114,7 +113,7 @@ func TestClonePVC(t *testing.T) {
 						corev1.ReadWriteOnce,
 					},
 					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						APIGroup: new(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},
@@ -135,7 +134,7 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 				},
 			},
 			expectedPVC: &corev1.PersistentVolumeClaim{
@@ -144,12 +143,12 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("custom-class"),
+					StorageClassName: new("custom-class"),
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						corev1.ReadWriteOnce,
 					},
 					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						APIGroup: new(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},
@@ -172,7 +171,7 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 				},
 			},
 			simulateQueryExistingErr: true,
@@ -185,7 +184,7 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 				},
 			},
 			simulateQueryExistingErr: true,
@@ -198,7 +197,7 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 				},
 			},
 			createdSnapshot: &volumesnapshotv1.VolumeSnapshot{
@@ -218,7 +217,7 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 				},
 			},
 			createdSnapshot: &volumesnapshotv1.VolumeSnapshot{
@@ -237,7 +236,7 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 				},
 			},
 			simulateCreateErr: true,
@@ -250,7 +249,7 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 				},
 			},
 			opts: ClonePVCOptions{ForceBind: true},
@@ -264,7 +263,7 @@ func TestClonePVC(t *testing.T) {
 						corev1.ReadWriteOnce,
 					},
 					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						APIGroup: new(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},
@@ -280,7 +279,7 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 				},
 			},
 			opts: ClonePVCOptions{ForceBind: true},
@@ -294,7 +293,7 @@ func TestClonePVC(t *testing.T) {
 						corev1.ReadWriteOnce,
 					},
 					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						APIGroup: new(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},
@@ -310,7 +309,7 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 				},
 			},
 			opts: ClonePVCOptions{ForceBind: true},
@@ -324,7 +323,7 @@ func TestClonePVC(t *testing.T) {
 						corev1.ReadWriteOnce,
 					},
 					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						APIGroup: new(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},
@@ -341,7 +340,7 @@ func TestClonePVC(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 				},
 			},
 			opts: ClonePVCOptions{ForceBind: true},
@@ -355,7 +354,7 @@ func TestClonePVC(t *testing.T) {
 						corev1.ReadWriteOnce,
 					},
 					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						APIGroup: new(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},
@@ -424,7 +423,7 @@ func TestClonePVC(t *testing.T) {
 				opts := core.CreatePVCOptions{
 					GenerateName: true,
 					Source: &corev1.TypedObjectReference{
-						APIGroup: ptr.To(volumesnapshotv1.SchemeGroupVersion.Group),
+						APIGroup: new(volumesnapshotv1.SchemeGroupVersion.Group),
 						Kind:     externalsnapshotter.VolumeSnapshotKind,
 						Name:     snapshotName,
 					},

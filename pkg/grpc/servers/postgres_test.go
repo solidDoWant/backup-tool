@@ -11,7 +11,6 @@ import (
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/durationpb"
-	"k8s.io/utils/ptr"
 )
 
 func TestNewPostgresServer(t *testing.T) {
@@ -40,7 +39,7 @@ func TestDecodePostgresCredentials(t *testing.T) {
 				Credentials: []*postgres_v1.EnvironmentCredentials_EnvironmentVariable{
 					postgres_v1.EnvironmentCredentials_EnvironmentVariable_builder{
 						Name:  postgres_v1.VarName_PGHOST.Enum(),
-						Value: ptr.To("localhost"),
+						Value: new("localhost"),
 					}.Build(),
 				},
 			}.Build(),
@@ -54,11 +53,11 @@ func TestDecodePostgresCredentials(t *testing.T) {
 				Credentials: []*postgres_v1.EnvironmentCredentials_EnvironmentVariable{
 					postgres_v1.EnvironmentCredentials_EnvironmentVariable_builder{
 						Name:  postgres_v1.VarName_PGHOST.Enum(),
-						Value: ptr.To("localhost"),
+						Value: new("localhost"),
 					}.Build(),
 					postgres_v1.EnvironmentCredentials_EnvironmentVariable_builder{
 						Name:  postgres_v1.VarName_PGPORT.Enum(),
-						Value: ptr.To("1234"),
+						Value: new("1234"),
 					}.Build(),
 				},
 			}.Build(),
@@ -121,7 +120,7 @@ func TestDumpAll(t *testing.T) {
 				Credentials: []*postgres_v1.EnvironmentCredentials_EnvironmentVariable{
 					postgres_v1.EnvironmentCredentials_EnvironmentVariable_builder{
 						Name:  postgres_v1.VarName_PGHOST.Enum(),
-						Value: ptr.To("localhost"),
+						Value: new("localhost"),
 					}.Build(),
 				},
 			}.Build(),
@@ -194,7 +193,7 @@ func TestRestore(t *testing.T) {
 				Credentials: []*postgres_v1.EnvironmentCredentials_EnvironmentVariable{
 					postgres_v1.EnvironmentCredentials_EnvironmentVariable_builder{
 						Name:  postgres_v1.VarName_PGHOST.Enum(),
-						Value: ptr.To("localhost"),
+						Value: new("localhost"),
 					}.Build(),
 				},
 			}.Build(),

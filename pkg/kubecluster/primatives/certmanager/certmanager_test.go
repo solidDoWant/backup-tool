@@ -18,7 +18,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubetesting "k8s.io/client-go/testing"
-	"k8s.io/utils/ptr"
 )
 
 func TestCreateCertificate(t *testing.T) {
@@ -32,7 +31,7 @@ func TestCreateCertificate(t *testing.T) {
 		},
 		Spec: certmanagerv1.CertificateSpec{
 			Duration:              &metav1.Duration{Duration: time.Hour},
-			EncodeUsagesInRequest: ptr.To(true),
+			EncodeUsagesInRequest: new(true),
 			IssuerRef: cmmeta.ObjectReference{
 				Group: certmanager.GroupName,
 				Kind:  "Issuer",
@@ -67,7 +66,7 @@ func TestCreateCertificate(t *testing.T) {
 				GenerateName: true,
 				CommonName:   "test.example.com",
 				DNSNames:     []string{"test1.example.com", "test2.example.com"},
-				Duration:     ptr.To(24 * time.Hour),
+				Duration:     new(24 * time.Hour),
 				IssuerKind:   "ClusterIssuer",
 				SecretName:   "secret-name-override",
 				Subject: &certmanagerv1.X509Subject{

@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 func TestCreateCRPForCertificate(t *testing.T) {
@@ -115,69 +114,69 @@ func TestCreateCRPForCertificate(t *testing.T) {
 							Duration: 24 * time.Hour,
 						},
 						PrivateKey: &policyv1alpha1.CertificateRequestPolicyConstraintsPrivateKey{
-							Algorithm: ptr.To(certmanagerv1.PrivateKeyAlgorithm("RSA")),
-							MinSize:   ptr.To(2048),
-							MaxSize:   ptr.To(2048),
+							Algorithm: new(certmanagerv1.PrivateKeyAlgorithm("RSA")),
+							MinSize:   new(2048),
+							MaxSize:   new(2048),
 						},
 					},
 					Allowed: &policyv1alpha1.CertificateRequestPolicyAllowed{
 						CommonName: &policyv1alpha1.CertificateRequestPolicyAllowedString{
-							Value:    ptr.To("test.example.com"),
-							Required: ptr.To(true),
+							Value:    new("test.example.com"),
+							Required: new(true),
 						},
 						DNSNames: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-							Values:   ptr.To([]string{"test1.example.com", "test2.example.org"}),
-							Required: ptr.To(true),
+							Values:   new([]string{"test1.example.com", "test2.example.org"}),
+							Required: new(true),
 						},
 						IPAddresses: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-							Values:   ptr.To([]string{"1.2.3.4", "5.6.7.8"}),
-							Required: ptr.To(true),
+							Values:   new([]string{"1.2.3.4", "5.6.7.8"}),
+							Required: new(true),
 						},
 						URIs: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-							Values:   ptr.To([]string{"https://test.example.com"}),
-							Required: ptr.To(true),
+							Values:   new([]string{"https://test.example.com"}),
+							Required: new(true),
 						},
 						EmailAddresses: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-							Values:   ptr.To([]string{"test1@example.com", "test2@example.org"}),
-							Required: ptr.To(true),
+							Values:   new([]string{"test1@example.com", "test2@example.org"}),
+							Required: new(true),
 						},
-						IsCA: ptr.To(true),
+						IsCA: new(true),
 						Usages: &[]certmanagerv1.KeyUsage{
 							certmanagerv1.UsageDigitalSignature,
 							certmanagerv1.UsageKeyEncipherment,
 						},
 						Subject: &policyv1alpha1.CertificateRequestPolicyAllowedX509Subject{
 							Organizations: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   ptr.To([]string{"Test Org"}),
-								Required: ptr.To(true),
+								Values:   new([]string{"Test Org"}),
+								Required: new(true),
 							},
 							OrganizationalUnits: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   ptr.To([]string{"Test OU"}),
-								Required: ptr.To(true),
+								Values:   new([]string{"Test OU"}),
+								Required: new(true),
 							},
 							Countries: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   ptr.To([]string{"Test Country"}),
-								Required: ptr.To(true),
+								Values:   new([]string{"Test Country"}),
+								Required: new(true),
 							},
 							Provinces: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   ptr.To([]string{"Test Province"}),
-								Required: ptr.To(true),
+								Values:   new([]string{"Test Province"}),
+								Required: new(true),
 							},
 							Localities: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   ptr.To([]string{"Test Locality"}),
-								Required: ptr.To(true),
+								Values:   new([]string{"Test Locality"}),
+								Required: new(true),
 							},
 							StreetAddresses: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   ptr.To([]string{"Test Street"}),
-								Required: ptr.To(true),
+								Values:   new([]string{"Test Street"}),
+								Required: new(true),
 							},
 							PostalCodes: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   ptr.To([]string{"Test Postal Code"}),
-								Required: ptr.To(true),
+								Values:   new([]string{"Test Postal Code"}),
+								Required: new(true),
 							},
 							SerialNumber: &policyv1alpha1.CertificateRequestPolicyAllowedString{
-								Value:    ptr.To("Test Serial Number"),
-								Required: ptr.To(true),
+								Value:    new("Test Serial Number"),
+								Required: new(true),
 							},
 						},
 					},

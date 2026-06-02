@@ -11,7 +11,6 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"k8s.io/utils/ptr"
 )
 
 func TestNewS3Client(t *testing.T) {
@@ -86,8 +85,8 @@ func TestS3Sync(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			request := s3_v1.SyncRequest_builder{
 				Credentials: encodedS3Credentials(credentials),
-				Source:      ptr.To(src),
-				Dest:        ptr.To(dest),
+				Source:      new(src),
+				Dest:        new(dest),
 				AsOf:        tt.expectedAsOf,
 			}.Build()
 
