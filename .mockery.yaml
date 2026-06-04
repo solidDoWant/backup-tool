@@ -33,6 +33,14 @@ packages:
   : <<: *baseline_config
     interfaces:
       CNPGRestoreInterface:
+  ? github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/backup
+  : <<: *baseline_config
+    interfaces:
+      FilesBackupInterface:
+  ? github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/restore
+  : <<: *baseline_config
+    interfaces:
+      FilesRestoreInterface:
   github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync:
     <<: *baseline_config
     interfaces:

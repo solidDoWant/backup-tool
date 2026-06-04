@@ -1,38 +1,29 @@
 package disasterrecovery
 
 import (
-	"io"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
-	"github.com/solidDoWant/backup-tool/pkg/constants"
+	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
-	"github.com/solidDoWant/backup-tool/pkg/files"
-	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
+	cnpgbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/backup"
+	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
+	filesbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/backup"
+	filesrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/restore"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonepvc"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
-	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	th "github.com/solidDoWant/backup-tool/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestNewVaultWarden(t *testing.T) {
@@ -40,78 +31,55 @@ func TestNewVaultWarden(t *testing.T) {
 	vw := NewVaultWarden(mockClient)
 
 	require.NotNil(t, vw)
-	assert.Equal(t, mockClient, vw.kubernetesClient)
+	assert.Equal(t, mockClient, vw.kubeClusterClient)
+	assert.NotNil(t, vw.newCNPGBackup)
+	assert.NotNil(t, vw.newCNPGRestore)
+	assert.NotNil(t, vw.newFilesBackup)
+	assert.NotNil(t, vw.newFilesRestore)
+	assert.NotNil(t, vw.newRemoteStage)
 }
 
 func TestVaultWardenBackupOptions(t *testing.T) {
 	th.OptStructTest[VaultWardenBackupOptions](t)
 }
 
-// expectForceSourceWALArchive sets up the mock expectations for the source WAL-archive step: the
-// GetCluster lookup (reporting a barman-plugin source with a primary) plus the psql exec'd in that
-// primary for the recovery fence (txid_current), the WAL-segment lookup, the switch, and the
-// pg_stat_archiver poll (reported as already archived).
-func expectForceSourceWALArchive(mockCNPG *cnpg.MockClientInterface, mockCore *core.MockClientInterface, namespace, clusterName string) {
-	const segment = "000000010000000000000001"
-	primary := clusterName + "-1"
-	mockCNPG.EXPECT().GetCluster(mock.Anything, namespace, clusterName).
-		Return(&apiv1.Cluster{
-			Spec:   apiv1.ClusterSpec{Plugins: []apiv1.PluginConfiguration{{Name: cnpg.BarmanCloudPluginName, IsWALArchiver: new(true)}}},
-			Status: apiv1.ClusterStatus{CurrentPrimary: primary},
-		}, nil)
-	mockCore.EXPECT().ExecInPod(mock.Anything, namespace, primary, "postgres", mock.Anything, nil).
-		RunAndReturn(func(_ *contexts.Context, _, _, _ string, command []string, _ io.Reader) (string, string, error) {
-			sql := command[len(command)-1]
-			switch {
-			case strings.Contains(sql, "pg_walfile_name"):
-				return segment + "\n", "", nil
-			case strings.Contains(sql, "pg_stat_archiver"):
-				return segment + "||f\n", "", nil
-			default:
-				return "0/0\n", "", nil
-			}
-		})
-}
-
 func TestVaultWardenBackup(t *testing.T) {
-	namespace := "test-ns"
 	backupName := "test-backup"
-	dataPVC := "test-data-pvc"
-	clonedPVCName := "test-cloned-pvc"
+	namespace := "test-ns"
+	dataPVCName := "test-data-pvc"
 	clusterName := "test-cluster"
 	servingIssuerName := "serving-cert-issuer"
 	clientIssuerName := "client-cert-issuer"
 
 	tests := []struct {
-		desc                           string
-		backupOptions                  VaultWardenBackupOptions
-		simulateCreateBackupErr        bool
-		simulateBackupCleanupErr       bool
-		simulateClonePVCError          bool
-		simulatePVCCleanupError        bool
-		simulateEnsurePVCError         bool
-		simulateCloneClusterErr        bool
-		simulateCloneClusterCleanupErr bool
-		simulateBTICreateError         bool
-		simulateBTICleanupError        bool
-		simulateGRPCClientErr          bool
-		simulateSyncFilesErr           bool
-		simulateDumpAllErr             bool
-		simulateSnapshotErr            bool
-		simulateWaitSnapErr            bool
+		desc                             string
+		opts                             VaultWardenBackupOptions
+		simulateGetDataPVCError          bool
+		simulateNewDRVolumeError         bool
+		simulateConfigureCNPGBackupError bool
+		simulateConfigureFilesBackupErr  bool
+		simulateRunError                 bool
+		simulateSnapshotError            bool
 	}{
 		{
 			desc: "success - no options set",
 		},
 		{
 			desc: "success - all options set",
-			backupOptions: VaultWardenBackupOptions{
+			opts: VaultWardenBackupOptions{
 				VolumeSize:         resource.MustParse("10Gi"),
 				VolumeStorageClass: "custom-storage-class",
 				CloneClusterOptions: clonedcluster.CloneClusterOptions{
+					Certificates: clonedcluster.CloneClusterOptionsCertificates{
+						ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
+							IssuerKind: "ClusterIssuer",
+						},
+						ClientCACert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
+							IssuerKind: "Issuer",
+						},
+					},
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
-				BackupToolPodCreationTimeout: helpers.MaxWaitTime(1 * time.Second),
 				BackupSnapshot: OptionsBackupSnapshot{
 					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
 					SnapshotClass: "custom-snapshot-class",
@@ -120,308 +88,165 @@ func TestVaultWardenBackup(t *testing.T) {
 			},
 		},
 		{
-			desc:                    "error creating CNPG backup",
-			simulateCreateBackupErr: true,
+			desc:                    "error getting data PVC for sizing",
+			simulateGetDataPVCError: true,
 		},
 		{
-			desc:                     "error cleaning up CNPG backup",
-			simulateBackupCleanupErr: true,
+			desc:                     "error creating DR volume",
+			simulateNewDRVolumeError: true,
 		},
 		{
-			desc:                  "error cloning PVC",
-			simulateClonePVCError: true,
+			desc:                             "error configuring CNPG backup",
+			simulateConfigureCNPGBackupError: true,
 		},
 		{
-			desc:                   "error ensuring backup volume",
-			simulateEnsurePVCError: true,
+			desc:                            "error configuring files backup",
+			simulateConfigureFilesBackupErr: true,
 		},
 		{
-			desc:                    "error cloning cluster",
-			simulateCloneClusterErr: true,
+			desc:             "error running backup",
+			simulateRunError: true,
 		},
 		{
-			desc:                   "error creating backup tool instance",
-			simulateBTICreateError: true,
-		},
-		{
-			desc:                    "error cleaning up backup tool instance",
-			simulateBTICleanupError: true,
-		},
-		{
-			desc:                  "error creating GRPC client",
-			simulateGRPCClientErr: true,
-		},
-		{
-			desc:                 "error syncing data directory",
-			simulateSyncFilesErr: true,
-		},
-		{
-			desc:               "error dumping logical backup",
-			simulateDumpAllErr: true,
-		},
-		{
-			desc:                "error snapshot volume",
-			simulateSnapshotErr: true,
-		},
-		{
-			desc:                "error waiting for snapshot",
-			simulateWaitSnapErr: true,
+			desc:                  "error creating snapshot",
+			simulateSnapshotError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			// T_dr: the clone's creation time, which the DB clone recovers forward to.
-			clonedPVCCreationTime := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
-			clonedPVC := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              clonedPVCName,
-					Namespace:         namespace,
-					CreationTimestamp: metav1.NewTime(clonedPVCCreationTime),
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					Resources: corev1.VolumeResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse("1Gi"),
-						},
-					},
-				},
-			}
-			cnpgBackup := &apiv1.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      clusterName + "-cloned-backup",
-					Namespace: namespace,
-				},
-			}
-			clonedCluster := clonedcluster.NewMockClonedClusterInterface(t)
-			servingCert := certmanagerv1.Certificate{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "serving-cert",
-					Namespace: namespace,
-				},
-			}
-			postgresCertificate := certmanagerv1.Certificate{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "postgres-cert",
-					Namespace: namespace,
-				},
-			}
-			btInstance := backuptoolinstance.NewMockBackupToolInstanceInterface(t)
-			credentials := postgres.EnvironmentCredentials{
-				postgres.UserVarName: "postgres",
-			}
-
 			mockClient := kubecluster.NewMockClientInterface(t)
 			mockCoreClient := core.NewMockClientInterface(t)
-			mockESClient := externalsnapshotter.NewMockClientInterface(t)
-			mockCNPGClient := cnpg.NewMockClientInterface(t)
 			mockClient.EXPECT().Core().Return(mockCoreClient).Maybe()
-			mockClient.EXPECT().ES().Return(mockESClient).Maybe()
-			mockClient.EXPECT().CNPG().Return(mockCNPGClient).Maybe()
 
-			mockGRPCClient := clients.NewMockClientInterface(t)
-			mockFilesRuntime := files.NewMockRuntime(t)
-			mockPostgresRuntime := postgres.NewMockRuntime(t)
-			mockGRPCClient.EXPECT().Files().Return(mockFilesRuntime).Maybe()
-			mockGRPCClient.EXPECT().Postgres().Return(mockPostgresRuntime).Maybe()
+			mockDRVolume := drvolume.NewMockDRVolumeInterface(t)
+
+			mockRemoteStage := remote.NewMockRemoteStageInterface(t)
+			mockCNPGBackup := cnpgbackup.NewMockCNPGBackupInterface(t)
+			mockFilesBackup := filesbackup.NewMockFilesBackupInterface(t)
 
 			vw := &VaultWarden{
-				kubernetesClient: mockClient,
+				kubeClusterClient: mockClient,
+				newCNPGBackup: func() cnpgbackup.CNPGBackupInterface {
+					return mockCNPGBackup
+				},
+				newFilesBackup: func() filesbackup.FilesBackupInterface {
+					return mockFilesBackup
+				},
+				newRemoteStage: func(kubeClusterClient kubecluster.ClientInterface, calledNamespace, calledEventName string, calledOpts remote.RemoteStageOptions) remote.RemoteStageInterface {
+					assert.Equal(t, mockClient, kubeClusterClient)
+					assert.Equal(t, namespace, calledNamespace)
+					assert.True(t, strings.Contains(calledEventName, backupName))
+					assert.Equal(t, tt.opts.CleanupTimeout, calledOpts.CleanupTimeout)
+
+					return mockRemoteStage
+				},
 			}
 
 			rootCtx := th.NewTestContext()
 
 			wantErr := th.ErrExpected(
-				tt.simulateCreateBackupErr,
-				tt.simulateBackupCleanupErr,
-				tt.simulateClonePVCError,
-				tt.simulatePVCCleanupError,
-				tt.simulateEnsurePVCError,
-				tt.simulateCloneClusterErr,
-				tt.simulateCloneClusterCleanupErr,
-				tt.simulateBTICreateError,
-				tt.simulateBTICleanupError,
-				tt.simulateGRPCClientErr,
-				tt.simulateSyncFilesErr,
-				tt.simulateDumpAllErr,
-				tt.simulateSnapshotErr,
-				tt.simulateWaitSnapErr,
+				tt.simulateGetDataPVCError,
+				tt.simulateNewDRVolumeError,
+				tt.simulateConfigureCNPGBackupError,
+				tt.simulateConfigureFilesBackupErr,
+				tt.simulateRunError,
+				tt.simulateSnapshotError,
 			)
 
 			// Setup mocks
 			func() {
-				var fullBackupName string
+				// DR volume sizing: only reads the data PVC when no explicit size was configured.
+				expectedDRVolumeSize := tt.opts.VolumeSize
+				if tt.opts.VolumeSize.IsZero() {
+					dataPVCSize := resource.MustParse("5Gi")
+					mockCoreClient.EXPECT().GetPVC(mock.Anything, namespace, dataPVCName).
+						RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*corev1.PersistentVolumeClaim, error) {
+							assert.True(t, calledCtx.IsChildOf(rootCtx))
 
-				// Step 1: take the CNPG base backup first (this fixes the consistency point before the
-				// data PVC is cloned, so the clone can be recovered forward to the PVC clone time).
-				mockClient.EXPECT().CreateClusterBackup(mock.Anything, namespace, clusterName, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName string, opts clonedcluster.CloneClusterOptions) (*apiv1.Backup, error) {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						return th.ErrOr1Val(cnpgBackup, tt.simulateCreateBackupErr)
-					})
-				if tt.simulateCreateBackupErr {
-					return
+							return th.ErrOr1Val(&corev1.PersistentVolumeClaim{
+								Spec: corev1.PersistentVolumeClaimSpec{
+									Resources: corev1.VolumeResourceRequirements{
+										Requests: corev1.ResourceList{corev1.ResourceStorage: dataPVCSize},
+									},
+								},
+							}, tt.simulateGetDataPVCError)
+						})
+					if tt.simulateGetDataPVCError {
+						return
+					}
+
+					expectedDRVolumeSize = dataPVCSize
+					expectedDRVolumeSize.Mul(2)
 				}
-				mockCNPGClient.EXPECT().DeleteBackup(mock.Anything, namespace, cnpgBackup.Name).RunAndReturn(func(cleanupCtx *contexts.Context, _, _ string) error {
-					require.NotEqual(t, rootCtx, cleanupCtx)
-					return th.ErrIfTrue(tt.simulateBackupCleanupErr)
+
+				mockClient.EXPECT().NewDRVolume(mock.Anything, namespace, backupName, expectedDRVolumeSize, drvolume.DRVolumeCreateOptions{
+					VolumeStorageClass: tt.opts.VolumeStorageClass,
+					CNPGClusterNames:   []string{clusterName},
+				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
+					assert.True(t, calledCtx.IsChildOf(rootCtx))
+
+					return th.ErrOr1Val(mockDRVolume, tt.simulateNewDRVolumeError)
 				})
-
-				// Step 2
-				mockClient.EXPECT().ClonePVC(mock.Anything, namespace, dataPVC, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, dataPVC string, opts clonepvc.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error) {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-
-						fullBackupName = opts.DestPvcNamePrefix
-						require.True(t, strings.HasPrefix(fullBackupName, backupName))
-						require.Equal(t, tt.backupOptions.CleanupTimeout, opts.CleanupTimeout)
-						return th.ErrOr1Val(clonedPVC, tt.simulateClonePVCError)
-					})
-				if tt.simulateClonePVCError {
-					return
-				}
-				mockCoreClient.EXPECT().DeletePVC(mock.Anything, namespace, clonedPVCName).RunAndReturn(func(cleanupCtx *contexts.Context, _, _ string) error {
-					require.NotEqual(t, rootCtx, cleanupCtx)
-					return th.ErrIfTrue(tt.simulatePVCCleanupError)
-				})
-
-				// Step 3
-				mockCoreClient.EXPECT().EnsurePVCExists(mock.Anything, namespace, backupName, mock.Anything, core.CreatePVCOptions{StorageClassName: tt.backupOptions.VolumeStorageClass}).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts core.CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						require.Equal(t, backupName, pvcName)
-						require.GreaterOrEqual(t, size.AsFloat64Slow(), new(clonedPVC.Spec.Resources.Requests[corev1.ResourceStorage]).AsFloat64Slow())
-						return th.ErrOr1Val(clonedPVC, tt.simulateEnsurePVCError)
-					})
-				if tt.simulateEnsurePVCError {
+				if tt.simulateNewDRVolumeError {
 					return
 				}
 
-				// Step 4a: the source recovery fence runs after the PVC clone fixes T_dr and before the
-				// cluster clone (see expectForceSourceWALArchive for the mocked statements).
-				expectForceSourceWALArchive(mockCNPGClient, mockCoreClient, namespace, clusterName)
-
-				// Step 4: create the clone from the base backup, recovering forward to T_dr (the data PVC
-				// clone time). The source fence guarantees recovery can reach that target.
-				mockClient.EXPECT().CloneClusterFromBackup(mock.Anything, namespace, clusterName, mock.Anything, servingIssuerName, clientIssuerName, cnpgBackup, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, backup *apiv1.Backup, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.Contains(t, newClusterName, helpers.CleanName(backupName))
-						assert.LessOrEqual(t, len(newClusterName), 40)
-						assert.Equal(t, cnpgBackup, backup)
-						assert.Equal(t, clonedPVCCreationTime.Format(time.RFC3339), opts.RecoveryTargetTime)
-						return th.ErrOr1Val(clonedCluster, tt.simulateCloneClusterErr)
-					})
-				if tt.simulateCloneClusterErr {
+				// Configuration - the CNPG capture is registered before the data directory capture so the
+				// base backup is taken before the data PVC clone that pins the consistency point.
+				mockCNPGBackup.EXPECT().Configure(mockClient, namespace, clusterName, servingIssuerName, clientIssuerName, backupName, "dump.sql", cnpgbackup.CNPGBackupOptions{
+					CloningOpts:    tt.opts.CloneClusterOptions,
+					CleanupTimeout: tt.opts.CleanupTimeout,
+				}).Return(th.ErrIfTrue(tt.simulateConfigureCNPGBackupError))
+				if tt.simulateConfigureCNPGBackupError {
 					return
 				}
-				clonedCluster.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
-					require.NotEqual(t, rootCtx, cleanupCtx)
-					return th.ErrIfTrue(tt.simulateCloneClusterCleanupErr)
-				})
+				mockRemoteStage.EXPECT().WithAction(mock.Anything, mockCNPGBackup).Return(mockRemoteStage)
 
-				// Step 5
-				clonedCluster.EXPECT().GetServingCert().Return(&servingCert)
-				userCert := clusterusercert.NewMockClusterUserCertInterface(t)
-				clonedCluster.EXPECT().GetPostgresUserCert().Return(userCert)
-				userCert.EXPECT().GetCertificate().Return(&postgresCertificate)
-				mockClient.EXPECT().CreateBackupToolInstance(mock.Anything, namespace, mock.Anything, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, instance string, opts backuptoolinstance.CreateBackupToolInstanceOptions) (backuptoolinstance.BackupToolInstanceInterface, error) {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.Contains(t, opts.NamePrefix, fullBackupName)
-						assert.Contains(t, opts.NamePrefix, constants.ToolName)
-						// TODO add test to ensure that the secrets are attached, along with the DR and cloned data PVCs
-						assert.Len(t, opts.Volumes, 4)
-						return th.ErrOr1Val(btInstance, tt.simulateBTICreateError)
-					})
-				if tt.simulateBTICreateError {
+				mockFilesBackup.EXPECT().Configure(mockClient, namespace, dataPVCName, backupName, "data-vol", filesbackup.FilesBackupOptions{
+					CleanupTimeout: tt.opts.CleanupTimeout,
+				}).Return(th.ErrIfTrue(tt.simulateConfigureFilesBackupErr))
+				if tt.simulateConfigureFilesBackupErr {
 					return
 				}
-				btInstance.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
-					require.NotEqual(t, rootCtx, cleanupCtx)
-					return th.ErrIfTrue(tt.simulateBTICleanupError)
-				})
+				mockRemoteStage.EXPECT().WithAction(mock.Anything, mockFilesBackup).Return(mockRemoteStage)
 
-				// Step 6
-				btInstance.EXPECT().GetGRPCClient(mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context) (clients.ClientInterface, error) {
+				mockRemoteStage.EXPECT().Run(mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context) error {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						return th.ErrOr1Val(mockGRPCClient, tt.simulateGRPCClientErr)
+
+						return th.ErrIfTrue(tt.simulateRunError)
 					})
-				if tt.simulateGRPCClientErr {
+				if tt.simulateRunError {
 					return
 				}
 
-				mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, src, dest string) error {
+				// Snapshot volume
+				mockDRVolume.EXPECT().SnapshotAndWaitReady(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, snapshotName string, opts drvolume.DRVolumeSnapshotAndWaitOptions) error {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.NotEqual(t, src, dest)
-						assert.True(t, strings.HasPrefix(src, vaultwardenBaseMountPath))
-						assert.True(t, strings.HasPrefix(dest, vaultwardenBaseMountPath))
-						assert.True(t, filepath.Base(dest) == "data-vol") // Important: changing this is will break restoration of old backups!
+						assert.Contains(t, snapshotName, helpers.CleanName(backupName))
+						assert.Equal(t, tt.opts.BackupSnapshot.SnapshotClass, opts.SnapshotClass)
+						assert.Equal(t, tt.opts.BackupSnapshot.ReadyTimeout, opts.ReadyTimeout)
 
-						return th.ErrIfTrue(tt.simulateSyncFilesErr)
+						return th.ErrIfTrue(tt.simulateSnapshotError)
 					})
-				if tt.simulateSyncFilesErr {
+				if tt.simulateSnapshotError {
 					return
 				}
-
-				// Step 7
-				clonedCluster.EXPECT().GetCredentials(mock.Anything, mock.Anything).
-					RunAndReturn(func(servingCertMountDirectory, clientCertMountDirectory string) postgres.Credentials {
-						assert.NotEqual(t, servingCertMountDirectory, clientCertMountDirectory)
-						assert.True(t, strings.HasPrefix(servingCertMountDirectory, vaultwardenBaseMountPath))
-						assert.True(t, strings.HasPrefix(clientCertMountDirectory, vaultwardenBaseMountPath))
-
-						return credentials
-					})
-				mockPostgresRuntime.EXPECT().DumpAll(mock.Anything, credentials, mock.Anything, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, creds postgres.Credentials, outputFilePath string, opts postgres.DumpAllOptions) error {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.True(t, filepath.Base(outputFilePath) == "dump.sql") // Important: changing this is will break restoration of old backups!
-						return th.ErrIfTrue(tt.simulateDumpAllErr)
-					})
-				if tt.simulateDumpAllErr {
-					return
-				}
-
-				// Step 8
-				mockESClient.EXPECT().SnapshotVolume(mock.Anything, namespace, clonedPVCName, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, pvcName string, opts externalsnapshotter.SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error) {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.Equal(t, helpers.CleanName(fullBackupName), opts.Name)
-						assert.Equal(t, tt.backupOptions.BackupSnapshot.SnapshotClass, opts.SnapshotClass)
-
-						return th.ErrOr1Val(&volumesnapshotv1.VolumeSnapshot{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      fullBackupName,
-								Namespace: namespace,
-							},
-						}, tt.simulateSnapshotErr)
-					})
-				if tt.simulateSnapshotErr {
-					return
-				}
-
-				mockESClient.EXPECT().WaitForReadySnapshot(mock.Anything, namespace, mock.Anything, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: tt.backupOptions.BackupSnapshot.ReadyTimeout}).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, snapsnotName string, wfrso externalsnapshotter.WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error) {
-						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.Equal(t, fullBackupName, snapsnotName)
-						return th.ErrOr1Val(&volumesnapshotv1.VolumeSnapshot{}, tt.simulateWaitSnapErr)
-					})
 			}()
 
-			backup, err := vw.Backup(rootCtx, namespace, backupName, dataPVC, clusterName,
-				servingIssuerName, clientIssuerName, tt.backupOptions)
+			backup, err := vw.Backup(rootCtx, namespace, backupName, dataPVCName, clusterName,
+				servingIssuerName, clientIssuerName, tt.opts)
 
 			require.NotNil(t, backup)
 			assert.NotEmpty(t, backup.StartTime)
 			assert.NotEmpty(t, backup.EndTime)
 
 			if wantErr {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -437,290 +262,122 @@ func TestVaultWardenRestore(t *testing.T) {
 	dataPVCName := "test-data-pvc"
 	clusterName := "test-cluster"
 	servingCertName := "test-serving-cert"
-	clientIssuerName := "test-client-issuer"
-	writeServiceName := "test-write-service"
+	clientCertIssuerName := "test-client-cert-issuer"
 
 	tests := []struct {
-		desc                          string
-		restoreOptions                VaultWardenRestoreOptions
-		simulateGetDRPVCError         bool
-		simulateGetDataPVCError       bool
-		simulateGetClusterError       bool
-		simulateClusterNotReady       bool
-		simulateGetServingCertError   bool
-		simulateGetIssuerError        bool
-		simulateIssuerNotReady        bool
-		simulateNewClusterUserCertErr bool
-		simulateUserCertCleanupErr    bool
-		simulateBTICreateError        bool
-		simulateBTICleanupError       bool
-		simulateGRPCClientErr         bool
-		simulateSyncFilesErr          bool
-		simulateRestoreErr            bool
+		desc                             string
+		opts                             VaultWardenRestoreOptions
+		simulateConfigureFilesRestoreErr bool
+		simulateCNPGRestoreError         bool
+		simulateRunError                 bool
 	}{
 		{
 			desc: "success - no options set",
 		},
 		{
 			desc: "success - all options set",
-			restoreOptions: VaultWardenRestoreOptions{
+			opts: VaultWardenRestoreOptions{
 				Certificates: vaultWardenRestoreOptionsCertificates{
 					PostgresUserCert: OptionsClusterUserCert{
-						Subject: &certmanagerv1.X509Subject{
+						Subject: &v1.X509Subject{
 							Organizations: []string{"test-org"},
 						},
-						WaitForReadyTimeout: helpers.MaxWaitTime(2 * time.Second),
+						WaitForReadyTimeout: helpers.MaxWaitTime(4 * time.Second),
 					},
 				},
-				CleanupTimeout: helpers.MaxWaitTime(3 * time.Second),
+				IssuerKind:              "ClusterIssuer",
+				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{},
+				CleanupTimeout:          helpers.MaxWaitTime(3 * time.Second),
 			},
 		},
 		{
-			desc:                  "error getting DR PVC",
-			simulateGetDRPVCError: true,
+			desc:                     "error configuring CNPG restore",
+			simulateCNPGRestoreError: true,
 		},
 		{
-			desc:                    "error getting data PVC",
-			simulateGetDataPVCError: true,
+			desc:                             "error configuring files restore",
+			simulateConfigureFilesRestoreErr: true,
 		},
 		{
-			desc:                    "error getting cluster",
-			simulateGetClusterError: true,
-		},
-		{
-			desc:                    "cluster not ready",
-			simulateClusterNotReady: true,
-		},
-		{
-			desc:                        "error getting serving cert",
-			simulateGetServingCertError: true,
-		},
-		{
-			desc:                   "error getting issuer",
-			simulateGetIssuerError: true,
-		},
-		{
-			desc:                   "issuer not ready",
-			simulateIssuerNotReady: true,
-		},
-		{
-			desc:                          "error creating cluster user cert",
-			simulateNewClusterUserCertErr: true,
-		},
-		{
-			desc:                       "error cleaning up user cert",
-			simulateUserCertCleanupErr: true,
-		},
-		{
-			desc:                   "error creating backup tool instance",
-			simulateBTICreateError: true,
-		},
-		{
-			desc:                    "error cleaning up backup tool instance",
-			simulateBTICleanupError: true,
-		},
-		{
-			desc:                  "error creating GRPC client",
-			simulateGRPCClientErr: true,
-		},
-		{
-			desc:                 "error syncing files",
-			simulateSyncFilesErr: true,
-		},
-		{
-			desc:               "error restoring database",
-			simulateRestoreErr: true,
+			desc:             "error running restore",
+			simulateRunError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			mockClient := kubecluster.NewMockClientInterface(t)
-			mockCoreClient := core.NewMockClientInterface(t)
-			mockCNPGClient := cnpg.NewMockClientInterface(t)
-			mockCMClient := certmanager.NewMockClientInterface(t)
-			mockClient.EXPECT().Core().Return(mockCoreClient).Maybe()
-			mockClient.EXPECT().CNPG().Return(mockCNPGClient).Maybe()
-			mockClient.EXPECT().CM().Return(mockCMClient).Maybe()
+
+			mockRemoteStage := remote.NewMockRemoteStageInterface(t)
+			mockCNPGRestore := cnpgrestore.NewMockCNPGRestoreInterface(t)
+			mockFilesRestore := filesrestore.NewMockFilesRestoreInterface(t)
 
 			vw := &VaultWarden{
-				kubernetesClient: mockClient,
+				kubeClusterClient: mockClient,
+				newCNPGRestore: func() cnpgrestore.CNPGRestoreInterface {
+					return mockCNPGRestore
+				},
+				newFilesRestore: func() filesrestore.FilesRestoreInterface {
+					return mockFilesRestore
+				},
+				newRemoteStage: func(kubeClusterClient kubecluster.ClientInterface, calledNamespace, calledEventName string, calledOpts remote.RemoteStageOptions) remote.RemoteStageInterface {
+					assert.Equal(t, mockClient, kubeClusterClient)
+					assert.Equal(t, namespace, calledNamespace)
+					assert.True(t, strings.Contains(calledEventName, restoreName))
+					assert.Equal(t, tt.opts.CleanupTimeout, calledOpts.CleanupTimeout)
+
+					return mockRemoteStage
+				},
 			}
 
 			rootCtx := th.NewTestContext()
 
-			drPVC := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      restoreName,
-					Namespace: namespace,
-				},
-			}
-
-			dataPVC := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      dataPVCName,
-					Namespace: namespace,
-				},
-			}
-
-			cluster := &apiv1.Cluster{
-				Status: apiv1.ClusterStatus{
-					WriteService: writeServiceName,
-					Conditions: []metav1.Condition{
-						{
-							Type:   string(apiv1.ConditionClusterReady),
-							Status: metav1.ConditionStatus(apiv1.ConditionTrue),
-						},
-					},
-				},
-			}
-
-			servingCert := &certmanagerv1.Certificate{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      servingCertName,
-					Namespace: namespace,
-				},
-			}
-
-			clientIssuer := &certmanagerv1.Issuer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      clientIssuerName,
-					Namespace: namespace,
-				},
-				Status: certmanagerv1.IssuerStatus{
-					Conditions: []certmanagerv1.IssuerCondition{
-						{
-							Type:   certmanagerv1.IssuerConditionReady,
-							Status: cmmeta.ConditionTrue,
-						},
-					},
-				},
-			}
-
 			wantErr := th.ErrExpected(
-				tt.simulateGetDRPVCError,
-				tt.simulateGetDataPVCError,
-				tt.simulateGetClusterError,
-				tt.simulateClusterNotReady,
-				tt.simulateGetServingCertError,
-				tt.simulateGetIssuerError,
-				tt.simulateIssuerNotReady,
-				tt.simulateNewClusterUserCertErr,
-				tt.simulateUserCertCleanupErr,
-				tt.simulateBTICreateError,
-				tt.simulateBTICleanupError,
-				tt.simulateGRPCClientErr,
-				tt.simulateSyncFilesErr,
-				tt.simulateRestoreErr,
+				tt.simulateCNPGRestoreError,
+				tt.simulateConfigureFilesRestoreErr,
+				tt.simulateRunError,
 			)
 
-			// Setup mocks
 			func() {
-				// Step 0: Resource validation
-				mockCoreClient.EXPECT().GetPVC(mock.Anything, namespace, restoreName).
-					Return(th.ErrOr1Val(drPVC, tt.simulateGetDRPVCError))
-				if tt.simulateGetDRPVCError {
+				mockCNPGRestore.EXPECT().Configure(mockClient, namespace, clusterName, servingCertName, clientCertIssuerName, restoreName, "dump.sql", cnpgrestore.CNPGRestoreOptions{
+					IssuerKind: tt.opts.IssuerKind,
+					PostgresUserCert: cnpgrestore.CNPGRestoreOptionsCert{
+						Subject:            tt.opts.Certificates.PostgresUserCert.Subject,
+						CRPOpts:            tt.opts.Certificates.PostgresUserCert.CRPOpts,
+						WaitForCertTimeout: tt.opts.Certificates.PostgresUserCert.WaitForReadyTimeout,
+					},
+					CleanupTimeout: tt.opts.CleanupTimeout,
+				}).Return(th.ErrIfTrue(tt.simulateCNPGRestoreError))
+				if tt.simulateCNPGRestoreError {
 					return
 				}
+				mockRemoteStage.EXPECT().WithAction(mock.Anything, mockCNPGRestore).Return(mockRemoteStage)
 
-				mockCoreClient.EXPECT().GetPVC(mock.Anything, namespace, dataPVCName).
-					Return(th.ErrOr1Val(dataPVC, tt.simulateGetDataPVCError))
-				if tt.simulateGetDataPVCError {
+				mockFilesRestore.EXPECT().Configure(mockClient, namespace, dataPVCName, restoreName, "data-vol", filesrestore.FilesRestoreOptions{}).
+					Return(th.ErrIfTrue(tt.simulateConfigureFilesRestoreErr))
+				if tt.simulateConfigureFilesRestoreErr {
 					return
 				}
+				mockRemoteStage.EXPECT().WithAction(mock.Anything, mockFilesRestore).Return(mockRemoteStage)
 
-				mockCNPGClient.EXPECT().GetCluster(mock.Anything, namespace, clusterName).
-					Return(th.ErrOr1Val(cluster, tt.simulateGetClusterError))
-				if tt.simulateGetClusterError {
-					return
-				}
-				if tt.simulateClusterNotReady {
-					cluster.Status.Conditions[0].Status = metav1.ConditionStatus(apiv1.ConditionFalse)
-					return
-				}
-
-				mockCMClient.EXPECT().GetCertificate(mock.Anything, namespace, servingCertName).
-					Return(th.ErrOr1Val(servingCert, tt.simulateGetServingCertError))
-				if tt.simulateGetServingCertError {
-					return
-				}
-
-				mockCMClient.EXPECT().GetIssuer(mock.Anything, namespace, clientIssuerName).
-					Return(th.ErrOr1Val(clientIssuer, tt.simulateGetIssuerError))
-				if tt.simulateGetIssuerError {
-					return
-				}
-				if tt.simulateIssuerNotReady {
-					clientIssuer.Status.Conditions[0].Status = cmmeta.ConditionFalse
-					return
-				}
-
-				// Step 1: Create postgres user cert
-				userCert := clusterusercert.NewMockClusterUserCertInterface(t)
-				mockClient.EXPECT().NewClusterUserCert(mock.Anything, namespace, "postgres", clientIssuerName, clusterName, mock.Anything).
-					Return(th.ErrOr1Val(userCert, tt.simulateNewClusterUserCertErr))
-				if tt.simulateNewClusterUserCertErr {
-					return
-				}
-
-				userCert.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
-					require.NotEqual(t, rootCtx, cleanupCtx)
-					return th.ErrIfTrue(tt.simulateUserCertCleanupErr)
-				})
-
-				// Step 2: Create backup tool instance
-				userCert.EXPECT().GetCertificate().Return(servingCert)
-				btInstance := backuptoolinstance.NewMockBackupToolInstanceInterface(t)
-				mockClient.EXPECT().CreateBackupToolInstance(mock.Anything, namespace, mock.Anything, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, instance string, opts backuptoolinstance.CreateBackupToolInstanceOptions) (backuptoolinstance.BackupToolInstanceInterface, error) {
+				mockRemoteStage.EXPECT().Run(mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context) error {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
-						assert.Contains(t, opts.NamePrefix, constants.ToolName)
-						assert.Len(t, opts.Volumes, 4)
-						return th.ErrOr1Val(btInstance, tt.simulateBTICreateError)
+
+						return th.ErrIfTrue(tt.simulateRunError)
 					})
-				if tt.simulateBTICreateError {
-					return
-				}
-
-				btInstance.EXPECT().Delete(mock.Anything).RunAndReturn(func(cleanupCtx *contexts.Context) error {
-					require.NotEqual(t, rootCtx, cleanupCtx)
-					return th.ErrIfTrue(tt.simulateBTICleanupError)
-				})
-
-				// Step 3: Setup GRPC client and sync files
-				mockGRPCClient := clients.NewMockClientInterface(t)
-				btInstance.EXPECT().GetGRPCClient(mock.Anything).
-					Return(th.ErrOr1Val(mockGRPCClient, tt.simulateGRPCClientErr))
-				if tt.simulateGRPCClientErr {
-					return
-				}
-
-				mockFilesRuntime := files.NewMockRuntime(t)
-				mockGRPCClient.EXPECT().Files().Return(mockFilesRuntime)
-				mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, mock.Anything, mock.Anything).
-					Return(th.ErrIfTrue(tt.simulateSyncFilesErr))
-				if tt.simulateSyncFilesErr {
-					return
-				}
-
-				// Step 4: Restore database
-				mockPostgresRuntime := postgres.NewMockRuntime(t)
-				mockGRPCClient.EXPECT().Postgres().Return(mockPostgresRuntime)
-				mockPostgresRuntime.EXPECT().Restore(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(th.ErrIfTrue(tt.simulateRestoreErr))
 			}()
 
-			restore, err := vw.Restore(rootCtx, namespace, restoreName, dataPVCName,
-				clusterName, servingCertName, clientIssuerName, tt.restoreOptions)
+			restore, err := vw.Restore(rootCtx, namespace, restoreName, dataPVCName, clusterName, servingCertName, clientCertIssuerName, tt.opts)
 
 			require.NotNil(t, restore)
 			assert.NotEmpty(t, restore.StartTime)
 			assert.NotEmpty(t, restore.EndTime)
 
 			if wantErr {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}

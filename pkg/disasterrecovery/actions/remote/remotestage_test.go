@@ -15,17 +15,19 @@ import (
 
 // fakeProducerConsumer is a test action that implements both the optional PreConsistencyPointAction and
 // ConsistencyPointConsumer capabilities (like the CNPG backup action), on top of a mocked RemoteAction.
+// pinnedTime is the instant its BeforeConsistencyPoint reports as pinned (zero pins nothing).
 type fakeProducerConsumer struct {
 	*MockCleanupAction
+	pinnedTime       time.Time
 	preErr           error
 	preCalled        bool
 	consistencyPoint time.Time
 	setCalled        bool
 }
 
-func (f *fakeProducerConsumer) BeforeConsistencyPoint(_ *contexts.Context) error {
+func (f *fakeProducerConsumer) BeforeConsistencyPoint(_ *contexts.Context) (time.Time, error) {
 	f.preCalled = true
-	return f.preErr
+	return f.pinnedTime, f.preErr
 }
 
 func (f *fakeProducerConsumer) SetConsistencyPoint(c time.Time) {
@@ -178,10 +180,10 @@ func TestCleanupFunc(t *testing.T) {
 }
 
 func TestSetup(t *testing.T) {
-	t.Run("runs pre-steps, establishes the consistency point, distributes it, then sets up every action", func(t *testing.T) {
+	t.Run("falls back to the current time when no pre-step pins an instant, then distributes and sets up every action", func(t *testing.T) {
 		ctx := th.NewTestContext()
 
-		// Two pre-consistency-point actions (e.g. CNPG base backups).
+		// Two pre-consistency-point actions (e.g. CNPG base backups) that pin no instant of their own.
 		coreMock := NewMockCleanupAction(t)
 		coreMock.EXPECT().Setup(mock.Anything, mock.Anything).Return(nil)
 		core := &fakeProducerConsumer{MockCleanupAction: coreMock}
@@ -212,14 +214,51 @@ func TestSetup(t *testing.T) {
 		assert.True(t, core.preCalled)
 		assert.True(t, audit.preCalled)
 
-		// The consistency point is stamped once and handed identically to every consumer; it is the
-		// instant after the pre-steps ran.
+		// The consistency point is stamped once and handed identically to every consumer; with nothing
+		// pinned it is the instant after the pre-steps ran.
 		assert.True(t, s3.setCalled)
 		c := s3.consistencyPoint
 		assert.Equal(t, c, core.consistencyPoint)
 		assert.Equal(t, c, audit.consistencyPoint)
 		assert.False(t, c.Before(before))
 		assert.False(t, c.After(after))
+	})
+
+	t.Run("pins the consistency point to the earliest instant any pre-step pinned", func(t *testing.T) {
+		ctx := th.NewTestContext()
+
+		earliest := time.Date(2026, time.June, 2, 12, 0, 0, 0, time.UTC)
+		later := earliest.Add(time.Hour)
+
+		// A pre-step that pins no instant (e.g. a base backup), and two that pin instants (e.g. filesystem
+		// freezes) — the earlier of the two must win, regardless of registration order.
+		baseMock := NewMockCleanupAction(t)
+		baseMock.EXPECT().Setup(mock.Anything, mock.Anything).Return(nil)
+		base := &fakeProducerConsumer{MockCleanupAction: baseMock}
+
+		laterMock := NewMockCleanupAction(t)
+		laterMock.EXPECT().Setup(mock.Anything, mock.Anything).Return(nil)
+		laterAction := &fakeProducerConsumer{MockCleanupAction: laterMock, pinnedTime: later}
+
+		earliestMock := NewMockCleanupAction(t)
+		earliestMock.EXPECT().Setup(mock.Anything, mock.Anything).Return(nil)
+		earliestAction := &fakeProducerConsumer{MockCleanupAction: earliestMock, pinnedTime: earliest}
+
+		stage := &RemoteStage{
+			eventName: "test-event",
+			actions: []namedRemoteAction{
+				newNamedRemoteAction("base", base),
+				newNamedRemoteAction("later", laterAction),
+				newNamedRemoteAction("earliest", earliestAction),
+			},
+		}
+
+		_, err := stage.setup(ctx)
+		require.NoError(t, err)
+
+		assert.Equal(t, earliest, base.consistencyPoint)
+		assert.Equal(t, earliest, laterAction.consistencyPoint)
+		assert.Equal(t, earliest, earliestAction.consistencyPoint)
 	})
 
 	t.Run("returns an error and skips setup when a pre-step fails", func(t *testing.T) {

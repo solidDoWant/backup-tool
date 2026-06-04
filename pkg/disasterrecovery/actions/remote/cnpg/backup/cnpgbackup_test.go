@@ -375,13 +375,15 @@ func TestBeforeConsistencyPoint(t *testing.T) {
 					})
 			}
 
-			err := currentState.BeforeConsistencyPoint(ctx)
+			pinnedTime, err := currentState.BeforeConsistencyPoint(ctx)
 			if th.ErrExpected(tt.notValidated, tt.alreadyBackedUp, tt.simulateBackupErr) {
 				assert.Error(t, err)
 				return
 			}
 
 			require.NoError(t, err)
+			// The base backup pins no instant of its own — it only needs to precede the consistency point.
+			assert.True(t, pinnedTime.IsZero())
 			assert.Equal(t, baseBackup, currentState.baseBackup)
 			assert.True(t, currentState.isBaseBackedUp)
 		})

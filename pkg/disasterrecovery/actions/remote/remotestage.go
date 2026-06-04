@@ -27,14 +27,22 @@ type CleanupAction interface {
 
 // PreConsistencyPointAction is an optional capability of a RemoteAction that has work to do before the
 // stage establishes the event's shared consistency point — the single instant the whole DR event is made
-// recoverable to. The canonical example is a database capture taking its base backup, which must complete
-// before the non-database captures so the database's recoverable state precedes them. The stage runs
-// BeforeConsistencyPoint on every such action first; once they all finish it stamps the consistency point
-// (the current time) and hands it to each ConsistencyPointConsumer. Any future action needing a
-// pre-consistency-point step can implement this without changing the stage.
+// recoverable to. There are two kinds of pre-step work, distinguished by the instant it returns:
+//
+//   - A capture that *pins* an instant freezes state at a wall-clock moment it cannot choose
+//     retroactively — e.g. a filesystem PVC snapshot, which exists only at the moment it is taken. It
+//     returns that moment, making it a candidate for the consistency point.
+//   - A capture that only needs to *precede* the point pins nothing and returns the zero time — e.g. a
+//     database base backup, from which the clone later recovers forward to the point.
+//
+// The stage runs BeforeConsistencyPoint on every such action first, then sets the consistency point to the
+// earliest non-zero instant any of them pinned (or the current time if none did) and hands it to each
+// ConsistencyPointConsumer. Choosing the earliest keeps every forward-recoverable capture (a DB clone) and
+// as-of capture (S3) from landing later than a capture already frozen at a fixed instant. Any future
+// action needing a pre-consistency-point step can implement this without changing the stage.
 type PreConsistencyPointAction interface {
 	RemoteAction
-	BeforeConsistencyPoint(ctx *contexts.Context) error
+	BeforeConsistencyPoint(ctx *contexts.Context) (time.Time, error)
 }
 
 // ConsistencyPointConsumer is an optional capability of a RemoteAction that needs the event's shared
@@ -125,24 +133,35 @@ func (rs *RemoteStage) setup(ctx *contexts.Context) (bti.CreateBackupToolInstanc
 		CleanupTimeout: rs.opts.CleanupTimeout,
 	}
 
-	// Phase 1: every action with pre-consistency-point work (e.g. a CNPG base backup) runs it now,
-	// before any clone is created and before the shared instant is fixed.
+	// Phase 1: every action with pre-consistency-point work (e.g. a CNPG base backup, or a filesystem PVC
+	// clone) runs it now, before any clone of a recovering cluster is created and before the shared instant
+	// is fixed. Each returns the instant its capture pinned, or the zero time if it pins none (it only needs
+	// to precede the point).
+	var consistencyPoint time.Time
 	for _, action := range rs.actions {
 		preAction, ok := action.remoteAction.(PreConsistencyPointAction)
 		if !ok {
 			continue
 		}
 
-		if err := preAction.BeforeConsistencyPoint(ctx.Child()); err != nil {
+		pinnedTime, err := preAction.BeforeConsistencyPoint(ctx.Child())
+		if err != nil {
 			return bti.CreateBackupToolInstanceOptions{}, trace.Wrap(err, fmt.Sprintf("failed to run pre-consistency-point step for %s", action.name))
+		}
+
+		// Track the earliest instant any capture pinned (see PreConsistencyPointAction for why earliest).
+		if !pinnedTime.IsZero() && (consistencyPoint.IsZero() || pinnedTime.Before(consistencyPoint)) {
+			consistencyPoint = pinnedTime
 		}
 	}
 
-	// Phase 2: the consistency point is the instant after all pre-step work completed — every capture in
-	// the event is made recoverable to it. Hand it to each action that aligns to it (cloned clusters
-	// recover forward to it; non-DB captures are taken as of it). Today every consumer is also a
-	// pre-step action, so when nothing produced a consistency point this loop has nothing to hand it to.
-	consistencyPoint := time.Now()
+	// When no capture pinned an instant, the point is simply the moment after all pre-step work completed.
+	if consistencyPoint.IsZero() {
+		consistencyPoint = time.Now()
+	}
+
+	// Phase 2: every capture in the event is made recoverable to the consistency point. Hand it to each
+	// action that aligns to it (cloned clusters recover forward to it; non-DB captures are taken as of it).
 	for _, action := range rs.actions {
 		if consumer, ok := action.remoteAction.(ConsistencyPointConsumer); ok {
 			consumer.SetConsistencyPoint(consistencyPoint)

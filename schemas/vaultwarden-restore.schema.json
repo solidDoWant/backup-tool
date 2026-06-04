@@ -1081,6 +1081,9 @@
         "certificates": {
           "$ref": "#/$defs/vaultWardenRestoreOptionsCertificates"
         },
+        "issuerKind": {
+          "type": "string"
+        },
         "cleanupTimeout": {
           "type": "integer"
         },

@@ -29,21 +29,31 @@ func (_m *MockCNPGBackupInterface) EXPECT() *MockCNPGBackupInterface_Expecter {
 }
 
 // BeforeConsistencyPoint provides a mock function with given fields: ctx
-func (_m *MockCNPGBackupInterface) BeforeConsistencyPoint(ctx *contexts.Context) error {
+func (_m *MockCNPGBackupInterface) BeforeConsistencyPoint(ctx *contexts.Context) (time.Time, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BeforeConsistencyPoint")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*contexts.Context) error); ok {
+	var r0 time.Time
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context) (time.Time, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context) time.Time); ok {
 		r0 = rf(ctx)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(time.Time)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(*contexts.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockCNPGBackupInterface_BeforeConsistencyPoint_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BeforeConsistencyPoint'
@@ -64,12 +74,12 @@ func (_c *MockCNPGBackupInterface_BeforeConsistencyPoint_Call) Run(run func(ctx 
 	return _c
 }
 
-func (_c *MockCNPGBackupInterface_BeforeConsistencyPoint_Call) Return(_a0 error) *MockCNPGBackupInterface_BeforeConsistencyPoint_Call {
-	_c.Call.Return(_a0)
+func (_c *MockCNPGBackupInterface_BeforeConsistencyPoint_Call) Return(_a0 time.Time, _a1 error) *MockCNPGBackupInterface_BeforeConsistencyPoint_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCNPGBackupInterface_BeforeConsistencyPoint_Call) RunAndReturn(run func(*contexts.Context) error) *MockCNPGBackupInterface_BeforeConsistencyPoint_Call {
+func (_c *MockCNPGBackupInterface_BeforeConsistencyPoint_Call) RunAndReturn(run func(*contexts.Context) (time.Time, error)) *MockCNPGBackupInterface_BeforeConsistencyPoint_Call {
 	_c.Call.Return(run)
 	return _c
 }

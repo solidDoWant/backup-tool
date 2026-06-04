@@ -1,70 +1,76 @@
 package disasterrecovery
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
-	"time"
-
-	"dario.cat/mergo"
 	"github.com/gravitational/trace"
-	"github.com/solidDoWant/backup-tool/pkg/cleanup"
-	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
 	cnpgbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/backup"
+	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
+	filesbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/backup"
+	filesrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/restore"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonepvc"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
-	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
-	vaultwardenBaseMountPath = string(os.PathSeparator) + "mnt"
-	vaultwardenDRVolPath     = "data-vol" // Important: changing this is will break restoration of old backups!
-	vaultwardenSQLFileName   = "dump.sql" // Important: changing this is will break restoration of old backups!
+	vaultwardenDRVolPath   = "data-vol" // Important: changing this is will break restoration of old backups!
+	vaultwardenSQLFileName = "dump.sql" // Important: changing this is will break restoration of old backups!
 )
 
 // TODO plumb a lot more options through to here
 type VaultWardenBackupOptions struct {
-	VolumeSize                   resource.Quantity                                  `yaml:"volumeSize,omitempty"`
-	VolumeStorageClass           string                                             `yaml:"volumeStorageClass,omitempty"`
-	CloneClusterOptions          clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
-	BackupToolPodCreationTimeout helpers.MaxWaitTime                                `yaml:"backupToolPodCreationTimeout,omitempty"`
-	BackupSnapshot               OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
-	RemoteBackupToolOptions      backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
-	CleanupTimeout               helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
+	VolumeSize                   resource.Quantity                 `yaml:"volumeSize,omitempty"`
+	VolumeStorageClass           string                            `yaml:"volumeStorageClass,omitempty"`
+	CloneClusterOptions          clonedcluster.CloneClusterOptions `yaml:"clusterCloning,omitempty"`
+	BackupToolPodCreationTimeout helpers.MaxWaitTime               `yaml:"backupToolPodCreationTimeout,omitempty"`
+	BackupSnapshot               OptionsBackupSnapshot             `yaml:"backupSnapshot,omitempty"`
+	CleanupTimeout               helpers.MaxWaitTime               `yaml:"cleanupTimeout,omitempty"`
 }
 
 type VaultWarden struct {
-	kubernetesClient kubecluster.ClientInterface
+	kubeClusterClient kubecluster.ClientInterface
+	// Testing injection
+	newCNPGBackup   func() cnpgbackup.CNPGBackupInterface
+	newCNPGRestore  func() cnpgrestore.CNPGRestoreInterface
+	newFilesBackup  func() filesbackup.FilesBackupInterface
+	newFilesRestore func() filesrestore.FilesRestoreInterface
+	newRemoteStage  func(kubeClusterClient kubecluster.ClientInterface, namespace, eventName string, opts remote.RemoteStageOptions) remote.RemoteStageInterface
 }
 
 func NewVaultWarden(client kubecluster.ClientInterface) *VaultWarden {
 	return &VaultWarden{
-		kubernetesClient: client,
+		kubeClusterClient: client,
+		newCNPGBackup:     cnpgbackup.NewCNPGBackup,
+		newCNPGRestore:    cnpgrestore.NewCNPGRestore,
+		newFilesBackup:    filesbackup.NewFilesBackup,
+		newFilesRestore:   filesrestore.NewFilesRestore,
+		newRemoteStage:    remote.NewRemoteStage,
 	}
 }
 
 // Backup process:
-// 1. Take the CNPG base backup (establishes the DB consistency point, before the other captures)
-// 2. Snapshot/clone the PVC containing the data directory (its clone time is the recovery target T_dr)
-// 3. Create the DR PVC if not exists
-// 4. Create the cloned CNPG cluster, recovering forward to T_dr (idle source falls back to the consistency point)
-// 5. Spawn a tool instance with the cloned PVC, cloned-cluster certs, and DR mount attached
-// 6. Sync the data directory to the DR volume
-// 7. Perform a CNPG logical backup (pg_dumpall) to the DR mount
-// 8. Take a snapshot of the DR volume
-// 9. Exit the tool instance, delete all created resources except for the DR volume snapshot
-func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, dataPVC, cnpgClusterName, servingCertIssuerName, clientCertIssuerName string, backupOptions VaultWardenBackupOptions) (backup *DREvent, err error) {
+//  1. Create the DR PVC if not exists
+//  2. Configure the backup actions: a CNPG logical backup of the cluster, and a files capture of the
+//     data-directory PVC
+//  3. Run the stage's pre-consistency-point work in order — the CNPG action takes its base backup, then the
+//     files action clones the live data PVC. The clone's creation time becomes the event's consistency
+//     point, and the stage sets up and executes each action against a single tool pod:
+//     - the CNPG action clones the cluster recovering forward to the consistency point (the data-directory
+//     freeze) and dumps it to the DR volume
+//     - the files action syncs the clone into the DR volume's data-vol subdirectory
+//  4. Snapshot the DR volume
+//
+// The CNPG action is registered before the files action because the database base backup must be taken
+// before the data-directory clone: the clone time is the consistency point, and the database can only
+// recover forward to it from a base backup taken earlier. Recovering forward to exactly the filesystem
+// freeze reproduces the original Vaultwarden behaviour, where the database is aligned to the moment the
+// data directory was captured.
+func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, dataPVC, cnpgClusterName, servingCertIssuerName, clientCertIssuerName string, opts VaultWardenBackupOptions) (backup *DREvent, err error) {
 	backup = NewDREventNow(backupName)
 	ctx.Log.With("backupName", backup.GetFullName(), "namespace", namespace).Info("Starting backup process")
 	defer func() {
@@ -77,144 +83,73 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 		}
 	}()
 
-	if backupOptions.CloneClusterOptions.CleanupTimeout == 0 {
-		backupOptions.CloneClusterOptions.CleanupTimeout = backupOptions.CleanupTimeout
-	}
-
-	// 1. Take the CNPG base backup first. Postgres can only be recovered forward from its base
-	// backup, so for cross-resource PITR the base backup must be the earliest capture in the event:
-	// its consistency point then precedes the filesystem/DR captures below, and the clone can be
-	// recovered forward from it to line up with them.
-	ctx.Log.Step().Info("Backing up the CNPG cluster")
-	cnpgBackup, err := vw.kubernetesClient.CreateClusterBackup(ctx.Child(), namespace, cnpgClusterName, backupOptions.CloneClusterOptions)
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to back up cluster %q", cnpgClusterName)
-	}
-	// The backup, and the volume snapshots it owns, must outlive the clone recovery below, so it is
-	// only deleted at the very end of the event.
-	defer cleanup.To(func(ctx *contexts.Context) error {
-		return vw.kubernetesClient.CNPG().DeleteBackup(ctx, namespace, cnpgBackup.Name)
-	}).WithErrMessage("failed to cleanup CNPG backup %q", helpers.FullNameStr(namespace, cnpgBackup.Name)).WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(backupOptions.CleanupTimeout.MaxWait(time.Minute)).Run()
-
-	// 2. Snapshot/clone the PVC containing the data directory. The clone freezes the filesystem; its
-	// creation time is T_dr, the instant the DB is recovered forward to so it aligns with the frozen
-	// filesystem.
-	ctx.Log.Step().Info("Cloning data PVC")
-	clonedPVC, err := vw.kubernetesClient.ClonePVC(ctx.Child(), namespace, dataPVC, clonepvc.ClonePVCOptions{DestPvcNamePrefix: backup.GetFullName(), CleanupTimeout: backupOptions.CleanupTimeout, ForceBind: true})
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to clone data PVC")
-	}
-	defer cleanup.To(func(ctx *contexts.Context) error {
-		return vw.kubernetesClient.Core().DeletePVC(ctx, namespace, clonedPVC.Name)
-	}).WithErrMessage("failed to cleanup PVC %q", helpers.FullName(clonedPVC)).WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(backupOptions.CleanupTimeout.MaxWait(time.Minute)).Run()
-
-	// 3. Create the DR PVC if not exists
-	ctx.Log.Step().Info("Ensuring DR PVC exists")
-	drVolumeSize := backupOptions.VolumeSize
+	// Create the DR PVC if not exists. Vaultwarden's DR volume holds the synced data directory in addition
+	// to the SQL dump, so size it from the data PVC rather than the CNPG cluster. Default to roughly twice
+	// the data PVC size to fit both captures.
+	ctx.Log.Step().Info("Ensuring DR volume exists")
+	drVolumeSize := opts.VolumeSize
 	if drVolumeSize.IsZero() {
-		snapshotSize, ok := clonedPVC.Spec.Resources.Requests[corev1.ResourceStorage]
-		if !ok {
-			return backup, trace.Wrap(err, "failed to get the size of the cloned PVC")
+		dataPVCObj, err := vw.kubeClusterClient.Core().GetPVC(ctx.Child(), namespace, dataPVC)
+		if err != nil {
+			return backup, trace.Wrap(err, "failed to get data PVC %q to size the DR volume", dataPVC)
 		}
-		drVolumeSize = snapshotSize
-		// Default to roughly twice the initial snapshot size
+
+		size, ok := dataPVCObj.Spec.Resources.Requests[corev1.ResourceStorage]
+		if !ok {
+			return backup, trace.Errorf("data PVC %q has no storage request to size the DR volume from", dataPVC)
+		}
+		drVolumeSize = size
 		drVolumeSize.Mul(2)
 	}
 
-	drPVC, err := vw.kubernetesClient.Core().EnsurePVCExists(ctx.Child(), namespace, backup.Name, drVolumeSize, core.CreatePVCOptions{StorageClassName: backupOptions.VolumeStorageClass})
+	drv, err := vw.kubeClusterClient.NewDRVolume(ctx.Child(), namespace, backup.Name, drVolumeSize, drvolume.DRVolumeCreateOptions{
+		VolumeStorageClass: opts.VolumeStorageClass,
+		CNPGClusterNames:   []string{cnpgClusterName},
+	})
 	if err != nil {
-		return backup, trace.Wrap(err, "failed to ensure backup volume exists")
+		return backup, trace.Wrap(err, "failed to create the DR volume")
 	}
 
-	// 4. Create the cloned CNPG cluster from the base backup, recovering forward to the data PVC
-	// clone time (T_dr) so the database lines up with the frozen filesystem.
-	ctx.Log.Step().Info("Cloning CNPG cluster")
-	backupOptions.CloneClusterOptions.RecoveryTargetTime = clonedPVC.CreationTimestamp.Format(time.RFC3339)
+	// Configuration
+	ctx.Log.Step().Info("Configuring backup actions")
+	stage := vw.newRemoteStage(vw.kubeClusterClient, namespace, backup.GetFullName(), remote.RemoteStageOptions{
+		CleanupTimeout: opts.CleanupTimeout,
+	})
 
-	// 4a. Write the source recovery fence after T_dr is fixed and before the clone, so the clone's
-	// forward recovery to T_dr can reach it. See ForceSourceWALArchive.
-	ctx.Log.Step().Info("Forcing source WAL archive")
-	if err := cnpgbackup.ForceSourceWALArchive(ctx.Child(), vw.kubernetesClient, namespace, cnpgClusterName); err != nil {
-		return backup, trace.Wrap(err, "failed to force source WAL archive for cluster %q", cnpgClusterName)
+	backupOpts := cnpgbackup.CNPGBackupOptions{
+		CloningOpts:    opts.CloneClusterOptions,
+		CleanupTimeout: opts.CleanupTimeout,
 	}
 
-	// Try and come up with the most useful name for the cloned cluster fitting CNPG requirements.
-	// More info is better, but it needs to at least convey the backup name and still be readable.
-	clonedClusterName := helpers.CleanName(fmt.Sprintf("%s-%s", cnpgClusterName, backup.GetFullName()))
-	if len(clonedClusterName) > 40 { // Max length that CNPG allows for cloned cluster names, see https://github.com/cloudnative-pg/cloudnative-pg/pull/6755
-		clonedClusterName = helpers.CleanName(helpers.TruncateString(backup.GetFullName(), 40, ""))
+	cnpgBackup := vw.newCNPGBackup()
+	if err := cnpgBackup.Configure(vw.kubeClusterClient, namespace, cnpgClusterName, servingCertIssuerName, clientCertIssuerName, backup.Name, vaultwardenSQLFileName, backupOpts); err != nil {
+		return backup, trace.Wrap(err, "failed to configure CNPG cluster backup")
+	}
+	stage.WithAction("Vaultwarden CNPG backup", cnpgBackup)
+
+	dataBackup := vw.newFilesBackup()
+	if err := dataBackup.Configure(vw.kubeClusterClient, namespace, dataPVC, backup.Name, vaultwardenDRVolPath, filesbackup.FilesBackupOptions{
+		CleanupTimeout: opts.CleanupTimeout,
+	}); err != nil {
+		return backup, trace.Wrap(err, "failed to configure data directory backup")
+	}
+	stage.WithAction("Vaultwarden data directory backup", dataBackup)
+
+	// Run
+	ctx.Log.Step().Info("Running backup actions")
+	if err := stage.Run(ctx.Child()); err != nil {
+		return backup, trace.Wrap(err, "failed to run backup actions")
 	}
 
-	clonedCluster, err := vw.kubernetesClient.CloneClusterFromBackup(ctx.Child(), namespace, cnpgClusterName, clonedClusterName, servingCertIssuerName, clientCertIssuerName, cnpgBackup, backupOptions.CloneClusterOptions)
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to clone cluster %q", cnpgClusterName)
-	}
-	defer cleanup.To(clonedCluster.Delete).WithErrMessage("failed to cleanup cloned cluster %q resources", clonedClusterName).WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(backupOptions.CleanupTimeout.MaxWait(10 * time.Minute)).Run()
-
-	// 5. Spawn a new tool instance with the cloned PVC attached, and DR mount and secrets attached
-	ctx.Log.Step().Info("Creating backup tool instance")
-	drVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "dr")
-	clonedVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "data")
-	secretsVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "secrets")
-	servingCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "serving-cert")
-	clientCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "client-cert")
-	btOpts := backuptoolinstance.CreateBackupToolInstanceOptions{
-		NamePrefix: fmt.Sprintf("%s-%s", constants.ToolName, backup.GetFullName()),
-		Volumes: []core.SingleContainerVolume{
-			core.NewSingleContainerPVC(drPVC.Name, drVolumeMountPath),
-			core.NewSingleContainerPVC(clonedPVC.Name, clonedVolumeMountPath),
-			core.NewSingleContainerSecret(clonedCluster.GetServingCert().Name, servingCertVolumeMountPath, corev1.KeyToPath{Key: "tls.crt", Path: "tls.crt"}),
-			core.NewSingleContainerSecret(clonedCluster.GetPostgresUserCert().GetCertificate().Name, clientCertVolumeMountPath),
-		},
-		CleanupTimeout: backupOptions.CleanupTimeout,
+	// Snapshot the backup PVC
+	ctx.Log.Step()
+	if err := drv.SnapshotAndWaitReady(ctx.Child(), backup.GetFullName(), drvolume.DRVolumeSnapshotAndWaitOptions{
+		SnapshotClass: opts.BackupSnapshot.SnapshotClass,
+		ReadyTimeout:  opts.BackupSnapshot.ReadyTimeout,
+	}); err != nil {
+		return backup, trace.Wrap(err, "failed to snapshot the backup volume")
 	}
 
-	if err := mergo.Merge(&btOpts, backupOptions.RemoteBackupToolOptions, mergo.WithOverride); err != nil {
-		return backup, trace.Wrap(err, "failed to merge backup tool options with defaults")
-	}
-
-	btInstance, err := vw.kubernetesClient.CreateBackupToolInstance(ctx.Child(), namespace, backup.GetFullName(), btOpts)
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to create %s instance", constants.ToolName)
-	}
-	defer cleanup.To(btInstance.Delete).WithErrMessage("failed to cleanup backup tool instance %q resources", backup.GetFullName()).
-		WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(backupOptions.CleanupTimeout.MaxWait(time.Minute)).Run()
-
-	// 6. Sync the data directory to the DR volume
-	ctx.Log.Step().Info("Syncing data directory to DR volume")
-	backupToolClient, err := btInstance.GetGRPCClient(ctx.Child())
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to create client for backup tool GRPC server")
-	}
-
-	drDataVolPath := filepath.Join(drVolumeMountPath, vaultwardenDRVolPath)
-	err = backupToolClient.Files().SyncFiles(ctx.Child(), clonedVolumeMountPath, drDataVolPath)
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to sync data directory files at %q to the disaster recovery volume at %q", clonedVolumeMountPath, drDataVolPath)
-	}
-
-	// 7. Perform a CNPG logical backup
-	ctx.Log.Step().Info("Performing Postgres logical backup")
-	podSQLFilePath := filepath.Join(drVolumeMountPath, vaultwardenSQLFileName)
-	clusterCredentials := clonedCluster.GetCredentials(servingCertVolumeMountPath, clientCertVolumeMountPath)
-	err = backupToolClient.Postgres().DumpAll(ctx.Child(), clusterCredentials, podSQLFilePath, postgres.DumpAllOptions{CleanupTimeout: backupOptions.CleanupTimeout})
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to dump logical backup for postgres server at %q", postgres.GetServerAddress(clusterCredentials))
-	}
-
-	// 8. Snapshot the backup PVC
-	ctx.Log.Step().Info("Snapshotting the DR volume")
-	snapshot, err := vw.kubernetesClient.ES().SnapshotVolume(ctx.Child(), namespace, drPVC.Name, externalsnapshotter.SnapshotVolumeOptions{Name: helpers.CleanName(backup.GetFullName()), SnapshotClass: backupOptions.BackupSnapshot.SnapshotClass})
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to snapshot backup volume %q", helpers.FullName(drPVC))
-	}
-
-	_, err = vw.kubernetesClient.ES().WaitForReadySnapshot(ctx.Child(), namespace, snapshot.Name, externalsnapshotter.WaitForReadySnapshotOpts{MaxWaitTime: backupOptions.BackupSnapshot.ReadyTimeout})
-	if err != nil {
-		return backup, trace.Wrap(err, "failed to wait for backup snapshot %q to become ready", helpers.FullName(snapshot))
-	}
-
-	// Backup complete!
 	return backup, nil
 }
 
@@ -224,6 +159,7 @@ type vaultWardenRestoreOptionsCertificates struct {
 
 type VaultWardenRestoreOptions struct {
 	Certificates            vaultWardenRestoreOptionsCertificates              `yaml:"certificates,omitempty"`
+	IssuerKind              string                                             `yaml:"issuerKind,omitempty"`
 	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 }
@@ -237,11 +173,11 @@ type VaultWardenRestoreOptions struct {
 // * The CNPG cluster must support TLS auth for the postgres user
 // * The CNPG cluster serving cert must already exist
 // Restore process:
-// 1. Ensure that the provided resources exist and are ready
-// 2. Spawn a new backup-tool pod with data directory PVC attached, and DR mount attached
-// 3. Sync the data files from the DR mount to the data directory PVC
-// 4. Perform a CNPG logical recovery
-// 5. Exit the backup-tool pod
+//  1. Configure the restoration actions: a files restore of the data directory onto the data PVC, and a
+//     CNPG logical recovery of the cluster
+//  2. Run the stage. It sets up and executes each action against a single tool pod:
+//     - the CNPG action issues a postgres user cert and restores the SQL dump into the cluster
+//     - the files action syncs the DR volume's data-vol subdirectory back onto the data PVC
 func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, dataPVCName, cnpgClusterName, servingCertName, clientCertIssuerName string, opts VaultWardenRestoreOptions) (restore *DREvent, err error) {
 	restore = NewDREventNow(restoreName)
 	ctx.Log.With("restoreName", restore.GetFullName(), "namespace", namespace).Info("Starting restore process")
@@ -255,112 +191,37 @@ func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, da
 		}
 	}()
 
-	// 1. Ensure the require resources already exist
-	ctx.Log.Step().Info("Ensuring required resources exist")
-	drPVC, err := vw.kubernetesClient.Core().GetPVC(ctx.Child(), namespace, restoreName)
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to get DR PVC %q", restoreName)
-	}
+	// 1. Configuration
+	ctx.Log.Step().Info("Configuring restoration actions")
+	stage := vw.newRemoteStage(vw.kubeClusterClient, namespace, restore.GetFullName(), remote.RemoteStageOptions{
+		CleanupTimeout: opts.CleanupTimeout,
+	})
 
-	dataPVC, err := vw.kubernetesClient.Core().GetPVC(ctx.Child(), namespace, dataPVCName)
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to get data PVC %q", dataPVCName)
-	}
-
-	cluster, err := vw.kubernetesClient.CNPG().GetCluster(ctx.Child(), namespace, cnpgClusterName)
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to get CNPG cluster %q", cnpgClusterName)
-	}
-	if !cnpg.IsClusterReady(cluster) {
-		return restore, trace.Errorf("CNPG cluster %q is not ready", cnpgClusterName)
-	}
-
-	servingCert, err := vw.kubernetesClient.CM().GetCertificate(ctx.Child(), namespace, servingCertName)
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to get CNPG cluster serving cert %q", servingCertName)
-	}
-
-	clientCertIssuer, err := vw.kubernetesClient.CM().GetIssuer(ctx.Child(), namespace, clientCertIssuerName)
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to get CNPG cluster client cert issuer %q", clientCertIssuerName)
-	}
-	if !certmanager.IsIssuerReady(&clientCertIssuer.Status) {
-		return restore, trace.Errorf("CNPG cluster client cert issuer %q is not ready", clientCertIssuerName)
-	}
-
-	// 2. Create the postgres user cert
-	ctx.Log.Step().Info("Creating CNPG cluster client cert")
-	cucOptions := clusterusercert.NewClusterUserCertOpts{
-		Subject:            opts.Certificates.PostgresUserCert.Subject,
-		CRPOpts:            opts.Certificates.PostgresUserCert.CRPOpts,
-		WaitForCertTimeout: opts.Certificates.PostgresUserCert.WaitForReadyTimeout,
-		CleanupTimeout:     opts.CleanupTimeout,
-	}
-	postgresUserCert, err := vw.kubernetesClient.NewClusterUserCert(ctx.Child(), namespace, "postgres", clientCertIssuerName, cnpgClusterName, cucOptions)
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to create postgres user CNPG cluster client cert")
-	}
-	defer cleanup.To(postgresUserCert.Delete).WithErrMessage("failed to cleanup postgres user CNPG cluster client cert resources").WithOriginalErr(&err).
-		WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(time.Minute)).Run()
-
-	// 3. Spawn a new backup-tool pod with data directory PVC attached, and DR mount attached
-	ctx.Log.Step().Info("Creating backup tool instance")
-	drVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "dr")
-	dataVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "data")
-	secretsVolumeMountPath := filepath.Join(vaultwardenBaseMountPath, "secrets")
-	servingCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "serving-cert")
-	clientCertVolumeMountPath := filepath.Join(secretsVolumeMountPath, "client-cert")
-	btOpts := backuptoolinstance.CreateBackupToolInstanceOptions{
-		NamePrefix: fmt.Sprintf("%s-%s", constants.ToolName, restore.GetFullName()),
-		Volumes: []core.SingleContainerVolume{
-			core.NewSingleContainerPVC(drPVC.Name, drVolumeMountPath),
-			core.NewSingleContainerPVC(dataPVC.Name, dataVolumeMountPath),
-			core.NewSingleContainerSecret(servingCert.Name, servingCertVolumeMountPath, corev1.KeyToPath{Key: "tls.crt", Path: "tls.crt"}),
-			core.NewSingleContainerSecret(postgresUserCert.GetCertificate().Name, clientCertVolumeMountPath),
+	// Restore actions are independent (no consistency point is established on restore), but they are
+	// registered in the same order as the backup actions for consistency: CNPG first, then the data
+	// directory.
+	cnpgRestore := vw.newCNPGRestore()
+	if err := cnpgRestore.Configure(vw.kubeClusterClient, namespace, cnpgClusterName, servingCertName, clientCertIssuerName, restoreName, vaultwardenSQLFileName, cnpgrestore.CNPGRestoreOptions{
+		IssuerKind: opts.IssuerKind,
+		PostgresUserCert: cnpgrestore.CNPGRestoreOptionsCert{
+			Subject:            opts.Certificates.PostgresUserCert.Subject,
+			CRPOpts:            opts.Certificates.PostgresUserCert.CRPOpts,
+			WaitForCertTimeout: opts.Certificates.PostgresUserCert.WaitForReadyTimeout,
 		},
 		CleanupTimeout: opts.CleanupTimeout,
+	}); err != nil {
+		return restore, trace.Wrap(err, "failed to configure CNPG cluster restoration")
 	}
+	stage.WithAction("Vaultwarden CNPG cluster restore", cnpgRestore)
 
-	if err := mergo.Merge(&btOpts, opts.RemoteBackupToolOptions, mergo.WithOverride); err != nil {
-		return restore, trace.Wrap(err, "failed to merge backup tool options with defaults")
+	dataRestore := vw.newFilesRestore()
+	if err := dataRestore.Configure(vw.kubeClusterClient, namespace, dataPVCName, restoreName, vaultwardenDRVolPath, filesrestore.FilesRestoreOptions{}); err != nil {
+		return restore, trace.Wrap(err, "failed to configure data directory restoration")
 	}
+	stage.WithAction("Vaultwarden data directory restore", dataRestore)
 
-	btInstance, err := vw.kubernetesClient.CreateBackupToolInstance(ctx.Child(), namespace, restore.GetFullName(), btOpts)
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to create %s instance", constants.ToolName)
-	}
-	defer cleanup.To(btInstance.Delete).WithErrMessage("failed to cleanup backup tool instance %q resources", restore.GetFullName()).
-		WithOriginalErr(&err).WithParentCtx(ctx).WithTimeout(opts.CleanupTimeout.MaxWait(time.Minute)).Run()
-
-	// 4. Sync the data files from the DR mount to the data directory PVC
-	ctx.Log.Step().Info("Syncing data directory to data PVC")
-	backupToolClient, err := btInstance.GetGRPCClient(ctx.Child())
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to create client for backup tool GRPC server")
-	}
-
-	drDataVolPath := filepath.Join(drVolumeMountPath, vaultwardenDRVolPath)
-	err = backupToolClient.Files().SyncFiles(ctx.Child(), drDataVolPath, dataVolumeMountPath)
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to sync data directory files at %q to the data PVC at %q", drDataVolPath, dataVolumeMountPath)
-	}
-
-	// 5. Perform a CNPG logical recovery
-	ctx.Log.Step().Info("Performing Postgres logical recovery")
-	podSQLFilePath := filepath.Join(drVolumeMountPath, vaultwardenSQLFileName)
-	clusterCredentials := &postgres.EnvironmentCredentials{
-		postgres.HostVarName:        fmt.Sprintf("%s.%s.svc", cluster.Status.WriteService, namespace),
-		postgres.UserVarName:        "postgres",
-		postgres.RequireAuthVarName: "none",        // Require TLS auth. Don't allow the server to ask the client for a password/similar.
-		postgres.SSLModeVarName:     "verify-full", // Check the server hostname against the cert, and validate the cert chain
-		postgres.SSLCertVarName:     filepath.Join(clientCertVolumeMountPath, "tls.crt"),
-		postgres.SSLKeyVarName:      filepath.Join(clientCertVolumeMountPath, "tls.key"),
-		postgres.SSLRootCertVarName: filepath.Join(servingCertVolumeMountPath, "tls.crt"),
-	}
-	err = backupToolClient.Postgres().Restore(ctx.Child(), clusterCredentials, podSQLFilePath, postgres.RestoreOptions{})
-	if err != nil {
-		return restore, trace.Wrap(err, "failed to restore logical backup for postgres server at %q", postgres.GetServerAddress(clusterCredentials))
-	}
-
-	return restore, nil
+	// 2. Run
+	ctx.Log.Step().Info("Running restoration actions")
+	err = stage.Run(ctx.Child())
+	return restore, trace.Wrap(err, "failed to run restoration actions")
 }

@@ -126,19 +126,20 @@ type baseBackupState struct {
 
 // BeforeConsistencyPoint takes the base backup that fixes this cluster's recoverable state. It runs
 // before the stage establishes the event's shared consistency point, so that point lands after this
-// backup completes and the clone can recover forward to it. The base backup is owned by this action and
-// torn down in Cleanup; it must outlive clone creation, since the clone's recovery volume snapshots are
-// owned by it. Implements remote.PreConsistencyPointAction.
-func (bs *baseBackupState) BeforeConsistencyPoint(ctx *contexts.Context) (err error) {
+// backup completes and the clone can recover forward to it. The base backup pins no instant of its own —
+// it only needs to precede the point — so it returns the zero time. The base backup is owned by this
+// action and torn down in Cleanup; it must outlive clone creation, since the clone's recovery volume
+// snapshots are owned by it. Implements remote.PreConsistencyPointAction.
+func (bs *baseBackupState) BeforeConsistencyPoint(ctx *contexts.Context) (_ time.Time, err error) {
 	bs.ctxLogWith(ctx).Info("Taking base backup for CNPG backup")
 	defer ctx.Log.Info("CNPG base backup complete", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
 
 	if !bs.isValidated {
-		return trace.Errorf("attempted to create base backup without validating")
+		return time.Time{}, trace.Errorf("attempted to create base backup without validating")
 	}
 
 	if bs.isBaseBackedUp {
-		return trace.Errorf("attempted to create base backup multiple times")
+		return time.Time{}, trace.Errorf("attempted to create base backup multiple times")
 	}
 
 	if bs.opts.CloningOpts.CleanupTimeout == 0 {
@@ -147,13 +148,13 @@ func (bs *baseBackupState) BeforeConsistencyPoint(ctx *contexts.Context) (err er
 
 	backup, err := bs.kubeClusterClient.CreateClusterBackup(ctx.Child(), bs.namespace, bs.clusterName, bs.opts.CloningOpts)
 	if err != nil {
-		return trace.Wrap(err, "failed to back up cluster %q", bs.clusterName)
+		return time.Time{}, trace.Wrap(err, "failed to back up cluster %q", bs.clusterName)
 	}
 
 	bs.baseBackup = backup
 	bs.isBaseBackedUp = true
 
-	return nil
+	return time.Time{}, nil
 }
 
 // SetConsistencyPoint records the shared consistency point established by the stage. Implements
