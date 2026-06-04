@@ -86,7 +86,7 @@ func TestCreateBackup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, fakeClientset, _ := createTestClient()
+			client, fakeClientset := createTestClient()
 
 			if tt.simulateClientFailure {
 				fakeClientset.PrependReactor("create", "backups", func(action kubetesting.Action) (bool, runtime.Object, error) {
@@ -184,7 +184,7 @@ func TestWaitForReadyBackup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			client, cnpgFakeClient, _ := createTestClient()
+			client, cnpgFakeClient := createTestClient()
 			ctx := th.NewTestContext()
 
 			if tt.initialBackup != nil {
@@ -239,7 +239,7 @@ func TestDeleteBackup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			client, _, _ := createTestClient()
+			client, _ := createTestClient()
 			ctx := th.NewTestContext()
 
 			var existingbackup *apiv1.Backup
@@ -279,13 +279,11 @@ func TestCreateCluster(t *testing.T) {
 	replicationUserCertName := "replication-user-cert"
 
 	tests := []struct {
-		desc                        string
-		enablePrometheusMetrics     bool
-		shouldFailToQueryForMetrics bool
-		opts                        CreateClusterOptions
-		commonLabels                map[string]string
-		expected                    *apiv1.Cluster
-		simulateClientFailure       bool
+		desc                  string
+		opts                  CreateClusterOptions
+		commonLabels          map[string]string
+		expected              *apiv1.Cluster
+		simulateClientFailure bool
 	}{
 		{
 			desc: "basic cluster creation",
@@ -346,27 +344,6 @@ func TestCreateCluster(t *testing.T) {
 					},
 				},
 			},
-		},
-		{
-			desc:                    "basic cluster with monitoring supported",
-			enablePrometheusMetrics: true,
-			opts:                    CreateClusterOptions{},
-			expected: &apiv1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: clusterName,
-				},
-				Spec: apiv1.ClusterSpec{
-					Monitoring: &apiv1.MonitoringConfiguration{
-						EnablePodMonitor: true,
-					},
-				},
-			},
-		},
-		{
-			desc:                        "basic cluster with monitoring supported but querying for support fails",
-			enablePrometheusMetrics:     true,
-			shouldFailToQueryForMetrics: true,
-			opts:                        CreateClusterOptions{},
 		},
 		{
 			desc: "cluster with volume snapshot recovery and plugin WAL source",
@@ -504,7 +481,7 @@ func TestCreateCluster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			ctx := th.NewTestContext()
-			client, cnpgFakeClient, apiExtensionsFakeClient := createTestClient()
+			client, cnpgFakeClient := createTestClient()
 			client.SetCommonLabels(tt.commonLabels)
 
 			if tt.simulateClientFailure {
@@ -513,21 +490,8 @@ func TestCreateCluster(t *testing.T) {
 				})
 			}
 
-			if tt.enablePrometheusMetrics {
-				apiExtensionsFakeClient.PrependReactor("get", "customresourcedefinitions", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
-					// Return just enough to satisfy the API call tests until the bugged API extensions package is fixed
-					if tt.shouldFailToQueryForMetrics {
-						return true, nil, assert.AnError
-					}
-					return true, nil, nil
-				})
-				// THe API extensions client is all kinds of screwed up, see https://github.com/kubernetes/kubernetes/issues/126850
-				// _, err := apiExtensionsFakeClient.ApiextensionsV1().CustomResourceDefinitions().Apply(ctx, v1.CustomResourceDefinition("podmonitors.monitoring.coreos.com"), metav1.ApplyOptions{})
-				// require.NoError(t, err)
-			}
-
 			createdCluster, err := client.CreateCluster(ctx, namespace, clusterName, volumeSize, servingCertName, clientCAName, replicationUserCertName, tt.opts)
-			if tt.simulateClientFailure || tt.shouldFailToQueryForMetrics {
+			if tt.simulateClientFailure {
 				require.Error(t, err)
 				require.Nil(t, createdCluster)
 				return
@@ -667,7 +631,7 @@ func TestWaitForReadyCluster(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			client, cnpgFakeClient, _ := createTestClient()
+			client, cnpgFakeClient := createTestClient()
 			ctx := th.NewTestContext()
 
 			if tt.initialCluster != nil {
@@ -736,7 +700,7 @@ func TestGetCluster(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			client, cnpgFakeClient, _ := createTestClient()
+			client, cnpgFakeClient := createTestClient()
 			ctx := th.NewTestContext()
 
 			if tt.shouldSetupCluster {
@@ -784,7 +748,7 @@ func TestDeleteCluster(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			client, cnpgFakeClient, _ := createTestClient()
+			client, cnpgFakeClient := createTestClient()
 			ctx := th.NewTestContext()
 
 			var existingCluster *apiv1.Cluster

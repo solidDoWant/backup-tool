@@ -6,7 +6,6 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg/gen/clientset/versioned"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/rest"
 )
@@ -27,8 +26,7 @@ type ClientInterface interface {
 
 type Client struct {
 	helpers.SimpleResourceLabeler
-	cnpgClient          versioned.Interface
-	apiExtensionsClient apiextensionsclientset.Interface
+	cnpgClient versioned.Interface
 }
 
 func NewClient(config *rest.Config) (*Client, error) {
@@ -37,13 +35,7 @@ func NewClient(config *rest.Config) (*Client, error) {
 		return nil, trace.Wrap(err, "failed to create cloudnative-pg client")
 	}
 
-	underlyingAPIExtensionsClient, err := apiextensionsclientset.NewForConfig(config)
-	if err != nil {
-		return nil, trace.Wrap(err, "failed to create apiextensions client")
-	}
-
 	return &Client{
-		cnpgClient:          underlyingCNPGClient,
-		apiExtensionsClient: underlyingAPIExtensionsClient,
+		cnpgClient: underlyingCNPGClient,
 	}, nil
 }

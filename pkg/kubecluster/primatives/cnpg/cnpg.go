@@ -9,12 +9,9 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-const podMonitorCRDName = "podmonitors.monitoring.coreos.com"
 
 // BarmanCloudPluginName is the CNPG-I plugin name of the barman-cloud plugin, which handles WAL
 // archiving for the source clusters this tool clones.
@@ -216,19 +213,9 @@ func (cnpgc *Client) CreateCluster(ctx *contexts.Context, namespace, clusterName
 		"hostssl all all all cert",
 	}
 
-	_, err := cnpgc.apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx.Child(), podMonitorCRDName, metav1.GetOptions{})
-	if err == nil {
-		// Enable metrics if the required CRD exists
-		cluster.Spec.Monitoring = &apiv1.MonitoringConfiguration{
-			EnablePodMonitor: true,
-		}
-	} else if !apierrors.IsNotFound(err) {
-		return nil, trace.Wrap(err, "failed to check if cluster has %q CRD", podMonitorCRDName)
-	}
-
 	cnpgc.LabelResource(cluster)
 
-	cluster, err = cnpgc.cnpgClient.PostgresqlV1().Clusters(namespace).Create(ctx.Child(), cluster, metav1.CreateOptions{})
+	cluster, err := cnpgc.cnpgClient.PostgresqlV1().Clusters(namespace).Create(ctx.Child(), cluster, metav1.CreateOptions{})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create cluster %q", clusterName)
 	}
