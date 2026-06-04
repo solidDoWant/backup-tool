@@ -369,32 +369,6 @@ func TestCreateCluster(t *testing.T) {
 			opts:                        CreateClusterOptions{},
 		},
 		{
-			desc: "cluster with backup recovery",
-			opts: CreateClusterOptions{
-				BackupName:   "test-backup",
-				DatabaseName: "testdb",
-				OwnerName:    "testowner",
-			},
-			expected: &apiv1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: clusterName,
-				},
-				Spec: apiv1.ClusterSpec{
-					Bootstrap: &apiv1.BootstrapConfiguration{
-						Recovery: &apiv1.BootstrapRecovery{
-							Backup: &apiv1.BackupSource{
-								LocalObjectReference: apiv1.LocalObjectReference{
-									Name: "test-backup",
-								},
-							},
-							Database: "testdb",
-							Owner:    "testowner",
-						},
-					},
-				},
-			},
-		},
-		{
 			desc: "cluster with volume snapshot recovery and plugin WAL source",
 			opts: CreateClusterOptions{
 				VolumeSnapshotRecovery: &VolumeSnapshotRecovery{
@@ -407,10 +381,10 @@ func TestCreateCluster(t *testing.T) {
 							Parameters: map[string]string{"barmanObjectName": "store", "serverName": "source-server"},
 						},
 					},
+					RecoveryTargetTime: "2024-01-01T00:00:00Z",
 				},
-				RecoveryTarget: &apiv1.RecoveryTarget{TargetTime: "2024-01-01T00:00:00Z"},
-				DatabaseName:   "testdb",
-				OwnerName:      "testowner",
+				DatabaseName: "testdb",
+				OwnerName:    "testowner",
 			},
 			expected: &apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -433,6 +407,54 @@ func TestCreateCluster(t *testing.T) {
 								},
 							},
 							RecoveryTarget: &apiv1.RecoveryTarget{TargetTime: "2024-01-01T00:00:00Z"},
+							Database:       "testdb",
+							Owner:          "testowner",
+						},
+					},
+					ExternalClusters: []apiv1.ExternalCluster{
+						{
+							Name: "source-server",
+							PluginConfiguration: &apiv1.PluginConfiguration{
+								Name:       BarmanCloudPluginName,
+								Parameters: map[string]string{"barmanObjectName": "store", "serverName": "source-server"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "cluster with volume snapshot recovery and no target time recovers to the consistency point",
+			opts: CreateClusterOptions{
+				VolumeSnapshotRecovery: &VolumeSnapshotRecovery{
+					DataSnapshotName: "snap-data",
+					WALSource: apiv1.ExternalCluster{
+						Name: "source-server",
+						PluginConfiguration: &apiv1.PluginConfiguration{
+							Name:       BarmanCloudPluginName,
+							Parameters: map[string]string{"barmanObjectName": "store", "serverName": "source-server"},
+						},
+					},
+				},
+				DatabaseName: "testdb",
+				OwnerName:    "testowner",
+			},
+			expected: &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterName,
+				},
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{
+							Source: "source-server",
+							VolumeSnapshots: &apiv1.DataSource{
+								Storage: corev1.TypedLocalObjectReference{
+									APIGroup: new("snapshot.storage.k8s.io"),
+									Kind:     "VolumeSnapshot",
+									Name:     "snap-data",
+								},
+							},
+							RecoveryTarget: &apiv1.RecoveryTarget{TargetImmediate: new(true)},
 							Database:       "testdb",
 							Owner:          "testowner",
 						},

@@ -206,15 +206,15 @@ func TestConfigureWALRecovery(t *testing.T) {
 		expectedOptions cnpg.CreateClusterOptions
 	}{
 		{
-			desc:            "in-tree barman (no plugins) recovers from the backup object",
-			backup:          snapshotBackup(dataElement),
-			expectedOptions: cnpg.CreateClusterOptions{BackupName: "test-backup"},
+			desc:      "source without the barman-cloud plugin is an error",
+			backup:    snapshotBackup(dataElement),
+			expectErr: true,
 		},
 		{
-			desc:            "non-barman plugin is ignored and treated as in-tree",
-			plugins:         []apiv1.PluginConfiguration{{Name: "some-other.plugin", IsWALArchiver: new(true)}},
-			backup:          snapshotBackup(dataElement),
-			expectedOptions: cnpg.CreateClusterOptions{BackupName: "test-backup"},
+			desc:      "non-barman plugin does not count as WAL archiving and is an error",
+			plugins:   []apiv1.PluginConfiguration{{Name: "some-other.plugin", IsWALArchiver: new(true)}},
+			backup:    snapshotBackup(dataElement),
+			expectErr: true,
 		},
 		{
 			desc:    "plugin with explicit serverName parameter",
@@ -311,7 +311,7 @@ func TestConfigureWALRecovery(t *testing.T) {
 			}
 
 			clusterOpts := cnpg.CreateClusterOptions{}
-			isPluginRecovery, err := p.configureWALRecovery(ctx, namespace, sourceCluster, tt.backup, &clusterOpts)
+			err := p.configureWALRecovery(ctx, namespace, sourceCluster, tt.backup, &clusterOpts)
 
 			if tt.expectErr {
 				require.Error(t, err)
@@ -319,8 +319,6 @@ func TestConfigureWALRecovery(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedOptions, clusterOpts)
-			// The plugin path is exactly the one that recovers from volume snapshots.
-			assert.Equal(t, tt.expectedOptions.VolumeSnapshotRecovery != nil, isPluginRecovery)
 		})
 	}
 }
@@ -913,7 +911,7 @@ func TestWaitForCloneRecovery(t *testing.T) {
 		want := readyCluster(clusterName)
 		p.cnpgClient.EXPECT().WaitForReadyCluster(mock.Anything, namespace, clusterName, mock.Anything).Return(want, nil)
 
-		got, err := p.waitForCloneRecovery(ctx, namespace, clusterName, false, CloneClusterOptions{})
+		got, err := p.waitForCloneRecovery(ctx, namespace, clusterName, CloneClusterOptions{})
 		require.NoError(t, err)
 		assert.Equal(t, want, got)
 	})
@@ -926,7 +924,7 @@ func TestWaitForCloneRecovery(t *testing.T) {
 		p.coreClient.EXPECT().WaitForJobCompletion(mock.Anything, namespace, "", core.WaitForJobCompletionOpts{LabelSelector: "cnpg.io/cluster=new-cluster,cnpg.io/jobRole"}).Return(&batchv1.Job{}, nil)
 		p.cnpgClient.EXPECT().WaitForReadyCluster(mock.Anything, namespace, clusterName, mock.Anything).Return(want, nil)
 
-		got, err := p.waitForCloneRecovery(ctx, namespace, clusterName, true, targetOpts)
+		got, err := p.waitForCloneRecovery(ctx, namespace, clusterName, targetOpts)
 		require.NoError(t, err)
 		assert.Equal(t, want, got)
 	})
@@ -936,7 +934,7 @@ func TestWaitForCloneRecovery(t *testing.T) {
 		ctx := th.NewTestContext()
 		p.coreClient.EXPECT().WaitForJobCompletion(mock.Anything, namespace, mock.Anything, mock.Anything).Return(nil, core.ErrJobFailed)
 
-		_, err := p.waitForCloneRecovery(ctx, namespace, clusterName, true, targetOpts)
+		_, err := p.waitForCloneRecovery(ctx, namespace, clusterName, targetOpts)
 		assert.ErrorIs(t, err, ErrRecoveryTargetNotReached)
 	})
 
@@ -945,7 +943,7 @@ func TestWaitForCloneRecovery(t *testing.T) {
 		ctx := th.NewTestContext()
 		p.coreClient.EXPECT().WaitForJobCompletion(mock.Anything, namespace, mock.Anything, mock.Anything).Return(nil, assert.AnError)
 
-		_, err := p.waitForCloneRecovery(ctx, namespace, clusterName, true, targetOpts)
+		_, err := p.waitForCloneRecovery(ctx, namespace, clusterName, targetOpts)
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, ErrRecoveryTargetNotReached)
 	})

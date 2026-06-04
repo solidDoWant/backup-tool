@@ -113,6 +113,24 @@ rawResources:
           kind: Issuer
           group: cert-manager.io
         secretName: authentik-postgres-authentik-user-cert
+  # WAL archiving is handled by the barman-cloud plugin. The plugin reads the bucket/credentials from
+  # this ObjectStore resource, which the cluster references by name via .spec.plugins.
+  authentik-postgres-wal-objectstore:
+    forceRename: authentik-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://authentik-postgres-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials:
+            accessKeyId:
+              name: seaweedfs-s3-secret
+              key: admin_access_key_id
+            secretAccessKey:
+              name: seaweedfs-s3-secret
+              key: admin_secret_access_key
   authentik-postgres-cluster:
     forceRename: authentik-postgres
     manifest:
@@ -132,6 +150,11 @@ rawResources:
         storage:
           size: 5Gi
           storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: authentik-wal-store
         backup:
           target: prefer-standby
           volumeSnapshot:
@@ -141,16 +164,6 @@ rawResources:
               immediateCheckpoint: false
               waitForArchive: true
             snapshotOwnerReference: backup
-          barmanObjectStore:
-            destinationPath: s3://authentik-postgres-wal/
-            endpointURL: http://seaweedfs-s3:8333
-            s3Credentials:
-              accessKeyId:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-              secretAccessKey:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
         certificates:
           serverTLSSecret: authentik-postgres-serving-cert
           serverCASecret: authentik-postgres-serving-cert

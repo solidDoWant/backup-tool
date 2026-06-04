@@ -6,7 +6,6 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
-	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/postgres"
 )
@@ -22,13 +21,6 @@ func sourcePSQLRunner(ctx *contexts.Context, kubeClient kubecluster.ClientInterf
 		return nil, trace.Wrap(err, "failed to get source cluster %q", helpers.FullNameStr(namespace, sourceClusterName))
 	}
 
-	// Wall-clock PITR — and therefore the forced WAL archive — only applies when the source archives WAL
-	// through the barman-cloud plugin. In-tree (or non-archiving) sources never recover forward to a
-	// wall-clock target, so there is nothing to force.
-	if !clonedcluster.UsesBarmanCloudWALArchiver(cluster) {
-		return nil, nil
-	}
-
 	primaryPod := cluster.Status.CurrentPrimary
 	if primaryPod == "" {
 		return nil, trace.Errorf("source cluster %q has no current primary to exec into", helpers.FullNameStr(namespace, sourceClusterName))
@@ -42,14 +34,11 @@ func sourcePSQLRunner(ctx *contexts.Context, kubeClient kubecluster.ClientInterf
 	return run, nil
 }
 
-// ForceSourceWALArchive writes a WAL recovery fence on a barman-cloud-plugin (PITR) source and forces
-// its segment to archive — see postgres.ForceWALArchive for the mechanism and why a committing fence
-// (not a restore point) is required. It must run after the recovery target is fixed and before the
-// clone, so the fence's commit timestamp lands past the target and the WAL is archived by the time
-// recovery needs it.
-//
-// For in-tree (or non-archiving) sources it is a no-op: those never recover forward to a wall-clock
-// target. Shared by every PITR-cloning app (Vaultwarden directly, and the RemoteStage CNPG backup
+// ForceSourceWALArchive writes a WAL recovery fence on the barman-cloud-plugin source and forces its
+// segment to archive — see postgres.ForceWALArchive for the mechanism and why a committing fence (not
+// a restore point) is required. It must run after the recovery target is fixed and before the clone,
+// so the fence's commit timestamp lands past the target and the WAL is archived by the time recovery
+// needs it. Shared by every PITR-cloning app (Vaultwarden directly, and the RemoteStage CNPG backup
 // action for Teleport/Authentik/future apps).
 func ForceSourceWALArchive(ctx *contexts.Context, kubeClient kubecluster.ClientInterface, namespace, sourceClusterName string) (err error) {
 	ctx.Log.With("sourceCluster", sourceClusterName).Info("Forcing WAL archive on source cluster")
@@ -58,11 +47,6 @@ func ForceSourceWALArchive(ctx *contexts.Context, kubeClient kubecluster.ClientI
 	run, err := sourcePSQLRunner(ctx, kubeClient, namespace, sourceClusterName)
 	if err != nil {
 		return err
-	}
-
-	if run == nil {
-		ctx.Log.Debug("Source does not use the barman-cloud plugin; skipping WAL archive")
-		return nil
 	}
 
 	return postgres.ForceWALArchive(ctx.Child(), run, postgres.ForceWALArchiveOptions{})

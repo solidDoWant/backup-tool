@@ -140,6 +140,24 @@ rawResources:
           kind: Issuer
           group: cert-manager.io
         secretName: teleport-core-postgres-teleport-core-user-cert
+  # WAL archiving is handled by the barman-cloud plugin. The plugin reads the bucket/credentials from
+  # this ObjectStore resource, which the cluster references by name via .spec.plugins.
+  teleport-core-postgres-wal-objectstore:
+    forceRename: teleport-core-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://teleport-core-postgres-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials:
+            accessKeyId:
+              name: seaweedfs-s3-secret
+              key: admin_access_key_id
+            secretAccessKey:
+              name: seaweedfs-s3-secret
+              key: admin_secret_access_key
   teleport-core-postgres-cluster:
     forceRename: teleport-core
     manifest:
@@ -167,6 +185,11 @@ rawResources:
         storage:
           size: 5Gi
           storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: teleport-core-wal-store
         backup:
           target: prefer-standby
           volumeSnapshot:
@@ -176,16 +199,6 @@ rawResources:
               immediateCheckpoint: false
               waitForArchive: true
             snapshotOwnerReference: backup
-          barmanObjectStore:
-            destinationPath: s3://teleport-core-postgres-wal/
-            endpointURL: http://seaweedfs-s3:8333
-            s3Credentials:
-              accessKeyId:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-              secretAccessKey:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
         certificates:
           serverTLSSecret: teleport-core-postgres-serving-cert
           serverCASecret: teleport-core-postgres-serving-cert
@@ -245,6 +258,22 @@ rawResources:
           kind: Issuer
           group: cert-manager.io
         secretName: teleport-audit-postgres-teleport-audit-user-cert
+  teleport-audit-postgres-wal-objectstore:
+    forceRename: teleport-audit-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://teleport-audit-postgres-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials:
+            accessKeyId:
+              name: seaweedfs-s3-secret
+              key: admin_access_key_id
+            secretAccessKey:
+              name: seaweedfs-s3-secret
+              key: admin_secret_access_key
   teleport-audit-postgres-cluster:
     forceRename: teleport-audit
     manifest:
@@ -264,6 +293,11 @@ rawResources:
         storage:
           size: 5Gi
           storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: teleport-audit-wal-store
         backup:
           target: prefer-standby
           volumeSnapshot:
@@ -273,16 +307,6 @@ rawResources:
               immediateCheckpoint: false
               waitForArchive: true
             snapshotOwnerReference: backup
-          barmanObjectStore:
-            destinationPath: s3://teleport-audit-postgres-wal/
-            endpointURL: http://seaweedfs-s3:8333
-            s3Credentials:
-              accessKeyId:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-              secretAccessKey:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
         certificates:
           serverTLSSecret: teleport-audit-postgres-serving-cert
           serverCASecret: teleport-audit-postgres-serving-cert

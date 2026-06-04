@@ -197,8 +197,7 @@ func (ss *setupState) Setup(ctx *contexts.Context, btiOpts *backuptoolinstance.C
 	}
 
 	// Write the source recovery fence after the consistency point is set and before the clone, so the
-	// clone's forward recovery to that point can reach it. A no-op for non-plugin sources. See
-	// ForceSourceWALArchive.
+	// clone's forward recovery to that point can reach it. See ForceSourceWALArchive.
 	if err := ForceSourceWALArchive(ctx.Child(), ss.kubeClusterClient, ss.namespace, ss.clusterName); err != nil {
 		return trace.Wrap(err, "failed to force source WAL archive for cluster %q", ss.clusterName)
 	}

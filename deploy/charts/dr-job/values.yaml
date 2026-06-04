@@ -154,7 +154,7 @@ resources:
               - delete
           # Barman-cloud plugin resources
           # Needed (read-only) to resolve the WAL archive server name when cloning a cluster that
-          # uses the barman-cloud plugin instead of in-tree barman WAL archiving.
+          # archives WAL with the barman-cloud plugin.
           - apiGroups:
               - barmancloud.cnpg.io
             resources:

@@ -84,9 +84,8 @@ rawResources:
           kind: Issuer
           group: cert-manager.io
         secretName: postgres-vaultwarden-cert
-  # WAL archiving is handled by the barman-cloud plugin (rather than the deprecated in-tree
-  # barman support). The plugin reads the bucket/credentials from this ObjectStore resource, which
-  # the cluster references by name via .spec.plugins.
+  # WAL archiving is handled by the barman-cloud plugin. The plugin reads the bucket/credentials from
+  # this ObjectStore resource, which the cluster references by name via .spec.plugins.
   postgres-wal-objectstore:
     forceRename: vaultwarden-wal-store
     manifest:

@@ -16,8 +16,8 @@ import (
 
 const podMonitorCRDName = "podmonitors.monitoring.coreos.com"
 
-// BarmanCloudPluginName is the CNPG-I plugin name of the barman-cloud plugin, which supersedes
-// the deprecated in-tree barman WAL archiving support.
+// BarmanCloudPluginName is the CNPG-I plugin name of the barman-cloud plugin, which handles WAL
+// archiving for the source clusters this tool clones.
 const BarmanCloudPluginName = "barman-cloud.cloudnative-pg.io"
 
 // volumeSnapshotAPIGroup is the API group of the external-snapshotter VolumeSnapshot resources
@@ -108,8 +108,7 @@ func (cnpgc *Client) DeleteBackup(ctx *contexts.Context, namespace, name string)
 
 // VolumeSnapshotRecovery configures recovery of a new cluster from volume snapshots, with
 // write-ahead logs fetched from an external cluster's WAL archive. This is the recovery path
-// used for source clusters that archive WAL with the barman-cloud plugin (the in-tree barman
-// support, driven by BackupName, recovers from a Backup object instead).
+// used for source clusters that archive WAL with the barman-cloud plugin.
 type VolumeSnapshotRecovery struct {
 	// DataSnapshotName is the name of the VolumeSnapshot holding PGDATA.
 	DataSnapshotName string
@@ -121,20 +120,19 @@ type VolumeSnapshotRecovery struct {
 	// as the server name (folder) the source cluster's backups are stored under, so it must match
 	// the source cluster's barman server name.
 	WALSource apiv1.ExternalCluster
+	// RecoveryTargetTime chooses how far recovery proceeds. When set (RFC3339), the clone recovers
+	// forward to that wall-clock instant (recoveryTarget.targetTime); when empty it stops at the
+	// backup's consistency point (recoveryTarget.targetImmediate).
+	RecoveryTargetTime string
 }
 
 // This doesn't need to support every option - just the ones that may be relavent to backups.
 type CreateClusterOptions struct {
 	helpers.GenerateName
-	// Deprecated: BackupName recovers the new cluster from a CNPG Backup object
-	// (bootstrap.recovery.backup). This relies on the deprecated in-tree barman WAL archiving
-	// support to fetch WAL during recovery. For source clusters using the barman-cloud plugin,
-	// use VolumeSnapshotRecovery instead. Mutually exclusive with VolumeSnapshotRecovery.
-	BackupName string
 	// VolumeSnapshotRecovery recovers the new cluster from volume snapshots, fetching WAL from an
-	// external cluster. Mutually exclusive with BackupName.
+	// external cluster (the recovery path for barman-cloud-plugin source clusters). It carries its
+	// own recovery target.
 	VolumeSnapshotRecovery *VolumeSnapshotRecovery
-	RecoveryTarget         *apiv1.RecoveryTarget // Only valid if recovering from a backup or volume snapshots
 	DatabaseName           string
 	OwnerName              string
 	StorageClass           string
@@ -175,52 +173,37 @@ func (cnpgc *Client) CreateCluster(ctx *contexts.Context, namespace, clusterName
 
 	opts.SetName(&cluster.ObjectMeta, clusterName)
 
-	switch {
-	case opts.VolumeSnapshotRecovery != nil:
-		// Recover from volume snapshots, fetching WAL from the external cluster's archive. This is
-		// the recovery path for source clusters that archive WAL with the barman-cloud plugin.
-		vsr := opts.VolumeSnapshotRecovery
+	if opts.VolumeSnapshotRecovery != nil {
+		recoveryTarget := &apiv1.RecoveryTarget{TargetImmediate: new(true)}
+		if opts.VolumeSnapshotRecovery.RecoveryTargetTime != "" {
+			recoveryTarget = &apiv1.RecoveryTarget{TargetTime: opts.VolumeSnapshotRecovery.RecoveryTargetTime}
+		}
 		recovery := &apiv1.BootstrapRecovery{
-			Source: vsr.WALSource.Name,
+			Source: opts.VolumeSnapshotRecovery.WALSource.Name,
 			VolumeSnapshots: &apiv1.DataSource{
 				Storage: corev1.TypedLocalObjectReference{
 					APIGroup: new(volumeSnapshotAPIGroup),
 					Kind:     "VolumeSnapshot",
-					Name:     vsr.DataSnapshotName,
+					Name:     opts.VolumeSnapshotRecovery.DataSnapshotName,
 				},
 			},
-			RecoveryTarget: opts.RecoveryTarget,
+			RecoveryTarget: recoveryTarget,
 			Database:       opts.DatabaseName,
 			Owner:          opts.OwnerName,
 		}
-		if vsr.WALSnapshotName != "" {
+		if opts.VolumeSnapshotRecovery.WALSnapshotName != "" {
 			recovery.VolumeSnapshots.WalStorage = &corev1.TypedLocalObjectReference{
 				APIGroup: new(volumeSnapshotAPIGroup),
 				Kind:     "VolumeSnapshot",
-				Name:     vsr.WALSnapshotName,
+				Name:     opts.VolumeSnapshotRecovery.WALSnapshotName,
 			}
 		}
 		cluster.Spec.Bootstrap.Recovery = recovery
-		cluster.Spec.ExternalClusters = []apiv1.ExternalCluster{vsr.WALSource}
-	case opts.BackupName != "":
-		// Deprecated: recover from a Backup object. This relies on the deprecated in-tree barman
-		// WAL archiving support to source WAL during recovery.
-		cluster.Spec.Bootstrap.Recovery = &apiv1.BootstrapRecovery{
-			Backup: &apiv1.BackupSource{
-				LocalObjectReference: apiv1.LocalObjectReference{
-					Name: opts.BackupName,
-				},
-			},
-			RecoveryTarget: opts.RecoveryTarget,
-			Database:       opts.DatabaseName,
-			Owner:          opts.OwnerName,
-		}
-	default:
-		if opts.DatabaseName != "" && opts.OwnerName != "" {
-			cluster.Spec.Bootstrap.InitDB = &apiv1.BootstrapInitDB{
-				Database: opts.DatabaseName,
-				Owner:    opts.OwnerName,
-			}
+		cluster.Spec.ExternalClusters = []apiv1.ExternalCluster{opts.VolumeSnapshotRecovery.WALSource}
+	} else if opts.DatabaseName != "" && opts.OwnerName != "" {
+		cluster.Spec.Bootstrap.InitDB = &apiv1.BootstrapInitDB{
+			Database: opts.DatabaseName,
+			Owner:    opts.OwnerName,
 		}
 	}
 

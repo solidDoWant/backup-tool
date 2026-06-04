@@ -112,6 +112,24 @@ rawResources:
           kind: Issuer
           group: cert-manager.io
         secretName: ar-postgres-authentik-user-cert
+  # WAL archiving is handled by the barman-cloud plugin. The plugin reads the bucket/credentials from
+  # this ObjectStore resource, which the cluster references by name via .spec.plugins.
+  ar-postgres-wal-objectstore:
+    forceRename: ar-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://ar-postgres-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials:
+            accessKeyId:
+              name: seaweedfs-s3-secret
+              key: admin_access_key_id
+            secretAccessKey:
+              name: seaweedfs-s3-secret
+              key: admin_secret_access_key
   ar-postgres-cluster:
     forceRename: ar-postgres
     manifest:
@@ -131,6 +149,11 @@ rawResources:
         storage:
           size: 5Gi
           storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: ar-wal-store
         backup:
           target: prefer-standby
           volumeSnapshot:
@@ -140,16 +163,6 @@ rawResources:
               immediateCheckpoint: false
               waitForArchive: true
             snapshotOwnerReference: backup
-          barmanObjectStore:
-            destinationPath: s3://ar-postgres-wal/
-            endpointURL: http://seaweedfs-s3:8333
-            s3Credentials:
-              accessKeyId:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-              secretAccessKey:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
         certificates:
           serverTLSSecret: ar-postgres-serving-cert
           serverCASecret: ar-postgres-serving-cert

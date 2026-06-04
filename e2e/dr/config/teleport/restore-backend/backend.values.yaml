@@ -140,6 +140,24 @@ rawResources:
           kind: Issuer
           group: cert-manager.io
         secretName: tpr-core-postgres-tpr-core-user-cert
+  # WAL archiving is handled by the barman-cloud plugin. The plugin reads the bucket/credentials from
+  # this ObjectStore resource, which the cluster references by name via .spec.plugins.
+  tpr-core-postgres-wal-objectstore:
+    forceRename: tpr-core-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://tpr-core-postgres-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials:
+            accessKeyId:
+              name: seaweedfs-s3-secret
+              key: admin_access_key_id
+            secretAccessKey:
+              name: seaweedfs-s3-secret
+              key: admin_secret_access_key
   tpr-core-postgres-cluster:
     forceRename: tpr-core
     manifest:
@@ -167,6 +185,11 @@ rawResources:
         storage:
           size: 5Gi
           storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: tpr-core-wal-store
         backup:
           target: prefer-standby
           volumeSnapshot:
@@ -176,16 +199,6 @@ rawResources:
               immediateCheckpoint: false
               waitForArchive: true
             snapshotOwnerReference: backup
-          barmanObjectStore:
-            destinationPath: s3://tpr-core-postgres-wal/
-            endpointURL: http://seaweedfs-s3:8333
-            s3Credentials:
-              accessKeyId:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-              secretAccessKey:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
         certificates:
           serverTLSSecret: tpr-core-postgres-serving-cert
           serverCASecret: tpr-core-postgres-serving-cert
@@ -245,6 +258,22 @@ rawResources:
           kind: Issuer
           group: cert-manager.io
         secretName: tpr-audit-postgres-tpr-audit-user-cert
+  tpr-audit-postgres-wal-objectstore:
+    forceRename: tpr-audit-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://tpr-audit-postgres-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials:
+            accessKeyId:
+              name: seaweedfs-s3-secret
+              key: admin_access_key_id
+            secretAccessKey:
+              name: seaweedfs-s3-secret
+              key: admin_secret_access_key
   tpr-audit-postgres-cluster:
     forceRename: tpr-audit
     manifest:
@@ -264,6 +293,11 @@ rawResources:
         storage:
           size: 5Gi
           storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: tpr-audit-wal-store
         backup:
           target: prefer-standby
           volumeSnapshot:
@@ -273,16 +307,6 @@ rawResources:
               immediateCheckpoint: false
               waitForArchive: true
             snapshotOwnerReference: backup
-          barmanObjectStore:
-            destinationPath: s3://tpr-audit-postgres-wal/
-            endpointURL: http://seaweedfs-s3:8333
-            s3Credentials:
-              accessKeyId:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-              secretAccessKey:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
         certificates:
           serverTLSSecret: tpr-audit-postgres-serving-cert
           serverCASecret: tpr-audit-postgres-serving-cert

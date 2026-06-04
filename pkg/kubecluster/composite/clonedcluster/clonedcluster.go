@@ -131,11 +131,10 @@ func (p *Provider) CreateClusterBackup(ctx *contexts.Context, namespace, existin
 }
 
 // CloneClusterFromBackup creates a new cluster that recovers from a previously-created (ready) backup,
-// with its own short-lived certificates. When the source uses the barman-cloud plugin and a
-// RecoveryTargetTime is supplied, the clone recovers forward to that wall-clock instant
-// (recoveryTarget.targetTime); if the source had no WAL at/after the target (an idle database), it
-// falls back to the backup's consistency point. In every other case it recovers to the consistency
-// point directly.
+// with its own short-lived certificates. When a RecoveryTargetTime is supplied, the clone recovers
+// forward to that wall-clock instant (recoveryTarget.targetTime); if the source had no WAL at/after the
+// target (an idle database), it falls back to the backup's consistency point. Otherwise it recovers to
+// the consistency point directly.
 func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, readyBackup *apiv1.Backup, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
 	if len(newClusterName) > 40 { // Max length that CNPG allows for cloned cluster names, see https://github.com/cloudnative-pg/cloudnative-pg/pull/6755
 		return nil, trace.Errorf("newClusterName must be 40 characters or less")
@@ -300,27 +299,14 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 		}
 	}
 
-	// Configure where the new cluster sources WAL during recovery, matching the WAL archiving method
-	// used by the source cluster (the barman-cloud plugin, or the deprecated in-tree barman support).
-	isPluginRecovery, err := p.configureWALRecovery(ctx.Child(), namespace, existingCluster, readyBackup, &clusterOpts)
-	if err != nil {
+	// Configure where the new cluster sources WAL during recovery from the source cluster's
+	// barman-cloud plugin object store.
+	if err := p.configureWALRecovery(ctx.Child(), namespace, existingCluster, readyBackup, &clusterOpts); err != nil {
 		return errHandler(err, "failed to configure WAL recovery for new cluster %q", helpers.FullNameStr(namespace, newClusterName))
 	}
 
-	// Choose how far to recover. A wall-clock target (recoveryTarget.targetTime) is only honored on the
-	// plugin path's recovery.source, so set one only when the plugin path is in use and a target is
-	// supplied; otherwise the plugin path recovers to the backup's consistency point (targetImmediate).
-	// The in-tree recovery.backup path is left with no recoveryTarget at all: it already stops at the
-	// consistency point, and CNPG's webhook rejects a recoveryTarget there unless it carries a backupID
-	// (which this path doesn't supply).
-	useTargetTime := false
-	if isPluginRecovery {
-		clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{TargetImmediate: new(true)}
-		if opts.RecoveryTargetTime != "" {
-			clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{TargetTime: opts.RecoveryTargetTime}
-			useTargetTime = true
-		}
-	}
+	// configureWALRecovery has already populated VolumeSnapshotRecovery, so this deref is safe.
+	clusterOpts.VolumeSnapshotRecovery.RecoveryTargetTime = opts.RecoveryTargetTime
 
 	createClone := func(ctx *contexts.Context) error {
 		newCluster, createErr := p.cnpgClient.CreateCluster(ctx.Child(), namespace, newClusterName, clusterVolumeSize, readyServingCert.Name, readyClientCACert.Name, replicationUserCert.GetCertificate().Name, clusterOpts)
@@ -337,7 +323,7 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 		return errHandler(err)
 	}
 
-	readyCluster, err := p.waitForCloneRecovery(ctx.Child(), namespace, newClusterName, useTargetTime, opts)
+	readyCluster, err := p.waitForCloneRecovery(ctx.Child(), namespace, newClusterName, opts)
 	if err != nil {
 		if !errors.Is(err, ErrRecoveryTargetNotReached) {
 			return errHandler(err, "failed to wait for new PITR cluster %q to become ready", helpers.FullNameStr(namespace, newClusterName))
@@ -355,7 +341,8 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 			return errHandler(deleteErr, "failed waiting for cluster %q deletion before recovery fallback", newClusterName)
 		}
 
-		clusterOpts.RecoveryTarget = &apiv1.RecoveryTarget{TargetImmediate: new(true)}
+		// An empty target time recovers to the consistency point (targetImmediate).
+		clusterOpts.VolumeSnapshotRecovery.RecoveryTargetTime = ""
 		if createErr := createClone(ctx.Child()); createErr != nil {
 			return errHandler(createErr)
 		}
@@ -384,8 +371,8 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 // up — unlike the cluster status (which doesn't surface the reason) or a one-shot pod check (which
 // can't tell an idle retry from a slow replay). The terminal state is observed even if CNPG garbage
 // collects the Job afterwards, since the delete watch event still carries the Job's final state.
-func (p *Provider) waitForCloneRecovery(ctx *contexts.Context, namespace, newClusterName string, useTargetTime bool, opts CloneClusterOptions) (*apiv1.Cluster, error) {
-	if useTargetTime {
+func (p *Provider) waitForCloneRecovery(ctx *contexts.Context, namespace, newClusterName string, opts CloneClusterOptions) (*apiv1.Cluster, error) {
+	if opts.RecoveryTargetTime != "" {
 		// The recovery Job's name isn't known ahead of time, so select it by the cluster + jobRole labels.
 		jobSelector := fmt.Sprintf("%s=%s,%s", utils.ClusterLabelName, newClusterName, utils.JobRoleLabelName)
 		_, err := p.coreClient.WaitForJobCompletion(ctx.Child(), namespace, "", core.WaitForJobCompletionOpts{MaxWaitTime: opts.WaitForClusterTimeout, LabelSelector: jobSelector})
@@ -402,40 +389,32 @@ func (p *Provider) waitForCloneRecovery(ctx *contexts.Context, namespace, newClu
 	return p.cnpgClient.WaitForReadyCluster(ctx.Child(), namespace, newClusterName, cnpg.WaitForReadyClusterOpts{MaxWaitTime: opts.WaitForClusterTimeout})
 }
 
-// configureWALRecovery sets the recovery source on clusterOpts based on how the source cluster
-// archives write-ahead logs, and reports whether the plugin (recovery.source) path is in use. Source
-// clusters using the barman-cloud plugin recover from the backup's volume snapshots, fetching WAL via
-// an external cluster that references the same object store; this path honors a wall-clock
-// recoveryTarget.targetTime. Source clusters using the deprecated in-tree barman support recover from
-// the Backup object directly (recovery.backup), which carries the WAL archive location but stops at
-// the backup's consistency point regardless of any target. The recovery target itself is chosen by
-// the caller; this only configures the source.
-func (p *Provider) configureWALRecovery(ctx *contexts.Context, namespace string, sourceCluster *apiv1.Cluster, backup *apiv1.Backup, clusterOpts *cnpg.CreateClusterOptions) (isPluginRecovery bool, err error) {
+// configureWALRecovery sets the recovery source on clusterOpts for a source cluster that archives
+// write-ahead logs with the barman-cloud plugin: the new cluster recovers from the backup's volume
+// snapshots, fetching WAL via an external cluster that references the same object store. This honors a
+// wall-clock recoveryTarget.targetTime. The recovery target itself is chosen by the caller; this only
+// configures the source. It is an error for the source cluster not to use the barman-cloud plugin.
+func (p *Provider) configureWALRecovery(ctx *contexts.Context, namespace string, sourceCluster *apiv1.Cluster, backup *apiv1.Backup, clusterOpts *cnpg.CreateClusterOptions) (err error) {
 	walArchiverPlugin := findBarmanCloudWALArchiver(sourceCluster)
 	if walArchiverPlugin == nil {
-		// No barman-cloud plugin: the source uses the deprecated in-tree barman WAL archiving, which
-		// records the WAL archive location on the Backup object itself, so recover straight from it.
-		ctx.Log.Debug("Source cluster uses in-tree barman WAL archiving; recovering from backup object", "backup", backup.Name)
-		// nolint:staticcheck
-		clusterOpts.BackupName = backup.Name
-		return false, nil
+		return trace.Errorf("source cluster %q does not archive WAL via the barman-cloud plugin", helpers.FullName(sourceCluster))
 	}
 
 	ctx.Log.Debug("Source cluster uses the barman-cloud plugin; recovering from volume snapshots", "plugin", walArchiverPlugin.Name)
 
 	objectStoreName := walArchiverPlugin.Parameters["barmanObjectName"]
 	if objectStoreName == "" {
-		return false, trace.Errorf("barman-cloud plugin on cluster %q is missing the %q parameter", helpers.FullName(sourceCluster), "barmanObjectName")
+		return trace.Errorf("barman-cloud plugin on cluster %q is missing the %q parameter", helpers.FullName(sourceCluster), "barmanObjectName")
 	}
 
 	serverName, err := p.resolveBarmanServerName(ctx, namespace, sourceCluster.Name, walArchiverPlugin, objectStoreName)
 	if err != nil {
-		return false, trace.Wrap(err, "failed to resolve barman server name for cluster %q", helpers.FullName(sourceCluster))
+		return trace.Wrap(err, "failed to resolve barman server name for cluster %q", helpers.FullName(sourceCluster))
 	}
 
 	dataSnapshotName, walSnapshotName := getBackupSnapshotNames(backup)
 	if dataSnapshotName == "" {
-		return false, trace.Errorf("backup %q did not report a PG_DATA volume snapshot to recover from", helpers.FullName(backup))
+		return trace.Errorf("backup %q did not report a PG_DATA volume snapshot to recover from", helpers.FullName(backup))
 	}
 
 	clusterOpts.VolumeSnapshotRecovery = &cnpg.VolumeSnapshotRecovery{
@@ -453,7 +432,7 @@ func (p *Provider) configureWALRecovery(ctx *contexts.Context, namespace string,
 		},
 	}
 
-	return true, nil
+	return nil
 }
 
 // resolveBarmanServerName determines the server name (the folder under which the source cluster's
@@ -478,16 +457,8 @@ func (p *Provider) resolveBarmanServerName(ctx *contexts.Context, namespace, clu
 }
 
 // findBarmanCloudWALArchiver returns the source cluster's barman-cloud WAL archiver plugin
-// configuration, or nil if the cluster does not use the plugin (i.e. it uses in-tree barman, or no
-// WAL archiving at all). It prefers the plugin explicitly marked as the WAL archiver.
-// UsesBarmanCloudWALArchiver reports whether the cluster archives WAL via the barman-cloud CNPG-I
-// plugin (the PITR-capable path) rather than the deprecated in-tree barman support (or no archiving).
-// Wall-clock PITR — and therefore the source WAL-archive / idle-detection handling — only applies on
-// this path.
-func UsesBarmanCloudWALArchiver(cluster *apiv1.Cluster) bool {
-	return findBarmanCloudWALArchiver(cluster) != nil
-}
-
+// configuration, or nil if the cluster does not use the plugin (i.e. it does no WAL archiving at
+// all). It prefers the plugin explicitly marked as the WAL archiver.
 func findBarmanCloudWALArchiver(cluster *apiv1.Cluster) *apiv1.PluginConfiguration {
 	var barmanCloudPlugin *apiv1.PluginConfiguration
 	for i := range cluster.Spec.Plugins {

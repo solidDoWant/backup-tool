@@ -132,7 +132,7 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 	backupOptions.CloneClusterOptions.RecoveryTargetTime = clonedPVC.CreationTimestamp.Format(time.RFC3339)
 
 	// 4a. Write the source recovery fence after T_dr is fixed and before the clone, so the clone's
-	// forward recovery to T_dr can reach it. A no-op for non-plugin sources. See ForceSourceWALArchive.
+	// forward recovery to T_dr can reach it. See ForceSourceWALArchive.
 	ctx.Log.Step().Info("Forcing source WAL archive")
 	if err := cnpgbackup.ForceSourceWALArchive(ctx.Child(), vw.kubernetesClient, namespace, cnpgClusterName); err != nil {
 		return backup, trace.Wrap(err, "failed to force source WAL archive for cluster %q", cnpgClusterName)
