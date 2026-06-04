@@ -480,6 +480,14 @@ func (p *Provider) resolveBarmanServerName(ctx *contexts.Context, namespace, clu
 // findBarmanCloudWALArchiver returns the source cluster's barman-cloud WAL archiver plugin
 // configuration, or nil if the cluster does not use the plugin (i.e. it uses in-tree barman, or no
 // WAL archiving at all). It prefers the plugin explicitly marked as the WAL archiver.
+// UsesBarmanCloudWALArchiver reports whether the cluster archives WAL via the barman-cloud CNPG-I
+// plugin (the PITR-capable path) rather than the deprecated in-tree barman support (or no archiving).
+// Wall-clock PITR — and therefore the source WAL-archive / idle-detection handling — only applies on
+// this path.
+func UsesBarmanCloudWALArchiver(cluster *apiv1.Cluster) bool {
+	return findBarmanCloudWALArchiver(cluster) != nil
+}
+
 func findBarmanCloudWALArchiver(cluster *apiv1.Cluster) *apiv1.PluginConfiguration {
 	var barmanCloudPlugin *apiv1.PluginConfiguration
 	for i := range cluster.Spec.Plugins {

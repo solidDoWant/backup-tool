@@ -99,6 +99,16 @@ resources:
               - list
               - watch
               - delete
+          # Pod exec
+          # Needed to run psql in a source cluster's primary pod (over its local socket) to force a
+          # restore point + WAL switch, so an idle source still archives the consistency-point WAL.
+          # Only used when a backup enables clusterCloning.sourceWALArchive.
+          - apiGroups:
+              - ""
+            resources:
+              - pods/exec
+            verbs:
+              - create
           # Recovery jobs (read-only)
           # Needed to watch the CNPG-managed recovery Job of a cloned cluster, to tell whether a
           # point-in-time recovery reached its target or ran out of WAL.

@@ -1,6 +1,8 @@
 package core
 
 import (
+	"io"
+
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
@@ -18,6 +20,7 @@ type ClientInterface interface {
 	CreatePod(ctx *contexts.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) // TODO see if this can be refined further
 	WaitForReadyPod(ctx *contexts.Context, namespace, name string, opts WaitForReadyPodOpts) (*corev1.Pod, error)
 	DeletePod(ctx *contexts.Context, namespace, name string) error
+	ExecInPod(ctx *contexts.Context, namespace, podName, container string, command []string, stdin io.Reader) (stdout, stderr string, err error)
 	// Jobs
 	WaitForJobCompletion(ctx *contexts.Context, namespace, name string, opts WaitForJobCompletionOpts) (*batchv1.Job, error)
 	// PVCs
@@ -38,6 +41,9 @@ type ClientInterface interface {
 type Client struct {
 	helpers.SimpleResourceLabeler
 	client kubernetes.Interface
+	// restConfig is retained for operations that need a direct transport rather than the typed client,
+	// such as pod exec (SPDY streaming).
+	restConfig *rest.Config
 }
 
 func NewClient(config *rest.Config) (*Client, error) {
@@ -47,6 +53,7 @@ func NewClient(config *rest.Config) (*Client, error) {
 	}
 
 	return &Client{
-		client: underlyingKubernetesClient,
+		client:     underlyingKubernetesClient,
+		restConfig: config,
 	}, nil
 }

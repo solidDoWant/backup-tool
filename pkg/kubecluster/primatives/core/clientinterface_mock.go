@@ -7,6 +7,8 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 
+	io "io"
+
 	mock "github.com/stretchr/testify/mock"
 
 	resource "k8s.io/apimachinery/pkg/api/resource"
@@ -469,6 +471,74 @@ func (_c *MockClientInterface_EnsurePVCExists_Call) Return(_a0 *v1.PersistentVol
 }
 
 func (_c *MockClientInterface_EnsurePVCExists_Call) RunAndReturn(run func(*contexts.Context, string, string, resource.Quantity, CreatePVCOptions) (*v1.PersistentVolumeClaim, error)) *MockClientInterface_EnsurePVCExists_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ExecInPod provides a mock function with given fields: ctx, namespace, podName, container, command, stdin
+func (_m *MockClientInterface) ExecInPod(ctx *contexts.Context, namespace string, podName string, container string, command []string, stdin io.Reader) (string, string, error) {
+	ret := _m.Called(ctx, namespace, podName, container, command, stdin)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExecInPod")
+	}
+
+	var r0 string
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, []string, io.Reader) (string, string, error)); ok {
+		return rf(ctx, namespace, podName, container, command, stdin)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, []string, io.Reader) string); ok {
+		r0 = rf(ctx, namespace, podName, container, command, stdin)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, string, []string, io.Reader) string); ok {
+		r1 = rf(ctx, namespace, podName, container, command, stdin)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(*contexts.Context, string, string, string, []string, io.Reader) error); ok {
+		r2 = rf(ctx, namespace, podName, container, command, stdin)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockClientInterface_ExecInPod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecInPod'
+type MockClientInterface_ExecInPod_Call struct {
+	*mock.Call
+}
+
+// ExecInPod is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - podName string
+//   - container string
+//   - command []string
+//   - stdin io.Reader
+func (_e *MockClientInterface_Expecter) ExecInPod(ctx interface{}, namespace interface{}, podName interface{}, container interface{}, command interface{}, stdin interface{}) *MockClientInterface_ExecInPod_Call {
+	return &MockClientInterface_ExecInPod_Call{Call: _e.mock.On("ExecInPod", ctx, namespace, podName, container, command, stdin)}
+}
+
+func (_c *MockClientInterface_ExecInPod_Call) Run(run func(ctx *contexts.Context, namespace string, podName string, container string, command []string, stdin io.Reader)) *MockClientInterface_ExecInPod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(string), args[4].([]string), args[5].(io.Reader))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_ExecInPod_Call) Return(stdout string, stderr string, err error) *MockClientInterface_ExecInPod_Call {
+	_c.Call.Return(stdout, stderr, err)
+	return _c
+}
+
+func (_c *MockClientInterface_ExecInPod_Call) RunAndReturn(run func(*contexts.Context, string, string, string, []string, io.Reader) (string, string, error)) *MockClientInterface_ExecInPod_Call {
 	_c.Call.Return(run)
 	return _c
 }

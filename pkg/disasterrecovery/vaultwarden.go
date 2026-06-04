@@ -11,6 +11,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	cnpgbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/backup"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
@@ -126,11 +127,17 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 	}
 
 	// 4. Create the cloned CNPG cluster from the base backup, recovering forward to the data PVC
-	// clone time (T_dr) so the database lines up with the frozen filesystem. If the source was idle
-	// between the base backup and T_dr, CloneClusterFromBackup transparently falls back to the
-	// backup's consistency point.
+	// clone time (T_dr) so the database lines up with the frozen filesystem.
 	ctx.Log.Step().Info("Cloning CNPG cluster")
 	backupOptions.CloneClusterOptions.RecoveryTargetTime = clonedPVC.CreationTimestamp.Format(time.RFC3339)
+
+	// 4a. Write the source recovery fence after T_dr is fixed and before the clone, so the clone's
+	// forward recovery to T_dr can reach it. A no-op for non-plugin sources. See ForceSourceWALArchive.
+	ctx.Log.Step().Info("Forcing source WAL archive")
+	if err := cnpgbackup.ForceSourceWALArchive(ctx.Child(), vw.kubernetesClient, namespace, cnpgClusterName); err != nil {
+		return backup, trace.Wrap(err, "failed to force source WAL archive for cluster %q", cnpgClusterName)
+	}
+
 	// Try and come up with the most useful name for the cloned cluster fitting CNPG requirements.
 	// More info is better, but it needs to at least convey the backup name and still be readable.
 	clonedClusterName := helpers.CleanName(fmt.Sprintf("%s-%s", cnpgClusterName, backup.GetFullName()))

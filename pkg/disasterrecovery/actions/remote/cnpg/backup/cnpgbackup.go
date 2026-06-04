@@ -152,6 +152,7 @@ func (bs *baseBackupState) BeforeConsistencyPoint(ctx *contexts.Context) (err er
 
 	bs.baseBackup = backup
 	bs.isBaseBackedUp = true
+
 	return nil
 }
 
@@ -188,12 +189,18 @@ func (ss *setupState) Setup(ctx *contexts.Context, btiOpts *backuptoolinstance.C
 
 	clonedClusterName := helpers.CleanName(helpers.TruncateString(fmt.Sprintf("%s-%s-cloned-%s", constants.ToolShortName, ss.uid, ss.clusterName), 40, ""))
 
-	// Recover the clone forward to the shared consistency point. If the source had no WAL at/after it (an
-	// idle database), CloneClusterFromBackup falls back to the backup's own consistency point. When no
-	// point was established (the action ran outside the stage's protocol), recover straight to the backup.
+	// Recover the clone forward to the shared consistency point. When no point was established (the action
+	// ran outside the stage's protocol), recover straight to the backup's own consistency point.
 	cloneOpts := ss.opts.CloningOpts
 	if !ss.consistencyPoint.IsZero() {
 		cloneOpts.RecoveryTargetTime = ss.consistencyPoint.Format(time.RFC3339)
+	}
+
+	// Write the source recovery fence after the consistency point is set and before the clone, so the
+	// clone's forward recovery to that point can reach it. A no-op for non-plugin sources. See
+	// ForceSourceWALArchive.
+	if err := ForceSourceWALArchive(ctx.Child(), ss.kubeClusterClient, ss.namespace, ss.clusterName); err != nil {
+		return trace.Wrap(err, "failed to force source WAL archive for cluster %q", ss.clusterName)
 	}
 
 	clonedCluster, err := ss.kubeClusterClient.CloneClusterFromBackup(ctx.Child(), ss.namespace, ss.clusterName,

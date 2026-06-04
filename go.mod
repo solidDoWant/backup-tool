@@ -94,8 +94,11 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
@@ -115,6 +118,7 @@ require (
 	github.com/prometheus/common v0.68.0 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/robfig/cron v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/thoas/go-funk v0.9.3 // indirect
 	github.com/vladimirvivien/gexe v0.4.1 // indirect

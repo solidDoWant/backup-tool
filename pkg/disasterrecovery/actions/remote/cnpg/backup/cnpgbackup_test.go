@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -493,6 +494,31 @@ func TestSetup(t *testing.T) {
 				if tt.hasNotBeenBaseBackedUp || currentState.isSetup {
 					return
 				}
+
+				// Setup writes the source WAL recovery fence and forces its archive after the consistency
+				// point and before cloning (plugin sources only).
+				mockCNPGClient := cnpg.NewMockClientInterface(t)
+				mockCoreClient := core.NewMockClientInterface(t)
+				mockClient.EXPECT().CNPG().Return(mockCNPGClient)
+				mockClient.EXPECT().Core().Return(mockCoreClient)
+				primary := currentState.clusterName + "-1"
+				mockCNPGClient.EXPECT().GetCluster(mock.Anything, currentState.namespace, currentState.clusterName).
+					Return(&apiv1.Cluster{
+						Spec:   apiv1.ClusterSpec{Plugins: []apiv1.PluginConfiguration{{Name: cnpg.BarmanCloudPluginName, IsWALArchiver: new(true)}}},
+						Status: apiv1.ClusterStatus{CurrentPrimary: primary},
+					}, nil)
+				mockCoreClient.EXPECT().ExecInPod(mock.Anything, currentState.namespace, primary, "postgres", mock.Anything, nil).
+					RunAndReturn(func(_ *contexts.Context, _, _, _ string, command []string, _ io.Reader) (string, string, error) {
+						const segment = "000000010000000000000001"
+						switch sql := command[len(command)-1]; {
+						case strings.Contains(sql, "pg_walfile_name"):
+							return segment + "\n", "", nil
+						case strings.Contains(sql, "pg_stat_archiver"):
+							return segment + "||f\n", "", nil
+						default:
+							return "0/0\n", "", nil
+						}
+					})
 
 				mockClient.EXPECT().CloneClusterFromBackup(mock.Anything, currentState.namespace, currentState.clusterName, mock.Anything, currentState.servingCertIssuerName, currentState.clientCertIssuerName, baseBackup, mock.Anything).
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, backup *apiv1.Backup, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {

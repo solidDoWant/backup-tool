@@ -1,6 +1,7 @@
 package disasterrecovery
 
 import (
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -44,6 +45,32 @@ func TestNewVaultWarden(t *testing.T) {
 
 func TestVaultWardenBackupOptions(t *testing.T) {
 	th.OptStructTest[VaultWardenBackupOptions](t)
+}
+
+// expectForceSourceWALArchive sets up the mock expectations for the source WAL-archive step: the
+// GetCluster lookup (reporting a barman-plugin source with a primary) plus the psql exec'd in that
+// primary for the recovery fence (txid_current), the WAL-segment lookup, the switch, and the
+// pg_stat_archiver poll (reported as already archived).
+func expectForceSourceWALArchive(mockCNPG *cnpg.MockClientInterface, mockCore *core.MockClientInterface, namespace, clusterName string) {
+	const segment = "000000010000000000000001"
+	primary := clusterName + "-1"
+	mockCNPG.EXPECT().GetCluster(mock.Anything, namespace, clusterName).
+		Return(&apiv1.Cluster{
+			Spec:   apiv1.ClusterSpec{Plugins: []apiv1.PluginConfiguration{{Name: cnpg.BarmanCloudPluginName, IsWALArchiver: new(true)}}},
+			Status: apiv1.ClusterStatus{CurrentPrimary: primary},
+		}, nil)
+	mockCore.EXPECT().ExecInPod(mock.Anything, namespace, primary, "postgres", mock.Anything, nil).
+		RunAndReturn(func(_ *contexts.Context, _, _, _ string, command []string, _ io.Reader) (string, string, error) {
+			sql := command[len(command)-1]
+			switch {
+			case strings.Contains(sql, "pg_walfile_name"):
+				return segment + "\n", "", nil
+			case strings.Contains(sql, "pg_stat_archiver"):
+				return segment + "||f\n", "", nil
+			default:
+				return "0/0\n", "", nil
+			}
+		})
 }
 
 func TestVaultWardenBackup(t *testing.T) {
@@ -144,10 +171,13 @@ func TestVaultWardenBackup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
+			// T_dr: the clone's creation time, which the DB clone recovers forward to.
+			clonedPVCCreationTime := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 			clonedPVC := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      clonedPVCName,
-					Namespace: namespace,
+					Name:              clonedPVCName,
+					Namespace:         namespace,
+					CreationTimestamp: metav1.NewTime(clonedPVCCreationTime),
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					Resources: corev1.VolumeResourceRequirements{
@@ -267,14 +297,19 @@ func TestVaultWardenBackup(t *testing.T) {
 					return
 				}
 
-				// Step 4: create the clone from the base backup, recovering to T_dr (the data PVC clone time).
+				// Step 4a: the source recovery fence runs after the PVC clone fixes T_dr and before the
+				// cluster clone (see expectForceSourceWALArchive for the mocked statements).
+				expectForceSourceWALArchive(mockCNPGClient, mockCoreClient, namespace, clusterName)
+
+				// Step 4: create the clone from the base backup, recovering forward to T_dr (the data PVC
+				// clone time). The source fence guarantees recovery can reach that target.
 				mockClient.EXPECT().CloneClusterFromBackup(mock.Anything, namespace, clusterName, mock.Anything, servingIssuerName, clientIssuerName, cnpgBackup, mock.Anything).
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName, newClusterName, servingIssuerName, clientIssuerName string, backup *apiv1.Backup, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
 						assert.Contains(t, newClusterName, helpers.CleanName(backupName))
 						assert.LessOrEqual(t, len(newClusterName), 40)
 						assert.Equal(t, cnpgBackup, backup)
-						assert.Equal(t, clonedPVC.CreationTimestamp.Format(time.RFC3339), opts.RecoveryTargetTime)
+						assert.Equal(t, clonedPVCCreationTime.Format(time.RFC3339), opts.RecoveryTargetTime)
 						return th.ErrOr1Val(clonedCluster, tt.simulateCloneClusterErr)
 					})
 				if tt.simulateCloneClusterErr {
