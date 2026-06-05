@@ -1,0 +1,237 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
+# Restore targets for the dummy app: two empty CNPG clusters and an empty data PVC that the generic
+# restore populates in place. The S3 sources restore back into the original buckets (in-place), so no
+# separate restore buckets are needed beyond each restore cluster's own WAL bucket.
+controllers:
+  dummy-restore-db1-wal-bucket:
+    type: job
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://dummy-restore-db1-wal/
+        env: &s3Env
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+  dummy-restore-db2-wal-bucket:
+    type: job
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://dummy-restore-db2-wal/
+        env: *s3Env
+persistence:
+  data-vol:
+    suffix: data-vol # PVC name: dummy-restore-backend-data-vol
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    storageClass: openebs-zfs
+rawResources:
+  dummy-restore-db1-serving-cert:
+    forceRename: dummy-restore-db1-serving
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      spec:
+        commonName: Dummy Restore DB1 Postgres serving
+        dnsNames:
+          - dummy-restore-db1-rw
+          - dummy-restore-db1-rw.default.svc
+        usages:
+          - server auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: dummy-restore-db1-serving
+  dummy-restore-db2-serving-cert:
+    forceRename: dummy-restore-db2-serving
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      spec:
+        commonName: Dummy Restore DB2 Postgres serving
+        dnsNames:
+          - dummy-restore-db2-rw
+          - dummy-restore-db2-rw.default.svc
+        usages:
+          - server auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: dummy-restore-db2-serving
+  dummy-restore-postgres-streaming-replica-cert:
+    forceRename: dummy-restore-postgres-streaming-replica
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      spec:
+        commonName: streaming_replica
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: dummy-restore-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: dummy-restore-postgres-streaming-replica
+  # Client cert (CN=app) the e2e verification job uses to read back the restored data over TLS.
+  dummy-restore-app-cert:
+    forceRename: dummy-restore-app
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      spec:
+        commonName: app
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: dummy-restore-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: dummy-restore-app
+  dummy-restore-db1-wal-objectstore:
+    forceRename: dummy-restore-db1-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://dummy-restore-db1-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials: &walCreds
+            accessKeyId:
+              name: seaweedfs-s3-secret
+              key: admin_access_key_id
+            secretAccessKey:
+              name: seaweedfs-s3-secret
+              key: admin_secret_access_key
+  dummy-restore-db2-wal-objectstore:
+    forceRename: dummy-restore-db2-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://dummy-restore-db2-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials: *walCreds
+  dummy-restore-db1-cluster:
+    forceRename: dummy-restore-db1
+    manifest:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      spec:
+        instances: 2
+        bootstrap:
+          initdb:
+            database: app
+            owner: app
+            postInitSQL:
+              - ALTER USER "app" WITH PASSWORD NULL;
+        postgresql:
+          pg_hba:
+            - hostssl all all all cert # let the restore job connect to all databases via TLS
+        storage:
+          size: 5Gi
+          storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: dummy-restore-db1-wal-store
+        backup:
+          target: prefer-standby
+          volumeSnapshot:
+            className: openebs-zfs
+            online: true
+            onlineConfiguration:
+              immediateCheckpoint: false
+              waitForArchive: true
+            snapshotOwnerReference: backup
+        certificates:
+          serverTLSSecret: dummy-restore-db1-serving
+          serverCASecret: dummy-restore-db1-serving
+          clientCASecret: dummy-restore-postgres-client-ca
+          replicationTLSSecret: dummy-restore-postgres-streaming-replica
+  dummy-restore-db2-cluster:
+    forceRename: dummy-restore-db2
+    manifest:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      spec:
+        instances: 2
+        bootstrap:
+          initdb:
+            database: app
+            owner: app
+            postInitSQL:
+              - ALTER USER "app" WITH PASSWORD NULL;
+        postgresql:
+          pg_hba:
+            - hostssl all all all cert
+        storage:
+          size: 5Gi
+          storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: dummy-restore-db2-wal-store
+        backup:
+          target: prefer-standby
+          volumeSnapshot:
+            className: openebs-zfs
+            online: true
+            onlineConfiguration:
+              immediateCheckpoint: false
+              waitForArchive: true
+            snapshotOwnerReference: backup
+        certificates:
+          serverTLSSecret: dummy-restore-db2-serving
+          serverCASecret: dummy-restore-db2-serving
+          clientCASecret: dummy-restore-postgres-client-ca
+          replicationTLSSecret: dummy-restore-postgres-streaming-replica

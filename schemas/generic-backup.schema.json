@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/solidDoWant/backup-tool/pkg/disasterrecovery/generic-backup-config",
+  "$ref": "#/$defs/GenericBackupConfig",
+  "$defs": {
+    "CloneClusterOptions": {
+      "properties": {
+        "waitForBackupTimeout": {
+          "type": "integer"
+        },
+        "certificates": {
+          "$ref": "#/$defs/CloneClusterOptionsCertificates"
+        },
+        "clientCAIssuer": {
+          "$ref": "#/$defs/CloneClusterOptionsCAIssuer"
+        },
+        "recoveryTargetTime": {
+          "type": "string",
+          "description": "The time to roll back to in RFC3339 format"
+        },
+        "waitForClusterTimeout": {
+          "type": "integer"
+        },
+        "cleanupTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CloneClusterOptionsCAIssuer": {
+      "properties": {
+        "waitForReadyTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CloneClusterOptionsCertificates": {
+      "properties": {
+        "servingCert": {
+          "$ref": "#/$defs/CloneClusterOptionsExternallyIssuedCertificate"
+        },
+        "clientCACert": {
+          "$ref": "#/$defs/CloneClusterOptionsExternallyIssuedCertificate"
+        },
+        "postgresUserCert": {
+          "$ref": "#/$defs/CloneClusterOptionsInternallyIssuedCertificate"
+        },
+        "streamingReplicaUserCert": {
+          "$ref": "#/$defs/CloneClusterOptionsInternallyIssuedCertificate"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CloneClusterOptionsExternallyIssuedCertificate": {
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/X509Subject"
+        },
+        "waitForReadyTimeout": {
+          "type": "integer"
+        },
+        "issuerKind": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CloneClusterOptionsInternallyIssuedCertificate": {
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/X509Subject"
+        },
+        "waitForReadyTimeout": {
+          "type": "integer"
+        },
+        "certificateRequestPolicy": {
+          "$ref": "#/$defs/NewClusterUserCertOptsCRP"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Credentials": {
+      "properties": {
+        "accessKeyId": {
+          "type": "string"
+        },
+        "secretAccessKey": {
+          "type": "string"
+        },
+        "sessionToken": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "s3ForcePathStyle": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "accessKeyId",
+        "secretAccessKey"
+      ]
+    },
+    "GenericBackupConfig": {
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "backupName": {
+          "type": "string"
+        },
+        "backupVolume": {
+          "$ref": "#/$defs/GenericBackupVolume"
+        },
+        "cleanupTimeout": {
+          "type": "integer"
+        },
+        "postgres": {
+          "items": {
+            "$ref": "#/$defs/GenericPostgresBackupSource"
+          },
+          "type": "array"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/GenericFilesSource"
+          },
+          "type": "array"
+        },
+        "s3": {
+          "items": {
+            "$ref": "#/$defs/GenericS3Source"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "namespace",
+        "backupName"
+      ]
+    },
+    "GenericBackupVolume": {
+      "properties": {
+        "storageClass": {
+          "type": "string"
+        },
+        "snapshotClass": {
+          "type": "string"
+        },
+        "size": {
+          "$ref": "#/$defs/Quantity"
+        },
+        "snapshotReadyTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "GenericFilesSource": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "pvc": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "pvc"
+      ]
+    },
+    "GenericPostgresBackupSource": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "cluster": {
+          "type": "string"
+        },
+        "clientCAIssuer": {
+          "type": "string"
+        },
+        "servingCertIssuer": {
+          "type": "string"
+        },
+        "clusterCloning": {
+          "$ref": "#/$defs/CloneClusterOptions"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "cluster",
+        "clientCAIssuer",
+        "servingCertIssuer"
+      ]
+    },
+    "GenericS3Source": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "credentials": {
+          "$ref": "#/$defs/Credentials"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "path"
+      ]
+    },
+    "NewClusterUserCertOptsCRP": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "waitForCRPTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Quantity": {
+      "properties": {
+        "Format": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "X509Subject": {
+      "properties": {
+        "Organizations": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Countries": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "OrganizationalUnits": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Localities": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Provinces": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "StreetAddresses": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "PostalCodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "SerialNumber": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    }
+  }
+}

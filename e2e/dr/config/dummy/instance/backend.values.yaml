@@ -1,0 +1,278 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
+# The dummy app has no real workload. This backend stands up everything the generic DR config captures:
+# two seeded CNPG clusters, two seeded S3 buckets, and one seeded data PVC — so a backup has real content
+# to capture and a restore has real content to reproduce.
+controllers:
+  # --- WAL buckets (barman-cloud archiving target for each source cluster) ---
+  dummy-db1-wal-bucket:
+    type: job
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://dummy-db1-wal/
+        env: &s3Env
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
+  dummy-db2-wal-bucket:
+    type: job
+    containers:
+      create-bucket:
+        image:
+          repository: d3fk/s3cmd
+          tag: latest
+        command:
+          - s3cmd
+        args:
+          - --access_key=$(AWS_ACCESS_KEY_ID)
+          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
+          - --host=seaweedfs-s3:8333
+          - --host-bucket=seaweedfs-s3:8333
+          - --no-ssl
+          - mb
+          - s3://dummy-db2-wal/
+        env: *s3Env
+  # --- Data buckets (the two S3 sources the generic config backs up), each seeded with one object ---
+  dummy-bucket1-seed:
+    type: job
+    containers:
+      seed-bucket:
+        image:
+          repository: minio/mc
+          tag: latest
+        command:
+          - /bin/sh
+          - -c
+        args:
+          - |
+            mc alias set sw http://seaweedfs-s3:8333 "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" && \
+            mc mb --ignore-existing sw/dummy-bucket1 && \
+            printf 'bucket1-seed' > /tmp/obj && \
+            mc cp /tmp/obj sw/dummy-bucket1/seed.txt
+        env: *s3Env
+  dummy-bucket2-seed:
+    type: job
+    containers:
+      seed-bucket:
+        image:
+          repository: minio/mc
+          tag: latest
+        command:
+          - /bin/sh
+          - -c
+        args:
+          - |
+            mc alias set sw http://seaweedfs-s3:8333 "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" && \
+            mc mb --ignore-existing sw/dummy-bucket2 && \
+            printf 'bucket2-seed' > /tmp/obj && \
+            mc cp /tmp/obj sw/dummy-bucket2/seed.txt
+        env: *s3Env
+  # --- Source data PVC seed (writes a known file into the files-source PVC) ---
+  dummy-data-seed:
+    type: job
+    containers:
+      seed-data:
+        image:
+          repository: busybox
+          tag: stable
+        command:
+          - /bin/sh
+          - -c
+        args:
+          - printf 'files-seed' > /data/hello.txt
+persistence:
+  data-vol:
+    suffix: data-vol # PVC name: dummy-backend-data-vol
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    storageClass: openebs-zfs
+    advancedMounts:
+      dummy-data-seed:
+        seed-data:
+          - path: /data
+rawResources:
+  dummy-db1-serving-cert:
+    forceRename: dummy-db1-serving
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      spec:
+        commonName: Dummy DB1 Postgres serving
+        dnsNames:
+          - dummy-db1-rw
+          - dummy-db1-rw.default.svc
+        usages:
+          - server auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: dummy-db1-serving
+  dummy-db2-serving-cert:
+    forceRename: dummy-db2-serving
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      spec:
+        commonName: Dummy DB2 Postgres serving
+        dnsNames:
+          - dummy-db2-rw
+          - dummy-db2-rw.default.svc
+        usages:
+          - server auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: dummy-db2-serving
+  dummy-postgres-streaming-replica-cert:
+    forceRename: dummy-postgres-streaming-replica
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      spec:
+        commonName: streaming_replica
+        usages:
+          - client auth
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: dummy-postgres-auth-ca-issuer
+          kind: Issuer
+          group: cert-manager.io
+        secretName: dummy-postgres-streaming-replica
+  dummy-db1-wal-objectstore:
+    forceRename: dummy-db1-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://dummy-db1-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials: &walCreds
+            accessKeyId:
+              name: seaweedfs-s3-secret
+              key: admin_access_key_id
+            secretAccessKey:
+              name: seaweedfs-s3-secret
+              key: admin_secret_access_key
+  dummy-db2-wal-objectstore:
+    forceRename: dummy-db2-wal-store
+    manifest:
+      apiVersion: barmancloud.cnpg.io/v1
+      kind: ObjectStore
+      spec:
+        configuration:
+          destinationPath: s3://dummy-db2-wal/
+          endpointURL: http://seaweedfs-s3:8333
+          s3Credentials: *walCreds
+  dummy-db1-cluster:
+    forceRename: dummy-db1
+    manifest:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      spec:
+        instances: 2
+        bootstrap:
+          initdb:
+            database: app
+            owner: app
+            postInitSQL:
+              - ALTER USER "app" WITH PASSWORD NULL;
+            postInitApplicationSQL:
+              - CREATE TABLE dr_test (id int PRIMARY KEY, val text);
+              - INSERT INTO dr_test VALUES (1, 'db1-seed');
+        postgresql:
+          pg_hba:
+            - hostssl app all all cert
+        storage:
+          size: 5Gi
+          storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: dummy-db1-wal-store
+        backup:
+          target: prefer-standby
+          volumeSnapshot:
+            className: openebs-zfs
+            online: true
+            onlineConfiguration:
+              immediateCheckpoint: false
+              waitForArchive: true
+            snapshotOwnerReference: backup
+        certificates:
+          serverTLSSecret: dummy-db1-serving
+          serverCASecret: dummy-db1-serving
+          clientCASecret: dummy-postgres-client-ca
+          replicationTLSSecret: dummy-postgres-streaming-replica
+  dummy-db2-cluster:
+    forceRename: dummy-db2
+    manifest:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      spec:
+        instances: 2
+        bootstrap:
+          initdb:
+            database: app
+            owner: app
+            postInitSQL:
+              - ALTER USER "app" WITH PASSWORD NULL;
+            postInitApplicationSQL:
+              - CREATE TABLE dr_test (id int PRIMARY KEY, val text);
+              - INSERT INTO dr_test VALUES (1, 'db2-seed');
+        postgresql:
+          pg_hba:
+            - hostssl app all all cert
+        storage:
+          size: 5Gi
+          storageClass: openebs-zfs
+        plugins:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: dummy-db2-wal-store
+        backup:
+          target: prefer-standby
+          volumeSnapshot:
+            className: openebs-zfs
+            online: true
+            onlineConfiguration:
+              immediateCheckpoint: false
+              waitForArchive: true
+            snapshotOwnerReference: backup
+        certificates:
+          serverTLSSecret: dummy-db2-serving
+          serverCASecret: dummy-db2-serving
+          clientCASecret: dummy-postgres-client-ca
+          replicationTLSSecret: dummy-postgres-streaming-replica

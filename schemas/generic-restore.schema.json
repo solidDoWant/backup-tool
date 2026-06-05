@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/solidDoWant/backup-tool/pkg/disasterrecovery/generic-restore-config",
+  "$ref": "#/$defs/GenericRestoreConfig",
+  "$defs": {
+    "CNPGRestoreOptionsCert": {
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/X509Subject"
+        },
+        "certificateRequestPolicy": {
+          "$ref": "#/$defs/NewClusterUserCertOptsCRP"
+        },
+        "waitForCertTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Credentials": {
+      "properties": {
+        "accessKeyId": {
+          "type": "string"
+        },
+        "secretAccessKey": {
+          "type": "string"
+        },
+        "sessionToken": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "s3ForcePathStyle": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "accessKeyId",
+        "secretAccessKey"
+      ]
+    },
+    "GenericFilesSource": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "pvc": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "pvc"
+      ]
+    },
+    "GenericPostgresRestoreSource": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "cluster": {
+          "type": "string"
+        },
+        "clientCAIssuer": {
+          "type": "string"
+        },
+        "servingCert": {
+          "type": "string"
+        },
+        "issuerKind": {
+          "type": "string"
+        },
+        "postgresUserCert": {
+          "$ref": "#/$defs/CNPGRestoreOptionsCert"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "cluster",
+        "clientCAIssuer",
+        "servingCert"
+      ]
+    },
+    "GenericRestoreConfig": {
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "backupName": {
+          "type": "string"
+        },
+        "cleanupTimeout": {
+          "type": "integer"
+        },
+        "postgres": {
+          "items": {
+            "$ref": "#/$defs/GenericPostgresRestoreSource"
+          },
+          "type": "array"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/GenericFilesSource"
+          },
+          "type": "array"
+        },
+        "s3": {
+          "items": {
+            "$ref": "#/$defs/GenericS3Source"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "namespace",
+        "backupName"
+      ]
+    },
+    "GenericS3Source": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "credentials": {
+          "$ref": "#/$defs/Credentials"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "path"
+      ]
+    },
+    "NewClusterUserCertOptsCRP": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "waitForCRPTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "X509Subject": {
+      "properties": {
+        "Organizations": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Countries": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "OrganizationalUnits": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Localities": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "Provinces": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "StreetAddresses": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "PostalCodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "SerialNumber": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    }
+  }
+}

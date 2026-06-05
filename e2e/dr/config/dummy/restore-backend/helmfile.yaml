@@ -1,0 +1,28 @@
+---
+helmDefaults:
+  cleanupOnFail: true
+  wait: true
+  waitForJobs: true
+  createNamespace: false
+  historyMax: 1
+  timeout: 600
+
+repositories:
+  - name: bjw-s-charts
+    url: https://bjw-s-labs.github.io/helm-charts
+
+releases:
+  - name: dummy-restore-client-ca
+    chart: bjw-s-charts/app-template
+    version: 5.0.1
+    atomic: true
+    values:
+      - ./client-ca.values.yaml
+  - name: dummy-restore-backend
+    chart: bjw-s-charts/app-template
+    version: 5.0.1
+    atomic: true
+    needs:
+      - dummy-restore-client-ca
+    values:
+      - ./backend.values.yaml

@@ -1,0 +1,443 @@
+package disasterrecovery
+
+import (
+	"fmt"
+	"regexp"
+
+	"github.com/gravitational/trace"
+	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
+	cnpgbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/backup"
+	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
+	filesbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/backup"
+	filesrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/restore"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	"github.com/solidDoWant/backup-tool/pkg/s3"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+)
+
+// The generic, config-driven DR "application": rather than a hand-written Go assembler per app
+// (vaultwarden.go, teleport.go, authentik.go), a standard app is expressed as a declarative config of
+// N volumes / M CNPG clusters / O S3 buckets. The engine (RemoteStage + the existing actions) is reused
+// verbatim; only the composition is lifted out of Go.
+//
+// Sources are grouped by kind (postgres/files/s3) as plain typed slices, which the existing config
+// toolchain (goccy strict YAML + go-playground/validator + invopop/jsonschema) handles directly. Backup
+// and restore are separate types (and files) because their direction-specific fields differ materially;
+// goccy strict mode then rejects a restore-only field in a backup file and vice-versa.
+
+// GenericFilesSource captures (backup) / restores a data-directory PVC into / from a subdirectory of the
+// DR volume. Shared by both directions — v1 restores in place (same target as backup).
+type GenericFilesSource struct {
+	Name string `yaml:"name" jsonschema:"required"` // slot id => DR subdir "<name>"
+	PVC  string `yaml:"pvc" jsonschema:"required"`  // sourcePVCName (backup) / targetPVCName (restore)
+}
+
+// GenericS3Source syncs an object-store prefix to (backup) / from (restore) a subdirectory of the DR
+// volume. Credentials are an optional inline s3.Credentials (matching the per-app configs); when omitted
+// the AWS environment variables are used (s3.NewCredentialsFromEnv).
+type GenericS3Source struct {
+	Name        string         `yaml:"name" jsonschema:"required"` // slot id => DR subdir "<name>"
+	Path        string         `yaml:"path" jsonschema:"required"` // s3://bucket/prefix
+	Credentials s3.Credentials `yaml:"credentials,omitempty"`
+}
+
+// GenericPostgresBackupSource clones a CNPG cluster and logically dumps it to the DR volume.
+type GenericPostgresBackupSource struct {
+	Name              string                            `yaml:"name" jsonschema:"required"`              // slot id => dump file "<name>.sql"
+	Cluster           string                            `yaml:"cluster" jsonschema:"required"`           // clusterName
+	ClientCAIssuer    string                            `yaml:"clientCAIssuer" jsonschema:"required"`    // clientCertIssuerName
+	ServingCertIssuer string                            `yaml:"servingCertIssuer" jsonschema:"required"` // issuer that mints the clone's serving cert
+	ClusterCloning    clonedcluster.CloneClusterOptions `yaml:"clusterCloning,omitempty"`                // CNPGBackupOptions.CloningOpts
+}
+
+// GenericPostgresRestoreSource logically restores a SQL dump from the DR volume into a live cluster.
+type GenericPostgresRestoreSource struct {
+	Name             string                             `yaml:"name" jsonschema:"required"`           // slot id => dump file "<name>.sql"
+	Cluster          string                             `yaml:"cluster" jsonschema:"required"`        // clusterName (v1: same target as backup)
+	ClientCAIssuer   string                             `yaml:"clientCAIssuer" jsonschema:"required"` // clientCertIssuerName
+	ServingCert      string                             `yaml:"servingCert" jsonschema:"required"`    // existing serving cert on the live target cluster
+	IssuerKind       string                             `yaml:"issuerKind,omitempty"`
+	PostgresUserCert cnpgrestore.CNPGRestoreOptionsCert `yaml:"postgresUserCert,omitempty"`
+}
+
+// GenericBackupVolume configures the DR volume and its snapshot for a backup event.
+type GenericBackupVolume struct {
+	StorageClass         string              `yaml:"storageClass,omitempty"`
+	SnapshotClass        string              `yaml:"snapshotClass,omitempty"`
+	Size                 resource.Quantity   `yaml:"size,omitempty"`
+	SnapshotReadyTimeout helpers.MaxWaitTime `yaml:"snapshotReadyTimeout,omitempty"`
+}
+
+// GenericBackupConfig is the declarative backup config for the generic app. A backup produces the event
+// named backupName.
+type GenericBackupConfig struct {
+	Namespace      string                        `yaml:"namespace" jsonschema:"required"`
+	BackupName     string                        `yaml:"backupName" jsonschema:"required"`
+	BackupVolume   GenericBackupVolume           `yaml:"backupVolume,omitempty"`
+	CleanupTimeout helpers.MaxWaitTime           `yaml:"cleanupTimeout,omitempty"`
+	Postgres       []GenericPostgresBackupSource `yaml:"postgres,omitempty"`
+	Files          []GenericFilesSource          `yaml:"files,omitempty"`
+	S3             []GenericS3Source             `yaml:"s3,omitempty"`
+}
+
+// GenericRestoreConfig is the declarative restore config for the generic app. A restore reads the DR PVC
+// named backupName, which must already exist in the namespace (hydrated from a backup snapshot
+// out-of-band, as for the per-app restores). v1 restores in place — the targets are the same resources
+// the backup captured.
+type GenericRestoreConfig struct {
+	Namespace      string                         `yaml:"namespace" jsonschema:"required"`
+	BackupName     string                         `yaml:"backupName" jsonschema:"required"`
+	CleanupTimeout helpers.MaxWaitTime            `yaml:"cleanupTimeout,omitempty"`
+	Postgres       []GenericPostgresRestoreSource `yaml:"postgres,omitempty"`
+	Files          []GenericFilesSource           `yaml:"files,omitempty"`
+	S3             []GenericS3Source              `yaml:"s3,omitempty"`
+}
+
+// Validation. The shared config-load path (features.ConfigFileCommand.validateConfig) runs go-playground
+// tag validation but does not descend into slices of structs, so per-source required fields and all
+// cross-field rules are enforced here instead. Validate is the single entrypoint Backup/Restore call
+// before touching any resources.
+
+// genericSlotNameRegex enforces a DNS-1123-label-shaped name: it becomes a filename slot and feeds derived
+// resource names subject to helpers.CleanName and the 40-char CNPG clone-name cap.
+var genericSlotNameRegex = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
+
+func validateSlotName(kind, name string) error {
+	if name == "" {
+		return trace.BadParameter("a %s source has an empty name", kind)
+	}
+	if !genericSlotNameRegex.MatchString(name) {
+		return trace.BadParameter("%s source name %q is not DNS/path-safe (lowercase alphanumeric and '-', must start and end with an alphanumeric)", kind, name)
+	}
+	return nil
+}
+
+func validateFilesSources(files []GenericFilesSource) error {
+	seen := make(map[string]struct{}, len(files))
+	for _, src := range files {
+		if err := validateSlotName("files", src.Name); err != nil {
+			return trace.Wrap(err)
+		}
+		if _, dup := seen[src.Name]; dup {
+			return trace.BadParameter("duplicate files slot name %q (collides on the on-disk subdir)", src.Name)
+		}
+		seen[src.Name] = struct{}{}
+		if src.PVC == "" {
+			return trace.BadParameter("files source %q: pvc is required", src.Name)
+		}
+	}
+	return nil
+}
+
+func validateS3Sources(s3Sources []GenericS3Source) error {
+	seen := make(map[string]struct{}, len(s3Sources))
+	for _, src := range s3Sources {
+		if err := validateSlotName("s3", src.Name); err != nil {
+			return trace.Wrap(err)
+		}
+		if _, dup := seen[src.Name]; dup {
+			return trace.BadParameter("duplicate s3 slot name %q (collides on the on-disk subdir)", src.Name)
+		}
+		seen[src.Name] = struct{}{}
+		if src.Path == "" {
+			return trace.BadParameter("s3 source %q: path is required", src.Name)
+		}
+		// Credentials are optional (empty => AWS env-var fallback), so nothing to validate beyond the path.
+	}
+	return nil
+}
+
+// Validate enforces the cross-field and per-source rules for a backup config.
+func (c GenericBackupConfig) Validate() error {
+	if len(c.Postgres)+len(c.Files)+len(c.S3) == 0 {
+		return trace.BadParameter("at least one source (postgres, files, or s3) must be configured")
+	}
+
+	pgNames := make(map[string]struct{}, len(c.Postgres))
+	for _, src := range c.Postgres {
+		if err := validateSlotName("postgres", src.Name); err != nil {
+			return trace.Wrap(err)
+		}
+		if _, dup := pgNames[src.Name]; dup {
+			return trace.BadParameter("duplicate postgres slot name %q (collides on the SQL dump file)", src.Name)
+		}
+		pgNames[src.Name] = struct{}{}
+		if src.Cluster == "" {
+			return trace.BadParameter("postgres source %q: cluster is required", src.Name)
+		}
+		if src.ClientCAIssuer == "" {
+			return trace.BadParameter("postgres source %q: clientCAIssuer is required", src.Name)
+		}
+		if src.ServingCertIssuer == "" {
+			return trace.BadParameter("postgres source %q: servingCertIssuer is required", src.Name)
+		}
+	}
+
+	if err := validateFilesSources(c.Files); err != nil {
+		return trace.Wrap(err)
+	}
+	if err := validateS3Sources(c.S3); err != nil {
+		return trace.Wrap(err)
+	}
+
+	// A files source contributes its source PVC's requested storage, but postgres and S3 sources have no
+	// well-defined size contribution, so size must be set explicitly whenever the config has any of them.
+	if (len(c.Postgres) > 0 || len(c.S3) > 0) && c.BackupVolume.Size.IsZero() {
+		return trace.BadParameter("backupVolume.size is required when the config has postgres or s3 sources (their size cannot be inferred)")
+	}
+
+	return nil
+}
+
+// Validate enforces the cross-field and per-source rules for a restore config.
+func (c GenericRestoreConfig) Validate() error {
+	if len(c.Postgres)+len(c.Files)+len(c.S3) == 0 {
+		return trace.BadParameter("at least one source (postgres, files, or s3) must be configured")
+	}
+
+	pgNames := make(map[string]struct{}, len(c.Postgres))
+	for _, src := range c.Postgres {
+		if err := validateSlotName("postgres", src.Name); err != nil {
+			return trace.Wrap(err)
+		}
+		if _, dup := pgNames[src.Name]; dup {
+			return trace.BadParameter("duplicate postgres slot name %q (collides on the SQL dump file)", src.Name)
+		}
+		pgNames[src.Name] = struct{}{}
+		if src.Cluster == "" {
+			return trace.BadParameter("postgres source %q: cluster is required", src.Name)
+		}
+		if src.ClientCAIssuer == "" {
+			return trace.BadParameter("postgres source %q: clientCAIssuer is required", src.Name)
+		}
+		if src.ServingCert == "" {
+			return trace.BadParameter("postgres source %q: servingCert is required", src.Name)
+		}
+	}
+
+	if err := validateFilesSources(c.Files); err != nil {
+		return trace.Wrap(err)
+	}
+	if err := validateS3Sources(c.S3); err != nil {
+		return trace.Wrap(err)
+	}
+
+	return nil
+}
+
+type GenericApp struct {
+	kubeClusterClient kubecluster.ClientInterface
+	// Testing injection
+	newCNPGBackup   func() cnpgbackup.CNPGBackupInterface
+	newCNPGRestore  func() cnpgrestore.CNPGRestoreInterface
+	newFilesBackup  func() filesbackup.FilesBackupInterface
+	newFilesRestore func() filesrestore.FilesRestoreInterface
+	newS3Sync       func() s3sync.S3SyncInterface
+	newRemoteStage  func(kubeClusterClient kubecluster.ClientInterface, namespace, eventName string, opts remote.RemoteStageOptions) remote.RemoteStageInterface
+}
+
+func NewGenericApp(client kubecluster.ClientInterface) *GenericApp {
+	return &GenericApp{
+		kubeClusterClient: client,
+		newCNPGBackup:     cnpgbackup.NewCNPGBackup,
+		newCNPGRestore:    cnpgrestore.NewCNPGRestore,
+		newFilesBackup:    filesbackup.NewFilesBackup,
+		newFilesRestore:   filesrestore.NewFilesRestore,
+		newS3Sync:         s3sync.NewS3Sync,
+		newRemoteStage:    remote.NewRemoteStage,
+	}
+}
+
+// dumpFileName is the on-disk SQL dump path for a postgres slot, derived from its slot name. Restore
+// re-derives the same path, so this single rule is the backup<->restore contract for postgres dumps.
+func dumpFileName(slotName string) string {
+	return slotName + ".sql"
+}
+
+// resolveS3Credentials uses the inline credentials when supplied, otherwise the AWS environment variables.
+func resolveS3Credentials(creds s3.Credentials) s3.CredentialsInterface {
+	if creds == (s3.Credentials{}) {
+		return s3.NewCredentialsFromEnv()
+	}
+	return &creds
+}
+
+// Backup captures every configured source into the DR volume and snapshots it. Sources are registered in
+// a fixed kind order — postgres, then files, then s3 — independent of their order in the config. This is
+// consistency-load-bearing: the postgres base backups must precede the filesystem freeze that defines the
+// event's consistency point (see CLAUDE.md, RemoteStage consistency-point protocol).
+func (g *GenericApp) Backup(ctx *contexts.Context, config GenericBackupConfig) (backup *DREvent, err error) {
+	if err := config.Validate(); err != nil {
+		return nil, trace.Wrap(err, "invalid backup configuration")
+	}
+
+	backup = NewDREventNow(config.BackupName)
+	ctx.Log.With("backupName", backup.GetFullName(), "namespace", config.Namespace).Info("Starting backup process")
+	defer func() {
+		backup.Stop()
+		keyvals := []interface{}{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
+		if err != nil {
+			ctx.Log.Warn("Backup process failed", keyvals...)
+		} else {
+			ctx.Log.Info("Backup process completed", keyvals...)
+		}
+	}()
+
+	ctx.Log.Step().Info("Ensuring DR volume exists")
+	drVolumeSize, err := g.backupVolumeSize(ctx.Child(), config)
+	if err != nil {
+		return backup, trace.Wrap(err, "failed to determine the DR volume size")
+	}
+
+	clusterNames := make([]string, 0, len(config.Postgres))
+	for _, src := range config.Postgres {
+		clusterNames = append(clusterNames, src.Cluster)
+	}
+
+	drv, err := g.kubeClusterClient.NewDRVolume(ctx.Child(), config.Namespace, backup.Name, drVolumeSize, drvolume.DRVolumeCreateOptions{
+		VolumeStorageClass: config.BackupVolume.StorageClass,
+		CNPGClusterNames:   clusterNames,
+	})
+	if err != nil {
+		return backup, trace.Wrap(err, "failed to create the DR volume")
+	}
+
+	ctx.Log.Step().Info("Configuring backup actions")
+	stage := g.newRemoteStage(g.kubeClusterClient, config.Namespace, backup.GetFullName(), remote.RemoteStageOptions{
+		CleanupTimeout: config.CleanupTimeout,
+	})
+
+	for _, src := range config.Postgres {
+		action := g.newCNPGBackup()
+		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.Cluster, src.ServingCertIssuer, src.ClientCAIssuer, backup.Name, dumpFileName(src.Name), cnpgbackup.CNPGBackupOptions{
+			CloningOpts:    src.ClusterCloning,
+			CleanupTimeout: config.CleanupTimeout,
+		}); err != nil {
+			return backup, trace.Wrap(err, "failed to configure postgres source %q backup", src.Name)
+		}
+		stage.WithAction(fmt.Sprintf("postgres %q backup", src.Name), action)
+	}
+
+	for _, src := range config.Files {
+		action := g.newFilesBackup()
+		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.PVC, backup.Name, src.Name, filesbackup.FilesBackupOptions{
+			CleanupTimeout: config.CleanupTimeout,
+		}); err != nil {
+			return backup, trace.Wrap(err, "failed to configure files source %q backup", src.Name)
+		}
+		stage.WithAction(fmt.Sprintf("files %q backup", src.Name), action)
+	}
+
+	for _, src := range config.S3 {
+		action := g.newS3Sync()
+		if err := action.Configure(g.kubeClusterClient, config.Namespace, backup.Name, src.Name, src.Path, resolveS3Credentials(src.Credentials), s3sync.DirectionDownload, s3sync.S3SyncOptions{}); err != nil {
+			return backup, trace.Wrap(err, "failed to configure s3 source %q backup", src.Name)
+		}
+		stage.WithAction(fmt.Sprintf("s3 %q sync", src.Name), action)
+	}
+
+	ctx.Log.Step().Info("Running backup actions")
+	if err := stage.Run(ctx.Child()); err != nil {
+		return backup, trace.Wrap(err, "failed to run backup actions")
+	}
+
+	ctx.Log.Step()
+	if err := drv.SnapshotAndWaitReady(ctx.Child(), backup.GetFullName(), drvolume.DRVolumeSnapshotAndWaitOptions{
+		SnapshotClass: config.BackupVolume.SnapshotClass,
+		ReadyTimeout:  config.BackupVolume.SnapshotReadyTimeout,
+	}); err != nil {
+		return backup, trace.Wrap(err, "failed to snapshot the backup volume")
+	}
+
+	return backup, nil
+}
+
+// backupVolumeSize returns the explicit backupVolume.size when set. Otherwise (only reachable for a
+// files-only config — Validate requires an explicit size when postgres/s3 sources are present) it sums the
+// files sources' PVC requests and doubles the total, the same sizing the per-app Vaultwarden backup uses.
+func (g *GenericApp) backupVolumeSize(ctx *contexts.Context, config GenericBackupConfig) (resource.Quantity, error) {
+	if !config.BackupVolume.Size.IsZero() {
+		return config.BackupVolume.Size, nil
+	}
+
+	total := resource.NewQuantity(0, resource.BinarySI)
+	for _, src := range config.Files {
+		pvc, err := g.kubeClusterClient.Core().GetPVC(ctx.Child(), config.Namespace, src.PVC)
+		if err != nil {
+			return resource.Quantity{}, trace.Wrap(err, "failed to get files source PVC %q to size the DR volume", src.PVC)
+		}
+
+		size, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+		if !ok {
+			return resource.Quantity{}, trace.Errorf("files source PVC %q has no storage request to size the DR volume from", src.PVC)
+		}
+		total.Add(size)
+	}
+
+	total.Mul(2)
+	return *total, nil
+}
+
+// Restore restores every configured source from the DR volume. The DR PVC named backupName must already
+// exist in the namespace. Sources are registered in the same fixed kind order as Backup; restore actions
+// are independent (no consistency point is established), so the order is purely for symmetry.
+func (g *GenericApp) Restore(ctx *contexts.Context, config GenericRestoreConfig) (restore *DREvent, err error) {
+	if err := config.Validate(); err != nil {
+		return nil, trace.Wrap(err, "invalid restore configuration")
+	}
+
+	restore = NewDREventNow(config.BackupName)
+	ctx.Log.With("restoreName", restore.GetFullName(), "namespace", config.Namespace).Info("Starting restore process")
+	defer func() {
+		restore.Stop()
+		keyvals := []interface{}{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
+		if err != nil {
+			ctx.Log.Warn("Restore process failed", keyvals...)
+		} else {
+			ctx.Log.Info("Restore process completed", keyvals...)
+		}
+	}()
+
+	ctx.Log.Step().Info("Configuring restoration actions")
+	stage := g.newRemoteStage(g.kubeClusterClient, config.Namespace, restore.GetFullName(), remote.RemoteStageOptions{
+		CleanupTimeout: config.CleanupTimeout,
+	})
+
+	for _, src := range config.Postgres {
+		action := g.newCNPGRestore()
+		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.Cluster, src.ServingCert, src.ClientCAIssuer, restore.Name, dumpFileName(src.Name), cnpgrestore.CNPGRestoreOptions{
+			IssuerKind:       src.IssuerKind,
+			PostgresUserCert: src.PostgresUserCert,
+			CleanupTimeout:   config.CleanupTimeout,
+		}); err != nil {
+			return restore, trace.Wrap(err, "failed to configure postgres source %q restoration", src.Name)
+		}
+		stage.WithAction(fmt.Sprintf("postgres %q restore", src.Name), action)
+	}
+
+	for _, src := range config.Files {
+		action := g.newFilesRestore()
+		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.PVC, restore.Name, src.Name, filesrestore.FilesRestoreOptions{}); err != nil {
+			return restore, trace.Wrap(err, "failed to configure files source %q restoration", src.Name)
+		}
+		stage.WithAction(fmt.Sprintf("files %q restore", src.Name), action)
+	}
+
+	for _, src := range config.S3 {
+		action := g.newS3Sync()
+		if err := action.Configure(g.kubeClusterClient, config.Namespace, restore.Name, src.Name, src.Path, resolveS3Credentials(src.Credentials), s3sync.DirectionUpload, s3sync.S3SyncOptions{}); err != nil {
+			return restore, trace.Wrap(err, "failed to configure s3 source %q restoration", src.Name)
+		}
+		stage.WithAction(fmt.Sprintf("s3 %q sync", src.Name), action)
+	}
+
+	ctx.Log.Step().Info("Running restoration actions")
+	err = stage.Run(ctx.Child())
+	return restore, trace.Wrap(err, "failed to run restoration actions")
+}

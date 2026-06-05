@@ -27,6 +27,11 @@ See [the design decision doc](docs/design%20decisions.md) for additional details
     * Only Postgres supported for "core" backend and audit events
     * Only S3-compatible object storage supported for audit session logs
 * Authentik
+* Generic
+    * Backup to an in-cluster PVC, which is then snapshotted
+    * Restore from an in-cluster PVC
+    * Specify multiple CNPG clusters, S3 buckets, and up to one volume and get a consistent backup
+    * Multiple PVCs result in an inconsistent backup due to tool limitation (VolumeGroupSnapshot is not supported yet)
 
 ## Upcoming support:
 * ZFS snapshot to tape drive/library

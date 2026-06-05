@@ -1,0 +1,35 @@
+---
+# Generic (config-driven) DR restore for the synthetic "dummy" app. In-place restore: the postgres
+# dumps go into the pre-deployed restore clusters, the files PVC is repopulated, and the S3 sources are
+# re-uploaded to their original buckets. S3 keys are injected via --set (see the test).
+jobConfig:
+  configFile:
+    backupName: dm-e2e
+    postgres:
+      - name: db1
+        cluster: dummy-restore-db1
+        clientCAIssuer: dummy-restore-postgres-auth-ca-issuer
+        servingCert: dummy-restore-db1-serving
+        issuerKind: Issuer
+        postgresUserCert: &postgresUserCert
+          certificateRequestPolicy:
+            enabled: true
+      - name: db2
+        cluster: dummy-restore-db2
+        clientCAIssuer: dummy-restore-postgres-auth-ca-issuer
+        servingCert: dummy-restore-db2-serving
+        issuerKind: Issuer
+        postgresUserCert: *postgresUserCert
+    files:
+      - name: files
+        pvc: dummy-restore-backend-data-vol
+    s3:
+      - name: bucket1
+        path: s3://dummy-bucket1/
+        credentials: &s3Credentials
+          endpoint: http://seaweedfs-s3:8333
+          region: dummy-value
+          s3ForcePathStyle: true
+      - name: bucket2
+        path: s3://dummy-bucket2/
+        credentials: *s3Credentials

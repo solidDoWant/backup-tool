@@ -256,7 +256,7 @@ clean-e2e:
 	@docker volume prune -f
 
 DR_SCHEMAS_PRETTY = true
-DR_SCHEMAS = vaultwarden teleport authentik
+DR_SCHEMAS = vaultwarden teleport authentik generic
 DR_COMMANDS = backup restore
 DR_SCHEMAS_DIR = $(PROJECT_DIR)/schemas
 

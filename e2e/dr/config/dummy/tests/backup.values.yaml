@@ -1,0 +1,45 @@
+---
+# Generic (config-driven) DR backup config for the synthetic "dummy" app. The S3 access/secret keys are
+# injected at install time via --set (see the test); everything else is inline below.
+jobConfig:
+  configFile:
+    backupName: dm-e2e
+    backupVolume:
+      storageClass: openebs-zfs
+      snapshotClass: openebs-zfs
+      size: 5Gi
+    postgres:
+      - name: db1 # => db1.sql
+        cluster: dummy-db1
+        clientCAIssuer: self-signed
+        servingCertIssuer: self-signed
+        clusterCloning: &clusterCloning
+          certificates:
+            servingCert:
+              issuerKind: Issuer
+            clientCACert:
+              issuerKind: Issuer
+            postgresUserCert:
+              certificateRequestPolicy:
+                enabled: true
+            streamingReplicaUserCert:
+              certificateRequestPolicy:
+                enabled: true
+      - name: db2 # => db2.sql
+        cluster: dummy-db2
+        clientCAIssuer: self-signed
+        servingCertIssuer: self-signed
+        clusterCloning: *clusterCloning
+    files:
+      - name: files # => DR subdir "files"
+        pvc: dummy-backend-data-vol
+    s3:
+      - name: bucket1 # => DR subdir "bucket1"
+        path: s3://dummy-bucket1/
+        credentials: &s3Credentials
+          endpoint: http://seaweedfs-s3:8333
+          region: dummy-value
+          s3ForcePathStyle: true
+      - name: bucket2 # => DR subdir "bucket2"
+        path: s3://dummy-bucket2/
+        credentials: *s3Credentials

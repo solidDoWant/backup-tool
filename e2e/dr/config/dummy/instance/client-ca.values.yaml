@@ -1,0 +1,49 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
+# Shared Postgres client CA for the dummy app's two source clusters. A single CA (and auth issuer)
+# is reused by both clusters' clientCASecret and signs their streaming-replica certs.
+rawResources:
+  dummy-postgres-client-ca-cert:
+    forceRename: dummy-postgres-client-ca
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      spec:
+        commonName: Dummy Postgres client CA
+        isCA: true
+        usages:
+          - cert sign
+        secretTemplate:
+          labels:
+            cnpg.io/reload: "true"
+        issuerRef:
+          name: self-signed
+          kind: Issuer
+          group: cert-manager.io
+        secretName: dummy-postgres-client-ca
+  dummy-postgres-auth-ca-issuer:
+    forceRename: dummy-postgres-auth-ca-issuer
+    manifest:
+      apiVersion: cert-manager.io/v1
+      kind: Issuer
+      spec:
+        ca:
+          secretName: dummy-postgres-client-ca
+  # Must exist before any cert it covers, or approval is racey.
+  dummy-postgres-auth-ca-request-policy:
+    forceRename: dummy-postgres-auth-ca-request-policy
+    manifest:
+      apiVersion: policy.cert-manager.io/v1alpha1
+      kind: CertificateRequestPolicy
+      spec:
+        selector:
+          issuerRef:
+            group: cert-manager.io
+            kind: Issuer
+            name: dummy-postgres-auth-ca-issuer
+        allowed:
+          commonName:
+            required: true
+            value: "*"
+          usages:
+            - client auth

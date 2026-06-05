@@ -12,6 +12,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +33,28 @@ func init() {
 
 	yaml.RegisterCustomMarshaler(func(mwt MaxWaitTime) ([]byte, error) {
 		return yaml.Marshal(time.Duration(mwt))
+	})
+
+	// resource.Quantity only implements json (un)marshaling, which goccy does not use, so a scalar like
+	// "10Gi" otherwise fails to decode into the struct. Register a (un)marshaler that round-trips it
+	// through its canonical string form so size fields parse from (and serialize back to) YAML.
+	yaml.RegisterCustomUnmarshaler(func(q *resource.Quantity, b []byte) error {
+		var quantityStr string
+		if err := yaml.Unmarshal(b, &quantityStr); err != nil {
+			return err
+		}
+
+		parsed, err := resource.ParseQuantity(quantityStr)
+		if err != nil {
+			return err
+		}
+
+		*q = parsed
+		return nil
+	})
+
+	yaml.RegisterCustomMarshaler(func(q resource.Quantity) ([]byte, error) {
+		return yaml.Marshal(q.String())
 	})
 }
 

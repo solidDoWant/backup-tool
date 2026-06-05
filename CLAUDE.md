@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-`backup-tool` is a Go CLI for performing consistent disaster-recovery (DR) backups and restores of Kubernetes-hosted applications (currently Vaultwarden, Teleport, Authentik). It runs either locally (driving a remote cluster) or in-cluster (as a transient pod spawned by the local invocation). The same binary serves three roles, switched by subcommand:
+`backup-tool` is a Go CLI for performing consistent disaster-recovery (DR) backups and restores of Kubernetes-hosted applications. Three apps are hand-written Go assemblers (Vaultwarden, Teleport, Authentik); a fourth, `generic`, is **config-driven** — a standard app (N volumes / M CNPG clusters / O S3 buckets) is expressed as a declarative YAML config instead of new Go, reusing the same engine (see `pkg/disasterrecovery/generic.go`). It runs either locally (driving a remote cluster) or in-cluster (as a transient pod spawned by the local invocation). The same binary serves three roles, switched by subcommand:
 
 - `dr <app> <backup|restore> run --config-file <yaml>` — drives a DR event from outside the cluster.
 - `dr <app> <backup|restore> gen-config-schema` — emits a JSON schema for the YAML config.
@@ -49,6 +49,7 @@ The release flow is `make release PUSH_ALL=true VERSION=x.y.z` (defaults to a no
 - `cmd/disasterrecovery/drcommand.go` enumerates registered DR apps via the `DRCommand` interface; each app implements `DRBackupCommand` / `DRRestoreCommand` to expose `backup` / `restore` subcommands.
 - `cmd/disasterrecovery/clusterdrcommand.go` is the generic glue (`ClusterDRCommand[TBackupConfig, TRestoreConfig]`): a per-app config struct + a `func(ctx, config, kubeCluster) error` is enough to plug a new app in. The shared command handles flags, config loading, validation, and schema generation.
 - Per-app `*.go` (e.g. `vaultwarden.go`) defines the strongly-typed config (which embeds the pkg-level `*Options` struct) and supplies the run callback. Required fields are tagged `jsonschema:"required"`.
+- `cmd/disasterrecovery/generic.go` wires the **config-driven** `generic` app: its config types live entirely in `pkg/disasterrecovery/generic.go` (no cmd-level wrapper to embed), so the run callback just hands the parsed config to `GenericApp.Backup`/`.Restore`.
 
 ### DR orchestration (`pkg/disasterrecovery/`)
 A high-level Backup/Restore method (e.g. `VaultWarden.Backup`) is a thin assembler: it ensures the DR PVC exists (`NewDRVolume`), builds a `RemoteStage` from a list of `RemoteAction`s, runs it, and snapshots the DR PVC. The stage does the heavy lifting:
@@ -58,7 +59,9 @@ A high-level Backup/Restore method (e.g. `VaultWarden.Backup`) is a thin assembl
 4. Snapshot the resulting DR PVC.
 5. Tear everything down via deferred `cleanup.To(...)`.
 
-**All apps (Vaultwarden, Teleport, Authentik) use the `RemoteStage` pattern** (`pkg/disasterrecovery/actions/remote`): `RemoteStage.WithAction(...).Run(ctx)` validates → sets up → executes a list of `RemoteAction`s against a single tool-pod lifecycle. **Use it for new applications too.** Each app composes the available actions: `cnpg/backup` + `cnpg/restore` (Postgres logical dump/restore of a cloned/target cluster), `files/backup` + `files/restore` (a data-directory PVC captured into / restored from a subdirectory of the DR volume — Vaultwarden's data dir), and `s3sync` (object-store captures — Teleport audit logs, Authentik media). Adding a new data source means writing a new `RemoteAction`, not a new imperative script.
+**All apps use the `RemoteStage` pattern** (`pkg/disasterrecovery/actions/remote`): `RemoteStage.WithAction(...).Run(ctx)` validates → sets up → executes a list of `RemoteAction`s against a single tool-pod lifecycle. **Use it for new applications too.** Each app composes the available actions: `cnpg/backup` + `cnpg/restore` (Postgres logical dump/restore of a cloned/target cluster), `files/backup` + `files/restore` (a data-directory PVC captured into / restored from a subdirectory of the DR volume — Vaultwarden's data dir), and `s3sync` (object-store captures — Teleport audit logs, Authentik media). Adding a new data source means writing a new `RemoteAction`, not a new imperative script.
+
+The `generic` app (`pkg/disasterrecovery/generic.go`, `GenericApp.Backup`/`.Restore`) is the config-driven path over this same machinery: a `GenericBackupConfig`/`GenericRestoreConfig` lists sources grouped by kind (`postgres`/`files`/`s3`), and the app registers the matching actions in a fixed, consistency-correct kind order (postgres → files → s3) regardless of file order — so a config, not new Go, onboards a standard app. The on-disk dump filename is derived from each postgres source's slot `name` (`<name>.sql`); files/s3 use the slot `name` as their DR-volume subdirectory. S3 credentials are an optional inline `s3.Credentials` (else AWS env vars). v1 scope: single namespace, in-place restore against a **pre-existing** DR PVC (no snapshot hydration; the restore reads the DR PVC named `backupName`, materialized out-of-band from a backup snapshot when the source is gone), no persisted-config write.
 
 ### Kubernetes client (`pkg/kubecluster/`)
 - `client.go` exposes a single `ClientInterface` that embeds smaller clients. Composites are wired to their primitive deps in `NewClient`.
