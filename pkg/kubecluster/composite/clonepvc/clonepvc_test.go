@@ -123,6 +123,7 @@ func TestClonePVC(t *testing.T) {
 		{
 			desc: "successful clone with custom options",
 			opts: ClonePVCOptions{
+				SnapshotClass:        "custom-snap-class",
 				DestStorageClassName: "custom-class",
 				DestPvcNamePrefix:    "custom-prefix",
 				ForceBind:            true,
@@ -374,7 +375,7 @@ func TestClonePVC(t *testing.T) {
 			// becomes expected, the function can be returned from
 			func() {
 				snapshot := th.ValOrDefault(tt.createdSnapshot, createdSnapshot)
-				p.esClient.EXPECT().SnapshotVolume(mock.Anything, namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{}).
+				p.esClient.EXPECT().SnapshotVolume(mock.Anything, namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{SnapshotClass: tt.opts.SnapshotClass}).
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts externalsnapshotter.SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error) {
 						assert.True(t, calledCtx.IsChildOf(ctx))
 						return th.ErrOr1Val(snapshot, tt.simulateSnapshotErr)

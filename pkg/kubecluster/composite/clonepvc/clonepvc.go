@@ -17,6 +17,7 @@ import (
 
 type ClonePVCOptions struct {
 	WaitForSnapshotTimeout helpers.MaxWaitTime
+	SnapshotClass          string // Override the VolumeSnapshotClass used to snapshot the source volume. Defaults to the cluster default when empty.
 	DestStorageClassName   string // Override the storage class used for the created volume. Must be compatible with the snapshot.
 	DestPvcNamePrefix      string // Override the prefix used for the created volume name
 	ForceBind              bool   // Force the PVC to be bound immediately. This should be set if the storage class does not have `volumeBindingMode: Immediate` set, because the snapshot will be deleted after the PVC is created.
@@ -30,7 +31,7 @@ func (p *Provider) ClonePVC(ctx *contexts.Context, namespace, pvcName string, op
 	defer ctx.Log.Info("Finished cloning PVC", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
 
 	ctx.Log.Step().Info("Creating snapshot of PVC")
-	snapshot, err := p.esClient.SnapshotVolume(ctx.Child(), namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{})
+	snapshot, err := p.esClient.SnapshotVolume(ctx.Child(), namespace, pvcName, externalsnapshotter.SnapshotVolumeOptions{SnapshotClass: opts.SnapshotClass})
 	if err != nil {
 		err = trace.Wrap(err, "failed to snapshot %q", helpers.FullNameStr(namespace, pvcName))
 		return

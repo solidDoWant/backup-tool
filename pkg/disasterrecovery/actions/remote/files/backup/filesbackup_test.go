@@ -213,7 +213,7 @@ func TestBeforeConsistencyPoint(t *testing.T) {
 						sourcePVCName:     "sourcePVCName",
 						drVolName:         "drVolName",
 						backupDirRelPath:  "backupDirRelPath",
-						opts:              FilesBackupOptions{CleanupTimeout: helpers.ShortWaitTime},
+						opts:              FilesBackupOptions{SnapshotClass: "snap-class", CleanupTimeout: helpers.ShortWaitTime},
 					},
 					isValidated: !tt.notValidated,
 				},
@@ -231,6 +231,7 @@ func TestBeforeConsistencyPoint(t *testing.T) {
 
 			if !tt.notValidated && !tt.alreadyCloned {
 				mockClient.EXPECT().ClonePVC(mock.Anything, currentState.namespace, currentState.sourcePVCName, clonepvc.ClonePVCOptions{
+					SnapshotClass:     currentState.opts.SnapshotClass,
 					DestPvcNamePrefix: currentState.drVolName,
 					ForceBind:         true,
 					CleanupTimeout:    currentState.opts.CleanupTimeout,

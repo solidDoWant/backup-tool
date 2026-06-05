@@ -135,7 +135,7 @@
         },
         "files": {
           "items": {
-            "$ref": "#/$defs/GenericFilesSource"
+            "$ref": "#/$defs/GenericFilesBackupSource"
           },
           "type": "array"
         },
@@ -171,12 +171,15 @@
       "additionalProperties": false,
       "type": "object"
     },
-    "GenericFilesSource": {
+    "GenericFilesBackupSource": {
       "properties": {
         "name": {
           "type": "string"
         },
         "pvc": {
+          "type": "string"
+        },
+        "snapshotClass": {
           "type": "string"
         }
       },

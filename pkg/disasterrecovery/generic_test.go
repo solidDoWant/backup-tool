@@ -36,7 +36,7 @@ func validBackupConfig() GenericBackupConfig {
 			ClientCAIssuer:    "cnpg-client-ca",
 			ServingCertIssuer: "cnpg-serving-ca",
 		}},
-		Files: []GenericFilesSource{{Name: "data", PVC: "vw-data"}},
+		Files: []GenericFilesBackupSource{{GenericFilesSource: GenericFilesSource{Name: "data", PVC: "vw-data"}, SnapshotClass: "ceph-block-snap"}},
 		S3: []GenericS3Source{{
 			Name:        "media",
 			Path:        "s3://media-bucket/vw",
@@ -73,7 +73,7 @@ func TestGenericBackupConfigValidate(t *testing.T) {
 		c := GenericBackupConfig{
 			Namespace:  "ns",
 			BackupName: "b",
-			Files:      []GenericFilesSource{{Name: "data", PVC: "vw-data"}},
+			Files:      []GenericFilesBackupSource{{GenericFilesSource: GenericFilesSource{Name: "data", PVC: "vw-data"}}},
 		}
 		require.NoError(t, c.Validate())
 	})
@@ -325,7 +325,7 @@ func TestGenericAppBackupVolumeSize(t *testing.T) {
 		g := &GenericApp{kubeClusterClient: mockClient}
 		size, err := g.backupVolumeSize(th.NewTestContext(), GenericBackupConfig{
 			Namespace: "ns",
-			Files:     []GenericFilesSource{{Name: "a", PVC: "pvc-a"}, {Name: "b", PVC: "pvc-b"}},
+			Files:     []GenericFilesBackupSource{{GenericFilesSource: GenericFilesSource{Name: "a", PVC: "pvc-a"}}, {GenericFilesSource: GenericFilesSource{Name: "b", PVC: "pvc-b"}}},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "10Gi", size.String()) // (3 + 2) * 2
@@ -340,7 +340,7 @@ func TestGenericAppBackupVolumeSize(t *testing.T) {
 		g := &GenericApp{kubeClusterClient: mockClient}
 		_, err := g.backupVolumeSize(th.NewTestContext(), GenericBackupConfig{
 			Namespace: "ns",
-			Files:     []GenericFilesSource{{Name: "a", PVC: "pvc-a"}},
+			Files:     []GenericFilesBackupSource{{GenericFilesSource: GenericFilesSource{Name: "a", PVC: "pvc-a"}}},
 		})
 		require.Error(t, err)
 	})
@@ -431,6 +431,7 @@ func TestGenericAppBackup(t *testing.T) {
 				}
 
 				mockFiles.EXPECT().Configure(mockClient, namespace, "vw-data", backupName, "data", filesbackup.FilesBackupOptions{
+					SnapshotClass:  config.Files[0].SnapshotClass,
 					CleanupTimeout: config.CleanupTimeout,
 				}).Return(th.ErrIfTrue(tt.simulateConfigureFilesErr))
 				if tt.simulateConfigureFilesErr {

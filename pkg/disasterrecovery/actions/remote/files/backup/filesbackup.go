@@ -19,6 +19,7 @@ import (
 )
 
 type FilesBackupOptions struct {
+	SnapshotClass  string              `yaml:"snapshotClass,omitempty"` // VolumeSnapshotClass used to snapshot the source PVC; cluster default when empty.
 	CleanupTimeout helpers.MaxWaitTime `yaml:"cleanupTimeout,omitempty"`
 }
 
@@ -117,6 +118,7 @@ func (cs *cloneState) BeforeConsistencyPoint(ctx *contexts.Context) (_ time.Time
 	// ForceBind is required because the snapshot is deleted once the clone exists, so the clone must bind
 	// immediately.
 	clonedPVC, err := cs.kubeClusterClient.ClonePVC(ctx.Child(), cs.namespace, cs.sourcePVCName, clonepvc.ClonePVCOptions{
+		SnapshotClass:     cs.opts.SnapshotClass,
 		DestPvcNamePrefix: cs.drVolName,
 		ForceBind:         true,
 		CleanupTimeout:    cs.opts.CleanupTimeout,

@@ -38,6 +38,15 @@ type GenericFilesSource struct {
 	PVC  string `yaml:"pvc" jsonschema:"required"`  // sourcePVCName (backup) / targetPVCName (restore)
 }
 
+// GenericFilesBackupSource is a files source plus backup-only capture options. SnapshotClass selects the
+// VolumeSnapshotClass used when snapshotting the source PVC for a consistent point-in-time clone; when
+// empty the cluster default VolumeSnapshotClass is used. Restore takes no source snapshot, so this field
+// is backup-only and lives on a backup-specific type (mirroring the postgres backup/restore split).
+type GenericFilesBackupSource struct {
+	GenericFilesSource `yaml:",inline"`
+	SnapshotClass      string `yaml:"snapshotClass,omitempty"`
+}
+
 // GenericS3Source syncs an object-store prefix to (backup) / from (restore) a subdirectory of the DR
 // volume. Credentials are an optional inline s3.Credentials (matching the per-app configs); when omitted
 // the AWS environment variables are used (s3.NewCredentialsFromEnv).
@@ -82,7 +91,7 @@ type GenericBackupConfig struct {
 	BackupVolume   GenericBackupVolume           `yaml:"backupVolume,omitempty"`
 	CleanupTimeout helpers.MaxWaitTime           `yaml:"cleanupTimeout,omitempty"`
 	Postgres       []GenericPostgresBackupSource `yaml:"postgres,omitempty"`
-	Files          []GenericFilesSource          `yaml:"files,omitempty"`
+	Files          []GenericFilesBackupSource    `yaml:"files,omitempty"`
 	S3             []GenericS3Source             `yaml:"s3,omitempty"`
 }
 
@@ -179,7 +188,11 @@ func (c GenericBackupConfig) Validate() error {
 		}
 	}
 
-	if err := validateFilesSources(c.Files); err != nil {
+	filesSources := make([]GenericFilesSource, len(c.Files))
+	for i := range c.Files {
+		filesSources[i] = c.Files[i].GenericFilesSource
+	}
+	if err := validateFilesSources(filesSources); err != nil {
 		return trace.Wrap(err)
 	}
 	if err := validateS3Sources(c.S3); err != nil {
@@ -327,6 +340,7 @@ func (g *GenericApp) Backup(ctx *contexts.Context, config GenericBackupConfig) (
 	for _, src := range config.Files {
 		action := g.newFilesBackup()
 		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.PVC, backup.Name, src.Name, filesbackup.FilesBackupOptions{
+			SnapshotClass:  src.SnapshotClass,
 			CleanupTimeout: config.CleanupTimeout,
 		}); err != nil {
 			return backup, trace.Wrap(err, "failed to configure files source %q backup", src.Name)
