@@ -4,7 +4,7 @@ jobConfig:
   drType: vaultwarden
   drAction: backup
   configFile: {}
-  configType: ConfigMap
+  configType: Secret
   type: cronjob
   cronjob:
     schedule: "@daily"
