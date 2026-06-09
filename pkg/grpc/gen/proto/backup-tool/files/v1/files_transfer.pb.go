@@ -328,6 +328,141 @@ func (b0 SyncFilesResponse_builder) Build() *SyncFilesResponse {
 	return m0
 }
 
+type ListDirectoryRequest struct {
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Path        *string                `protobuf:"bytes,1,opt,name=path"`
+	XXX_raceDetectHookData protoimpl.RaceDetectHookData
+	XXX_presence           [1]uint32
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *ListDirectoryRequest) Reset() {
+	*x = ListDirectoryRequest{}
+	mi := &file_files_transfer_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDirectoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDirectoryRequest) ProtoMessage() {}
+
+func (x *ListDirectoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_files_transfer_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *ListDirectoryRequest) GetPath() string {
+	if x != nil {
+		if x.xxx_hidden_Path != nil {
+			return *x.xxx_hidden_Path
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *ListDirectoryRequest) SetPath(v string) {
+	x.xxx_hidden_Path = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 1)
+}
+
+func (x *ListDirectoryRequest) HasPath() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
+}
+
+func (x *ListDirectoryRequest) ClearPath() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_Path = nil
+}
+
+type ListDirectoryRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Path *string
+}
+
+func (b0 ListDirectoryRequest_builder) Build() *ListDirectoryRequest {
+	m0 := &ListDirectoryRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	if b.Path != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 1)
+		x.xxx_hidden_Path = b.Path
+	}
+	return m0
+}
+
+type ListDirectoryResponse struct {
+	state              protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Entries []string               `protobuf:"bytes,1,rep,name=entries"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *ListDirectoryResponse) Reset() {
+	*x = ListDirectoryResponse{}
+	mi := &file_files_transfer_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDirectoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDirectoryResponse) ProtoMessage() {}
+
+func (x *ListDirectoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_files_transfer_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *ListDirectoryResponse) GetEntries() []string {
+	if x != nil {
+		return x.xxx_hidden_Entries
+	}
+	return nil
+}
+
+func (x *ListDirectoryResponse) SetEntries(v []string) {
+	x.xxx_hidden_Entries = v
+}
+
+type ListDirectoryResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Entries []string
+}
+
+func (b0 ListDirectoryResponse_builder) Build() *ListDirectoryResponse {
+	m0 := &ListDirectoryResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Entries = b.Entries
+	return m0
+}
+
 var File_files_transfer_proto protoreflect.FileDescriptor
 
 const file_files_transfer_proto_rawDesc = "" +
@@ -340,14 +475,20 @@ const file_files_transfer_proto_rawDesc = "" +
 	"\x10SyncFilesRequest\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12\x12\n" +
 	"\x04dest\x18\x02 \x01(\tR\x04dest\"\x13\n" +
-	"\x11SyncFilesResponseBUZSgithub.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/files/v1;files_v1b\beditionsp\xe8\a"
+	"\x11SyncFilesResponse\"*\n" +
+	"\x14ListDirectoryRequest\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\"1\n" +
+	"\x15ListDirectoryResponse\x12\x18\n" +
+	"\aentries\x18\x01 \x03(\tR\aentriesBUZSgithub.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/files/v1;files_v1b\beditionsp\xe8\a"
 
-var file_files_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_files_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_files_transfer_proto_goTypes = []any{
-	(*CopyFilesRequest)(nil),  // 0: CopyFilesRequest
-	(*CopyFilesResponse)(nil), // 1: CopyFilesResponse
-	(*SyncFilesRequest)(nil),  // 2: SyncFilesRequest
-	(*SyncFilesResponse)(nil), // 3: SyncFilesResponse
+	(*CopyFilesRequest)(nil),      // 0: CopyFilesRequest
+	(*CopyFilesResponse)(nil),     // 1: CopyFilesResponse
+	(*SyncFilesRequest)(nil),      // 2: SyncFilesRequest
+	(*SyncFilesResponse)(nil),     // 3: SyncFilesResponse
+	(*ListDirectoryRequest)(nil),  // 4: ListDirectoryRequest
+	(*ListDirectoryResponse)(nil), // 5: ListDirectoryResponse
 }
 var file_files_transfer_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -368,7 +509,7 @@ func file_files_transfer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_files_transfer_proto_rawDesc), len(file_files_transfer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

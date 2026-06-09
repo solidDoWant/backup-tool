@@ -41,6 +41,14 @@ packages:
   : <<: *baseline_config
     interfaces:
       FilesRestoreInterface:
+  ? github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/groupbackup
+  : <<: *baseline_config
+    interfaces:
+      FilesGroupBackupInterface:
+  ? github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/grouprestore
+  : <<: *baseline_config
+    interfaces:
+      FilesGroupRestoreInterface:
   github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync:
     <<: *baseline_config
     interfaces:

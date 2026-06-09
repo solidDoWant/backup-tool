@@ -1,0 +1,24 @@
+# Snapshot CRDs + controller for VolumeGroupSnapshot coverage, pinned to external-snapshotter v8.6.0. See
+# the DeploySnapshotVGS setup step (setup_test.go) for why v8.6.0 and not the piraeus chart, and for the
+# host-path driver that is applied alongside this.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # external-snapshotter v8.6.0 CRDs (VolumeSnapshot* + VolumeGroupSnapshot*, the latter serving v1).
+  - github.com/kubernetes-csi/external-snapshotter/client/config/crd?ref=v8.6.0
+  # external-snapshotter v8.6.0 snapshot-controller (Deployment + RBAC).
+  - github.com/kubernetes-csi/external-snapshotter/deploy/kubernetes/snapshot-controller?ref=v8.6.0
+
+patches:
+  # The snapshot-controller needs the CSIVolumeGroupSnapshot feature gate (still BETA/off-by-default in
+  # v8.6.0). The matching gate on the host-path csi-snapshotter sidecar is applied by DeploySnapshotVGS.
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: snapshot-controller
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --feature-gates=CSIVolumeGroupSnapshot=true

@@ -21,7 +21,6 @@ func TestClonePVC(t *testing.T) {
 	namespace := "test-ns"
 	pvcName := "test-pvc"
 	snapshotName := "test-snapshot"
-	podName := "test-pod"
 	size := resource.MustParse("5Gi")
 
 	createdSnapshot := &volumesnapshotv1.VolumeSnapshot{
@@ -31,16 +30,6 @@ func TestClonePVC(t *testing.T) {
 		},
 		Status: &volumesnapshotv1.VolumeSnapshotStatus{
 			RestoreSize: &size,
-		},
-	}
-
-	createdPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      podName,
-			Namespace: namespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/component": "force-bind",
-			},
 		},
 	}
 
@@ -54,9 +43,7 @@ func TestClonePVC(t *testing.T) {
 		simulateWaitForSnapshotErr bool
 		simulateQueryExistingErr   bool
 		simulateCreateErr          bool
-		simulatePodCreateErr       bool
-		simulatePodWaitErr         bool
-		simulatePodDeleteError     bool
+		simulateForceBindErr       bool
 		simulatePVCDeleteError     bool
 		expectRestoreSizeErr       bool
 		expectedPVC                *corev1.PersistentVolumeClaim
@@ -243,7 +230,7 @@ func TestClonePVC(t *testing.T) {
 			simulateCreateErr: true,
 		},
 		{
-			desc: "error while creating pod for force bind",
+			desc: "error while force binding",
 			initialPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      pvcName,
@@ -270,10 +257,10 @@ func TestClonePVC(t *testing.T) {
 					},
 				},
 			},
-			simulatePodCreateErr: true,
+			simulateForceBindErr: true,
 		},
 		{
-			desc: "error while waiting for pod to be ready",
+			desc: "error while deleting pvc after force bind failure",
 			initialPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      pvcName,
@@ -300,68 +287,7 @@ func TestClonePVC(t *testing.T) {
 					},
 				},
 			},
-			simulatePodWaitErr: true,
-		},
-		{
-			desc: "error while deleting pod",
-			initialPVC: &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      pvcName,
-					Namespace: namespace,
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: new("standard"),
-				},
-			},
-			opts: ClonePVCOptions{ForceBind: true},
-			clonedPVC: &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      pvcName,
-					Namespace: namespace,
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					AccessModes: []corev1.PersistentVolumeAccessMode{
-						corev1.ReadWriteOnce,
-					},
-					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: new(volumesnapshotv1.SchemeGroupVersion.Group),
-						Kind:     externalsnapshotter.VolumeSnapshotKind,
-						Name:     snapshotName,
-					},
-				},
-			},
-			simulatePodDeleteError: true,
-			simulatePodWaitErr:     true,
-		},
-		{
-			desc: "error while deleting pvc",
-			initialPVC: &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      pvcName,
-					Namespace: namespace,
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: new("standard"),
-				},
-			},
-			opts: ClonePVCOptions{ForceBind: true},
-			clonedPVC: &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      pvcName,
-					Namespace: namespace,
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					AccessModes: []corev1.PersistentVolumeAccessMode{
-						corev1.ReadWriteOnce,
-					},
-					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: new(volumesnapshotv1.SchemeGroupVersion.Group),
-						Kind:     externalsnapshotter.VolumeSnapshotKind,
-						Name:     snapshotName,
-					},
-				},
-			},
-			simulatePodWaitErr:     true,
+			simulateForceBindErr:   true,
 			simulatePVCDeleteError: true,
 		},
 	}
@@ -450,7 +376,7 @@ func TestClonePVC(t *testing.T) {
 					return
 				}
 
-				if tt.simulatePodCreateErr || tt.simulatePodWaitErr || tt.simulatePodDeleteError {
+				if tt.simulateForceBindErr {
 					p.coreClient.EXPECT().DeletePVC(mock.Anything, namespace, mock.Anything).
 						RunAndReturn(func(cleanupCtx *contexts.Context, namespace, name string) error {
 							assert.NotEqual(t, ctx, cleanupCtx)
@@ -462,39 +388,8 @@ func TestClonePVC(t *testing.T) {
 					return
 				}
 
-				p.coreClient.EXPECT().CreatePod(mock.Anything, namespace, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
-						assert.True(t, calledCtx.IsChildOf(ctx))
-
-						assert.Contains(t, pod.Name, "force-bind")
-						assert.Len(t, pod.Spec.Containers, 1)
-						assert.Len(t, pod.Spec.Volumes, 1)
-
-						volume := pod.Spec.Volumes[0]
-						require.NotNil(t, volume.PersistentVolumeClaim)
-
-						container := pod.Spec.Containers[0]
-						assert.Contains(t, container.Image, "pause")
-						assert.Len(t, container.VolumeMounts, 1)
-						volumeMount := container.VolumeMounts[0]
-						assert.Equal(t, volume.Name, volumeMount.Name)
-
-						return th.ErrOr1Val(createdPod, tt.simulatePodCreateErr)
-					})
-				if tt.simulatePodCreateErr {
-					return
-				}
-				p.coreClient.EXPECT().DeletePod(mock.Anything, namespace, createdPod.Name).
-					RunAndReturn(func(cleanupCtx *contexts.Context, namespace, name string) error {
-						assert.NotEqual(t, ctx, cleanupCtx)
-						return th.ErrIfTrue(tt.simulatePodDeleteError)
-					})
-
-				p.coreClient.EXPECT().WaitForReadyPod(mock.Anything, namespace, createdPod.Name, core.WaitForReadyPodOpts{MaxWaitTime: tt.opts.ForceBindTimeout}).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, opts core.WaitForReadyPodOpts) (*corev1.Pod, error) {
-						assert.True(t, calledCtx.IsChildOf(ctx))
-						return th.ErrOr1Val(createdPod, tt.simulatePodWaitErr)
-					})
+				// Force-binding runs the internal forceBindVolumes helper against the core client.
+				p.expectForceBind(t, ctx, namespace, tt.simulateForceBindErr)
 			}()
 
 			clonedPVC, err := p.ClonePVC(ctx, namespace, pvcName, tt.opts)
@@ -504,9 +399,7 @@ func TestClonePVC(t *testing.T) {
 				tt.simulateQueryExistingErr,
 				tt.simulateCreateErr,
 				tt.expectRestoreSizeErr,
-				tt.simulatePodCreateErr,
-				tt.simulatePodWaitErr,
-				tt.simulatePodDeleteError,
+				tt.simulateForceBindErr,
 				tt.simulatePVCDeleteError,
 			) {
 				require.Error(t, err)

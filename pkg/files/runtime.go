@@ -6,6 +6,7 @@ import "github.com/solidDoWant/backup-tool/pkg/contexts"
 type Runtime interface {
 	CopyFiles(ctx *contexts.Context, src, dest string) error
 	SyncFiles(ctx *contexts.Context, src, dest string) error
+	ListDirectory(ctx *contexts.Context, path string) ([]string, error)
 }
 
 type LocalRuntime struct{}

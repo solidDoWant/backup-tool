@@ -10,6 +10,9 @@ import (
 	cnpgbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/backup"
 	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
 	filesbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/backup"
+	filesgroupbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/groupbackup"
+	filesgrouprestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/grouprestore"
+	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/layout"
 	filesrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/restore"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
@@ -19,6 +22,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/s3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // The generic, config-driven DR "application": rather than a hand-written Go assembler per app
@@ -26,7 +30,7 @@ import (
 // N volumes / M CNPG clusters / O S3 buckets. The engine (RemoteStage + the existing actions) is reused
 // verbatim; only the composition is lifted out of Go.
 //
-// Sources are grouped by kind (postgres/files/s3) as plain typed slices, which the existing config
+// Sources are grouped by kind (postgres/files/fileGroups/s3) as plain typed slices, which the existing config
 // toolchain (goccy strict YAML + go-playground/validator + invopop/jsonschema) handles directly. Backup
 // and restore are separate types (and files) because their direction-specific fields differ materially;
 // goccy strict mode then rejects a restore-only field in a backup file and vice-versa.
@@ -45,6 +49,26 @@ type GenericFilesSource struct {
 type GenericFilesBackupSource struct {
 	GenericFilesSource `yaml:",inline"`
 	SnapshotClass      string `yaml:"snapshotClass,omitempty"`
+}
+
+// GenericFileGroupSource captures (backup) / restores a label-selected group of data-directory PVCs into /
+// from the DR volume, frozen atomically as a single VolumeGroupSnapshot. The same selector is supplied in
+// both directions: at backup it selects the live member PVCs to snapshot together; at restore it re-resolves
+// the (already-hydrated) target PVCs so each captured member syncs back onto its identically-named PVC. The
+// capture lands under "fileGroups/<name>/<pvc>" on the DR volume (one member subdir per PVC). Shared by both
+// directions — v1 restores in place.
+type GenericFileGroupSource struct {
+	Name     string               `yaml:"name" jsonschema:"required"`     // slot id => DR subdir "fileGroups/<name>"
+	Selector metav1.LabelSelector `yaml:"selector" jsonschema:"required"` // member PVC selector (must match >=1 PVC)
+}
+
+// GenericFileGroupBackupSource is a file-group source plus backup-only capture options. SnapshotClass
+// selects the VolumeGroupSnapshotClass used when snapshotting the member PVCs; when empty the cluster
+// default is used. Restore takes no snapshot, so this field is backup-only and lives on a backup-specific
+// type (mirroring the files/postgres backup/restore split).
+type GenericFileGroupBackupSource struct {
+	GenericFileGroupSource `yaml:",inline"`
+	SnapshotClass          string `yaml:"snapshotClass,omitempty"`
 }
 
 // GenericS3Source syncs an object-store prefix to (backup) / from (restore) a subdirectory of the DR
@@ -86,13 +110,14 @@ type GenericBackupVolume struct {
 // GenericBackupConfig is the declarative backup config for the generic app. A backup produces the event
 // named backupName.
 type GenericBackupConfig struct {
-	Namespace      string                        `yaml:"namespace" jsonschema:"required"`
-	BackupName     string                        `yaml:"backupName" jsonschema:"required"`
-	BackupVolume   GenericBackupVolume           `yaml:"backupVolume,omitempty"`
-	CleanupTimeout helpers.MaxWaitTime           `yaml:"cleanupTimeout,omitempty"`
-	Postgres       []GenericPostgresBackupSource `yaml:"postgres,omitempty"`
-	Files          []GenericFilesBackupSource    `yaml:"files,omitempty"`
-	S3             []GenericS3Source             `yaml:"s3,omitempty"`
+	Namespace      string                         `yaml:"namespace" jsonschema:"required"`
+	BackupName     string                         `yaml:"backupName" jsonschema:"required"`
+	BackupVolume   GenericBackupVolume            `yaml:"backupVolume,omitempty"`
+	CleanupTimeout helpers.MaxWaitTime            `yaml:"cleanupTimeout,omitempty"`
+	Postgres       []GenericPostgresBackupSource  `yaml:"postgres,omitempty"`
+	Files          []GenericFilesBackupSource     `yaml:"files,omitempty"`
+	FileGroups     []GenericFileGroupBackupSource `yaml:"fileGroups,omitempty"`
+	S3             []GenericS3Source              `yaml:"s3,omitempty"`
 }
 
 // GenericRestoreConfig is the declarative restore config for the generic app. A restore reads the DR PVC
@@ -105,6 +130,7 @@ type GenericRestoreConfig struct {
 	CleanupTimeout helpers.MaxWaitTime            `yaml:"cleanupTimeout,omitempty"`
 	Postgres       []GenericPostgresRestoreSource `yaml:"postgres,omitempty"`
 	Files          []GenericFilesSource           `yaml:"files,omitempty"`
+	FileGroups     []GenericFileGroupSource       `yaml:"fileGroups,omitempty"`
 	S3             []GenericS3Source              `yaml:"s3,omitempty"`
 }
 
@@ -124,6 +150,12 @@ func validateSlotName(kind, name string) error {
 	if !genericSlotNameRegex.MatchString(name) {
 		return trace.BadParameter("%s source name %q is not DNS/path-safe (lowercase alphanumeric and '-', must start and end with an alphanumeric)", kind, name)
 	}
+	// The flat-slot namespace shares the DR-volume root with the file-groups parent (layout.FileGroupsDirName),
+	// so no slot may take its name. The lowercase-only regex above already rules this out, but enforce it
+	// explicitly so the invariant survives a future regex change rather than silently allowing a collision.
+	if name == layout.FileGroupsDirName {
+		return trace.BadParameter("%s source name %q is reserved for the file-groups directory", kind, name)
+	}
 	return nil
 }
 
@@ -139,6 +171,30 @@ func validateFilesSources(files []GenericFilesSource) error {
 		seen[src.Name] = struct{}{}
 		if src.PVC == "" {
 			return trace.BadParameter("files source %q: pvc is required", src.Name)
+		}
+	}
+	return nil
+}
+
+// isEmptyLabelSelector reports whether a selector constrains nothing. An empty LabelSelector matches every
+// PVC in the namespace, which for a file group would silently capture/restore unrelated volumes, so it is
+// rejected as a misconfiguration.
+func isEmptyLabelSelector(selector metav1.LabelSelector) bool {
+	return len(selector.MatchLabels) == 0 && len(selector.MatchExpressions) == 0
+}
+
+func validateFileGroupSources(groups []GenericFileGroupSource) error {
+	seen := make(map[string]struct{}, len(groups))
+	for _, src := range groups {
+		if err := validateSlotName("fileGroup", src.Name); err != nil {
+			return trace.Wrap(err)
+		}
+		if _, dup := seen[src.Name]; dup {
+			return trace.BadParameter("duplicate fileGroup slot name %q (collides on the on-disk subdir)", src.Name)
+		}
+		seen[src.Name] = struct{}{}
+		if isEmptyLabelSelector(src.Selector) {
+			return trace.BadParameter("fileGroup source %q: selector must match on at least one label or expression (an empty selector would match every PVC in the namespace)", src.Name)
 		}
 	}
 	return nil
@@ -164,8 +220,8 @@ func validateS3Sources(s3Sources []GenericS3Source) error {
 
 // Validate enforces the cross-field and per-source rules for a backup config.
 func (c GenericBackupConfig) Validate() error {
-	if len(c.Postgres)+len(c.Files)+len(c.S3) == 0 {
-		return trace.BadParameter("at least one source (postgres, files, or s3) must be configured")
+	if len(c.Postgres)+len(c.Files)+len(c.FileGroups)+len(c.S3) == 0 {
+		return trace.BadParameter("at least one source (postgres, files, fileGroups, or s3) must be configured")
 	}
 
 	pgNames := make(map[string]struct{}, len(c.Postgres))
@@ -195,14 +251,23 @@ func (c GenericBackupConfig) Validate() error {
 	if err := validateFilesSources(filesSources); err != nil {
 		return trace.Wrap(err)
 	}
+
+	fileGroupSources := make([]GenericFileGroupSource, len(c.FileGroups))
+	for i := range c.FileGroups {
+		fileGroupSources[i] = c.FileGroups[i].GenericFileGroupSource
+	}
+	if err := validateFileGroupSources(fileGroupSources); err != nil {
+		return trace.Wrap(err)
+	}
 	if err := validateS3Sources(c.S3); err != nil {
 		return trace.Wrap(err)
 	}
 
-	// A files source contributes its source PVC's requested storage, but postgres and S3 sources have no
-	// well-defined size contribution, so size must be set explicitly whenever the config has any of them.
-	if (len(c.Postgres) > 0 || len(c.S3) > 0) && c.BackupVolume.Size.IsZero() {
-		return trace.BadParameter("backupVolume.size is required when the config has postgres or s3 sources (their size cannot be inferred)")
+	// A files source contributes its source PVC's requested storage, but postgres, S3, and fileGroup sources
+	// have no well-defined size contribution (a fileGroup's membership is selector-resolved and variable), so
+	// size must be set explicitly whenever the config has any of them.
+	if (len(c.Postgres) > 0 || len(c.S3) > 0 || len(c.FileGroups) > 0) && c.BackupVolume.Size.IsZero() {
+		return trace.BadParameter("backupVolume.size is required when the config has postgres, s3, or fileGroup sources (their size cannot be inferred)")
 	}
 
 	return nil
@@ -210,8 +275,8 @@ func (c GenericBackupConfig) Validate() error {
 
 // Validate enforces the cross-field and per-source rules for a restore config.
 func (c GenericRestoreConfig) Validate() error {
-	if len(c.Postgres)+len(c.Files)+len(c.S3) == 0 {
-		return trace.BadParameter("at least one source (postgres, files, or s3) must be configured")
+	if len(c.Postgres)+len(c.Files)+len(c.FileGroups)+len(c.S3) == 0 {
+		return trace.BadParameter("at least one source (postgres, files, fileGroups, or s3) must be configured")
 	}
 
 	pgNames := make(map[string]struct{}, len(c.Postgres))
@@ -237,6 +302,9 @@ func (c GenericRestoreConfig) Validate() error {
 	if err := validateFilesSources(c.Files); err != nil {
 		return trace.Wrap(err)
 	}
+	if err := validateFileGroupSources(c.FileGroups); err != nil {
+		return trace.Wrap(err)
+	}
 	if err := validateS3Sources(c.S3); err != nil {
 		return trace.Wrap(err)
 	}
@@ -247,23 +315,27 @@ func (c GenericRestoreConfig) Validate() error {
 type GenericApp struct {
 	kubeClusterClient kubecluster.ClientInterface
 	// Testing injection
-	newCNPGBackup   func() cnpgbackup.CNPGBackupInterface
-	newCNPGRestore  func() cnpgrestore.CNPGRestoreInterface
-	newFilesBackup  func() filesbackup.FilesBackupInterface
-	newFilesRestore func() filesrestore.FilesRestoreInterface
-	newS3Sync       func() s3sync.S3SyncInterface
-	newRemoteStage  func(kubeClusterClient kubecluster.ClientInterface, namespace, eventName string, opts remote.RemoteStageOptions) remote.RemoteStageInterface
+	newCNPGBackup        func() cnpgbackup.CNPGBackupInterface
+	newCNPGRestore       func() cnpgrestore.CNPGRestoreInterface
+	newFilesBackup       func() filesbackup.FilesBackupInterface
+	newFilesRestore      func() filesrestore.FilesRestoreInterface
+	newFilesGroupBackup  func() filesgroupbackup.FilesGroupBackupInterface
+	newFilesGroupRestore func() filesgrouprestore.FilesGroupRestoreInterface
+	newS3Sync            func() s3sync.S3SyncInterface
+	newRemoteStage       func(kubeClusterClient kubecluster.ClientInterface, namespace, eventName string, opts remote.RemoteStageOptions) remote.RemoteStageInterface
 }
 
 func NewGenericApp(client kubecluster.ClientInterface) *GenericApp {
 	return &GenericApp{
-		kubeClusterClient: client,
-		newCNPGBackup:     cnpgbackup.NewCNPGBackup,
-		newCNPGRestore:    cnpgrestore.NewCNPGRestore,
-		newFilesBackup:    filesbackup.NewFilesBackup,
-		newFilesRestore:   filesrestore.NewFilesRestore,
-		newS3Sync:         s3sync.NewS3Sync,
-		newRemoteStage:    remote.NewRemoteStage,
+		kubeClusterClient:    client,
+		newCNPGBackup:        cnpgbackup.NewCNPGBackup,
+		newCNPGRestore:       cnpgrestore.NewCNPGRestore,
+		newFilesBackup:       filesbackup.NewFilesBackup,
+		newFilesRestore:      filesrestore.NewFilesRestore,
+		newFilesGroupBackup:  filesgroupbackup.NewFilesGroupBackup,
+		newFilesGroupRestore: filesgrouprestore.NewFilesGroupRestore,
+		newS3Sync:            s3sync.NewS3Sync,
+		newRemoteStage:       remote.NewRemoteStage,
 	}
 }
 
@@ -282,9 +354,10 @@ func resolveS3Credentials(creds s3.Credentials) s3.CredentialsInterface {
 }
 
 // Backup captures every configured source into the DR volume and snapshots it. Sources are registered in
-// a fixed kind order — postgres, then files, then s3 — independent of their order in the config. This is
-// consistency-load-bearing: the postgres base backups must precede the filesystem freeze that defines the
-// event's consistency point (see CLAUDE.md, RemoteStage consistency-point protocol).
+// a fixed kind order — postgres, then files, then fileGroups, then s3 — independent of their order in the
+// config. This is consistency-load-bearing: the postgres base backups must precede the filesystem freezes
+// (both files and fileGroups) that define the event's consistency point (see CLAUDE.md, RemoteStage
+// consistency-point protocol).
 func (g *GenericApp) Backup(ctx *contexts.Context, config GenericBackupConfig) (backup *DREvent, err error) {
 	if err := config.Validate(); err != nil {
 		return nil, trace.Wrap(err, "invalid backup configuration")
@@ -348,6 +421,17 @@ func (g *GenericApp) Backup(ctx *contexts.Context, config GenericBackupConfig) (
 		stage.WithAction(fmt.Sprintf("files %q backup", src.Name), action)
 	}
 
+	for _, src := range config.FileGroups {
+		action := g.newFilesGroupBackup()
+		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.Selector, backup.Name, src.Name, filesgroupbackup.FilesGroupBackupOptions{
+			SnapshotClass:  src.SnapshotClass,
+			CleanupTimeout: config.CleanupTimeout,
+		}); err != nil {
+			return backup, trace.Wrap(err, "failed to configure fileGroup source %q backup", src.Name)
+		}
+		stage.WithAction(fmt.Sprintf("fileGroup %q backup", src.Name), action)
+	}
+
 	for _, src := range config.S3 {
 		action := g.newS3Sync()
 		if err := action.Configure(g.kubeClusterClient, config.Namespace, backup.Name, src.Name, src.Path, resolveS3Credentials(src.Credentials), s3sync.DirectionDownload, s3sync.S3SyncOptions{}); err != nil {
@@ -373,8 +457,9 @@ func (g *GenericApp) Backup(ctx *contexts.Context, config GenericBackupConfig) (
 }
 
 // backupVolumeSize returns the explicit backupVolume.size when set. Otherwise (only reachable for a
-// files-only config — Validate requires an explicit size when postgres/s3 sources are present) it sums the
-// files sources' PVC requests and doubles the total, the same sizing the per-app Vaultwarden backup uses.
+// files-only config — Validate requires an explicit size when postgres/s3/fileGroup sources are present) it
+// sums the files sources' PVC requests and doubles the total, the same sizing the per-app Vaultwarden backup
+// uses.
 func (g *GenericApp) backupVolumeSize(ctx *contexts.Context, config GenericBackupConfig) (resource.Quantity, error) {
 	if !config.BackupVolume.Size.IsZero() {
 		return config.BackupVolume.Size, nil
@@ -441,6 +526,14 @@ func (g *GenericApp) Restore(ctx *contexts.Context, config GenericRestoreConfig)
 			return restore, trace.Wrap(err, "failed to configure files source %q restoration", src.Name)
 		}
 		stage.WithAction(fmt.Sprintf("files %q restore", src.Name), action)
+	}
+
+	for _, src := range config.FileGroups {
+		action := g.newFilesGroupRestore()
+		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.Selector, restore.Name, src.Name, filesgrouprestore.FilesGroupRestoreOptions{}); err != nil {
+			return restore, trace.Wrap(err, "failed to configure fileGroup source %q restoration", src.Name)
+		}
+		stage.WithAction(fmt.Sprintf("fileGroup %q restore", src.Name), action)
 	}
 
 	for _, src := range config.S3 {

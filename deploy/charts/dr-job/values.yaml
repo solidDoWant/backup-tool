@@ -128,11 +128,26 @@ resources:
             verbs:
               - get
           # External snapshotter (volume snapshot) resources
-          # Needed to snapshot volumes for cloning, and for making backup snapshots
+          # Needed to snapshot volumes for cloning and for backup snapshots; also covers the per-PVC members
+          # the controller materializes for a VolumeGroupSnapshot (the fileGroups source lists/watches them).
           - apiGroups:
               - snapshot.storage.k8s.io
             resources:
               - volumesnapshots
+            verbs:
+              - create
+              - get
+              - list
+              - watch
+              - delete
+          # External snapshotter VolumeGroupSnapshot resources
+          # Needed by the generic app's fileGroups source: it captures a label-selected PVC set as one atomic
+          # VolumeGroupSnapshot (created, waited on, deleted) that the controller fans out into the per-PVC
+          # volumesnapshots granted above.
+          - apiGroups:
+              - groupsnapshot.storage.k8s.io
+            resources:
+              - volumegroupsnapshots
             verbs:
               - create
               - get

@@ -84,3 +84,33 @@ func TestFilesClient_SyncFiles(t *testing.T) {
 		&files_v1.SyncFilesResponse{},
 	)
 }
+
+func TestFilesClient_ListDirectory(t *testing.T) {
+	path := "path"
+	request := files_v1.ListDirectoryRequest_builder{Path: &path}.Build()
+
+	t.Run("successful", func(t *testing.T) {
+		entries := []string{"a", "b"}
+		response := files_v1.ListDirectoryResponse_builder{Entries: entries}.Build()
+
+		mockClient := files_v1.NewMockFilesClient()
+		mockClient.On("ListDirectory", mock.Anything, request, mock.Anything).Return(response, nil)
+
+		fc := &FilesClient{client: mockClient}
+		got, err := fc.ListDirectory(th.NewTestContext(), path)
+		assert.NoError(t, err)
+		assert.Equal(t, entries, got)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := files_v1.NewMockFilesClient()
+		mockClient.On("ListDirectory", mock.Anything, request, mock.Anything).Return(nil, assert.AnError)
+
+		fc := &FilesClient{client: mockClient}
+		got, err := fc.ListDirectory(th.NewTestContext(), path)
+		assert.Error(t, err)
+		assert.Nil(t, got)
+		mockClient.AssertExpectations(t)
+	})
+}

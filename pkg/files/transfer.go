@@ -84,6 +84,32 @@ func (lr *LocalRuntime) SyncFiles(ctx *contexts.Context, src, dest string) (err 
 	return lr.CopyFiles(ctx.Child(), src, dest)
 }
 
+// Lists the names of the immediate subdirectories of the provided path. Non-directory entries are
+// omitted. The returned names are entry names only, not full paths. The directory must exist.
+func (*LocalRuntime) ListDirectory(ctx *contexts.Context, path string) (entries []string, err error) {
+	ctx.Log.With("path", path).Info("Listing directory")
+	defer ctx.Log.Info("Finished listing directory", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
+
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, trace.Errorf("no path provided")
+	}
+
+	dirEntries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to read directory %q", path)
+	}
+
+	entries = make([]string, 0, len(dirEntries))
+	for _, entry := range dirEntries {
+		if entry.IsDir() {
+			entries = append(entries, entry.Name())
+		}
+	}
+
+	return entries, nil
+}
+
 func deleteMissingFiles(ctx *contexts.Context, src, dest string) error {
 	ctx.Log.Info("Deleting files in the destination that are missing from the source")
 	defer ctx.Log.Info("Finished deleting files")

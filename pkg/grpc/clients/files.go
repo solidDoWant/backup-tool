@@ -45,3 +45,20 @@ func (fc *FilesClient) SyncFiles(ctx *contexts.Context, src, dest string) error 
 	_, err := fc.client.SyncFiles(ctx.Child(), request, grpc.Header(&header))
 	return trail.FromGRPC(err, header)
 }
+
+func (fc *FilesClient) ListDirectory(ctx *contexts.Context, path string) ([]string, error) {
+	ctx.Log.With("path", path).Info("Listing directory")
+	defer ctx.Log.Info("Finished listing directory", ctx.Stopwatch.Keyval())
+
+	request := files_v1.ListDirectoryRequest_builder{
+		Path: &path,
+	}.Build()
+
+	var header metadata.MD
+	response, err := fc.client.ListDirectory(ctx.Child(), request, grpc.Header(&header))
+	if err != nil {
+		return nil, trail.FromGRPC(err, header)
+	}
+
+	return response.GetEntries(), nil
+}

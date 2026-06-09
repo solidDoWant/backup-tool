@@ -7,4 +7,5 @@ import "files_transfer.proto";
 service Files {
   rpc CopyFiles(CopyFilesRequest) returns (CopyFilesResponse);
   rpc SyncFiles(SyncFilesRequest) returns (SyncFilesResponse);
+  rpc ListDirectory(ListDirectoryRequest) returns (ListDirectoryResponse);
 }

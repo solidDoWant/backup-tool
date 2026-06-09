@@ -663,6 +663,66 @@ func (_c *MockClientInterface_GetPVC_Call) RunAndReturn(run func(*contexts.Conte
 	return _c
 }
 
+// ListPVCs provides a mock function with given fields: ctx, namespace, opts
+func (_m *MockClientInterface) ListPVCs(ctx *contexts.Context, namespace string, opts ListPVCsOptions) ([]v1.PersistentVolumeClaim, error) {
+	ret := _m.Called(ctx, namespace, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPVCs")
+	}
+
+	var r0 []v1.PersistentVolumeClaim
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, ListPVCsOptions) ([]v1.PersistentVolumeClaim, error)); ok {
+		return rf(ctx, namespace, opts)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, ListPVCsOptions) []v1.PersistentVolumeClaim); ok {
+		r0 = rf(ctx, namespace, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]v1.PersistentVolumeClaim)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, ListPVCsOptions) error); ok {
+		r1 = rf(ctx, namespace, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_ListPVCs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPVCs'
+type MockClientInterface_ListPVCs_Call struct {
+	*mock.Call
+}
+
+// ListPVCs is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - opts ListPVCsOptions
+func (_e *MockClientInterface_Expecter) ListPVCs(ctx interface{}, namespace interface{}, opts interface{}) *MockClientInterface_ListPVCs_Call {
+	return &MockClientInterface_ListPVCs_Call{Call: _e.mock.On("ListPVCs", ctx, namespace, opts)}
+}
+
+func (_c *MockClientInterface_ListPVCs_Call) Run(run func(ctx *contexts.Context, namespace string, opts ListPVCsOptions)) *MockClientInterface_ListPVCs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(ListPVCsOptions))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_ListPVCs_Call) Return(_a0 []v1.PersistentVolumeClaim, _a1 error) *MockClientInterface_ListPVCs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_ListPVCs_Call) RunAndReturn(run func(*contexts.Context, string, ListPVCsOptions) ([]v1.PersistentVolumeClaim, error)) *MockClientInterface_ListPVCs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetCommonLabels provides a mock function with given fields: labels
 func (_m *MockClientInterface) SetCommonLabels(labels map[string]string) {
 	_m.Called(labels)

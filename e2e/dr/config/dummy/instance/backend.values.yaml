@@ -111,6 +111,70 @@ persistence:
         seed-data:
           - path: /data
 rawResources:
+  # --- File-group source: two label-selected PVCs on the VGS-capable host-path driver (openebs-zfs can't do
+  # group snapshots), each seeded with a known file. The generic config's fileGroups source captures both
+  # atomically as one VolumeGroupSnapshot; restore is in-place onto these same PVCs (resolved by the same
+  # selector), so the dummy test corrupts them after the backup to make the restore a real round-trip. ---
+  dummy-shard-a-pvc:
+    forceRename: dummy-shard-a
+    manifest:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        labels:
+          app: dummy-fileshard
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: csi-hostpath-sc
+        resources:
+          requests:
+            storage: 64Mi
+  dummy-shard-b-pvc:
+    forceRename: dummy-shard-b
+    manifest:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        labels:
+          app: dummy-fileshard
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: csi-hostpath-sc
+        resources:
+          requests:
+            storage: 64Mi
+  dummy-shard-seed-job:
+    forceRename: dummy-shard-seed
+    manifest:
+      apiVersion: batch/v1
+      kind: Job
+      spec:
+        backoffLimit: 6
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: seed
+                image: busybox:stable
+                command:
+                  - /bin/sh
+                  - -c
+                args:
+                  - printf 'shard-a-seed' > /a/d.txt && printf 'shard-b-seed' > /b/d.txt
+                volumeMounts:
+                  - name: a
+                    mountPath: /a
+                  - name: b
+                    mountPath: /b
+            volumes:
+              - name: a
+                persistentVolumeClaim:
+                  claimName: dummy-shard-a
+              - name: b
+                persistentVolumeClaim:
+                  claimName: dummy-shard-b
   dummy-db1-serving-cert:
     forceRename: dummy-db1-serving
     manifest:

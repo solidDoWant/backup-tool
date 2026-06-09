@@ -128,7 +128,13 @@ func verifyDummyRestoredData(namespace string) features.Func {
 			`echo "db2=[$db2]"`,
 			`files=$(cat /data/hello.txt 2>&1) || true`,
 			`echo "files=[$files]"`,
-			`[ "$db1" = db1-seed ] && [ "$db2" = db2-seed ] && [ "$files" = files-seed ]`,
+			// The two file-group shard PVCs were corrupted after the backup, so matching the seeded
+			// content here proves the in-place group restore reproduced each member from the DR volume.
+			`shardA=$(cat /shard-a/d.txt 2>&1) || true`,
+			`echo "shardA=[$shardA]"`,
+			`shardB=$(cat /shard-b/d.txt 2>&1) || true`,
+			`echo "shardB=[$shardB]"`,
+			`[ "$db1" = db1-seed ] && [ "$db2" = db2-seed ] && [ "$files" = files-seed ] && [ "$shardA" = shard-a-seed ] && [ "$shardB" = shard-b-seed ]`,
 			"echo verify-ok",
 		}, "\n")
 
@@ -151,6 +157,8 @@ func verifyDummyRestoredData(namespace string) features.Func {
 								{Name: "db1", MountPath: "/certs/db1", ReadOnly: true},
 								{Name: "db2", MountPath: "/certs/db2", ReadOnly: true},
 								{Name: "data", MountPath: "/data", ReadOnly: true},
+								{Name: "shard-a", MountPath: "/shard-a", ReadOnly: true},
+								{Name: "shard-b", MountPath: "/shard-b", ReadOnly: true},
 							},
 						}},
 						Volumes: []corev1.Volume{
@@ -158,6 +166,8 @@ func verifyDummyRestoredData(namespace string) features.Func {
 							{Name: "db1", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "dummy-restore-db1-serving"}}},
 							{Name: "db2", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "dummy-restore-db2-serving"}}},
 							{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "dummy-restore-backend-data-vol"}}},
+							{Name: "shard-a", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "dummy-shard-a"}}},
+							{Name: "shard-b", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "dummy-shard-b"}}},
 						},
 					},
 				},
@@ -183,6 +193,64 @@ func verifyDummyRestoredData(namespace string) features.Func {
 		assert.NoError(t, err, "verification job did not finish")
 		if !assert.Equal(t, batchv1.JobComplete, finalCondition.Type, "restored data verification failed") {
 			t.Logf("verification job pod logs:\n%s", jobPodLogs(ctx, c, namespace, job.Name))
+		}
+
+		return ctx
+	}
+}
+
+// corruptShardData runs a one-shot Job that overwrites both file-group shard PVCs (dummy-shard-a/b), then
+// waits for it. Run between the backup and the restore so the in-place group restore is a real round-trip -
+// without it the verify job's seeded-content check would pass even on a no-op restore. The shard PVCs are
+// ReadWriteOnce and free here (the seed and backup-tool pods have terminated), and this pod terminates
+// before the restore tool pod needs them.
+func corruptShardData(namespace string) features.Func {
+	return func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{Name: "dummy-shard-corrupt", Namespace: namespace},
+			Spec: batchv1.JobSpec{
+				BackoffLimit: new(int32(3)),
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyNever,
+						Containers: []corev1.Container{{
+							Name:    "corrupt",
+							Image:   "busybox:stable",
+							Command: []string{"/bin/sh", "-c"},
+							Args:    []string{"printf corrupt-a > /a/d.txt && printf corrupt-b > /b/d.txt"},
+							VolumeMounts: []corev1.VolumeMount{
+								{Name: "a", MountPath: "/a"},
+								{Name: "b", MountPath: "/b"},
+							},
+						}},
+						Volumes: []corev1.Volume{
+							{Name: "a", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "dummy-shard-a"}}},
+							{Name: "b", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "dummy-shard-b"}}},
+						},
+					},
+				},
+			},
+		}
+
+		client := c.Client()
+		require.NoError(t, client.Resources().Create(ctx, job), "failed to create shard corruption job")
+
+		var finalCondition batchv1.JobCondition
+		err := wait.For(func(ctx context.Context) (bool, error) {
+			if err := client.Resources().Get(ctx, job.Name, namespace, job); err != nil {
+				return false, trace.Wrap(err, "failed to get shard corruption job")
+			}
+			for _, condition := range job.Status.Conditions {
+				if (condition.Type == batchv1.JobComplete || condition.Type == batchv1.JobFailed) && condition.Status == corev1.ConditionTrue {
+					finalCondition = condition
+					return true, nil
+				}
+			}
+			return false, nil
+		}, wait.WithContext(ctx), wait.WithInterval(5*time.Second), wait.WithTimeout(5*time.Minute))
+		assert.NoError(t, err, "shard corruption job did not finish")
+		if !assert.Equal(t, batchv1.JobComplete, finalCondition.Type, "shard corruption job failed") {
+			t.Logf("shard corruption job pod logs:\n%s", jobPodLogs(ctx, c, namespace, job.Name))
 		}
 
 		return ctx
@@ -235,8 +303,15 @@ func TestDummy(t *testing.T) {
 			assertSeedFile(t, filepath.Join(mountpoint, "bucket1", "seed.txt"), "bucket1-seed")
 			assertSeedFile(t, filepath.Join(mountpoint, "bucket2", "seed.txt"), "bucket2-seed")
 
+			// The fileGroups source captured both label-selected shard PVCs as one VolumeGroupSnapshot into
+			// fileGroups/<group>/<pvc>/. Both member subdirs present with their seeded content confirms the
+			// group was frozen and synced atomically (one subdir per member PVC, keyed by source PVC name).
+			assertSeedFile(t, filepath.Join(mountpoint, "fileGroups", "shards", "dummy-shard-a", "d.txt"), "shard-a-seed")
+			assertSeedFile(t, filepath.Join(mountpoint, "fileGroups", "shards", "dummy-shard-b", "d.txt"), "shard-b-seed")
+
 			return ctx
 		}).
+		Assess("file-group shards are corrupted before restore", corruptShardData(namespace)).
 		Teardown(uninstallBTHelmChart(backupReleaseName, namespace)).
 		Setup(installBTHelmChart(restoreReleaseName, namespace, "generic", "restore", "config/dummy/tests/restore.values.yaml", s3Creds...)).
 		Assess("restore resources are deployed", verifyCronJobIsDeployed(restoreCronJobName, namespace)).

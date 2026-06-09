@@ -53,6 +53,7 @@ func TestMain(m *testing.M) {
 	pushImageSetup, pushImageFinish := PushImage()
 	buildChartSetup, buildChartFinish := BuildChart()
 	zfsPoolSetup, zfsPoolFinish := ZfsPool(clusterName)
+	deploySnapshotVGSSetup, deploySnapshotVGSFinish := DeploySnapshotVGS()
 	deployDependentServicesSetup, deployDependentServicesFinish := DeployDependentServices(clusterName)
 	addTestHelmReposSetup, addTestHelmReposFinish := AddTestHelmRepos()
 
@@ -66,8 +67,13 @@ func TestMain(m *testing.M) {
 		timed("cluster", clusterSetup),
 		Parallel(
 			Sequential(timed("registry", registrySetup), timed("push-image", pushImageSetup)),
-			// The ZFS pool must exist before the dependent services (openebs consumes it).
-			Sequential(timed("zfs-pool", zfsPoolSetup), timed("dependent-services", deployDependentServicesSetup)),
+			// The ZFS pool must exist before the dependent services (openebs consumes it), and the snapshot
+			// stack + host-path driver must too (its CRDs must exist before openebs' csi-snapshotter sidecar
+			// starts). Those two are independent, so they run concurrently before dependent-services.
+			Sequential(
+				Parallel(timed("zfs-pool", zfsPoolSetup), timed("snapshot-vgs", deploySnapshotVGSSetup)),
+				timed("dependent-services", deployDependentServicesSetup),
+			),
 			timed("build-chart", buildChartSetup),
 			timed("add-test-helm-repos", addTestHelmReposSetup),
 		),
@@ -82,6 +88,7 @@ func TestMain(m *testing.M) {
 		Parallel(
 			Sequential(timed("push-image-finish", pushImageFinish), timed("registry-finish", registryFinish)),
 			timed("dependent-services-finish", deployDependentServicesFinish),
+			timed("snapshot-vgs-finish", deploySnapshotVGSFinish),
 			timed("build-chart-finish", buildChartFinish),
 			timed("add-test-helm-repos-finish", addTestHelmReposFinish),
 		),
@@ -432,6 +439,59 @@ func ZfsPool(clusterName string) (types.EnvFunc, types.EnvFunc) {
 		}
 
 		return ctx, trace.NewAggregate(errors...)
+	}
+
+	return setup, finish
+}
+
+// DeploySnapshotVGS installs the external-snapshotter v8.6.0 snapshot stack (CRDs + controller) plus the
+// host-path CSI driver, for VolumeGroupSnapshot coverage. It replaces the piraeus snapshot-controller chart:
+// that chart only reaches external-snapshotter v8.5.0, whose VGS CRD serves v1beta1/v1beta2, while
+// backup-tool uses the GA groupsnapshot.storage.k8s.io/v1 API first served by v8.6.0 (which has no helm chart
+// yet). v8.6.0 still serves VolumeSnapshot v1, so the existing zfs-backed apps are unaffected. Must run
+// before DeployDependentServices so the snapshot CRDs exist before openebs' csi-snapshotter sidecar starts.
+//
+// Everything is fetched from upstream at pinned versions (nothing vendored): the CRDs + controller via a
+// kustomization referencing git refs, and the host-path manifests - which have no kustomization base - via
+// raw-URL `kubectl apply -f` plus a patch (snapshotter-patch.yaml). There is no teardown; TestMain destroys
+// the cluster wholesale.
+func DeploySnapshotVGS() (types.EnvFunc, types.EnvFunc) {
+	// Real path is kubernetes-1.30: deploy/kubernetes-1.31 (and -latest) are symlinks to it in this tag, and
+	// raw.githubusercontent.com does not follow directory symlinks (a 1.31 URL 404s).
+	const hostpathDir = "https://raw.githubusercontent.com/kubernetes-csi/csi-driver-host-path/v1.17.1/deploy/kubernetes-1.30/hostpath"
+
+	// Sidecar RBAC, pinned to the sidecar image versions in the plugin manifest; defines the external-*-runner
+	// ClusterRoles / *-cfg Roles the plugin's ServiceAccount bindings reference.
+	sidecarRBAC := []string{
+		"https://raw.githubusercontent.com/kubernetes-csi/external-provisioner/v5.2.0/deploy/kubernetes/rbac.yaml",
+		"https://raw.githubusercontent.com/kubernetes-csi/external-attacher/v4.8.0/deploy/kubernetes/rbac.yaml",
+		"https://raw.githubusercontent.com/kubernetes-csi/external-resizer/v1.13.1/deploy/kubernetes/rbac.yaml",
+		"https://raw.githubusercontent.com/kubernetes-csi/external-health-monitor/v0.14.0/deploy/kubernetes/external-health-monitor-controller/rbac.yaml",
+		"https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.6.0/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml",
+	}
+
+	commands := []string{
+		// Snapshot CRDs + controller (external-snapshotter v8.6.0) + the controller's VGS feature gate.
+		"kubectl apply -k ./config/setup/csi-snapshot-vgs",
+		// Host-path sidecar RBAC, then the CSIDriver + node plugin. RBAC first so the plugin's sidecars have
+		// it as soon as they start.
+		"kubectl apply -f " + strings.Join(sidecarRBAC, " -f "),
+		"kubectl apply -f " + hostpathDir + "/csi-hostpath-driverinfo.yaml -f " + hostpathDir + "/csi-hostpath-plugin.yaml",
+		// Match the csi-snapshotter sidecar to the v8.6.0 controller and enable the VGS feature gate on it.
+		"kubectl -n default patch statefulset csi-hostpathplugin --type=strategic --patch-file ./config/setup/csi-snapshot-vgs/snapshotter-patch.yaml",
+	}
+
+	setup := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		for _, command := range commands {
+			if p := utils.RunCommand(command); p.Err() != nil {
+				return ctx, trace.Wrap(p.Err(), "failed to deploy the snapshot stack / host-path driver via %q: %s", command, p.Result())
+			}
+		}
+		return ctx, nil
+	}
+
+	finish := func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		return ctx, nil
 	}
 
 	return setup, finish

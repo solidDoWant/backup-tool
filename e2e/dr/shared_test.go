@@ -230,9 +230,12 @@ func verifyJobSucceeds(cronJobName, namespace string) func(ctx context.Context, 
 		}, wait.WithContext(ctx), wait.WithInterval(10*time.Second), wait.WithTimeout(20*time.Minute))
 		assert.NoError(t, err)
 
-		// Verify that the job reports success
-		assert.Equal(t, batchv1.JobComplete, finalCondition.Type)
-		assert.Equal(t, corev1.ConditionTrue, finalCondition.Status)
+		// Verify that the job reports success. On failure, surface the DR job pod's logs (which carry the
+		// driver's trace.DebugReport) — the cluster is torn down before the test process exits, so this is
+		// the only chance to see why a backup/restore failed.
+		if !assert.Equal(t, batchv1.JobComplete, finalCondition.Type) || !assert.Equal(t, corev1.ConditionTrue, finalCondition.Status) {
+			t.Logf("DR job %q pod logs:\n%s", jobName, jobPodLogs(ctx, c, namespace, jobName))
+		}
 
 		return ctx
 	}

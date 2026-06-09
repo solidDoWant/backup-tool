@@ -33,6 +33,12 @@ jobConfig:
     files:
       - name: files # => DR subdir "files"
         pvc: dummy-backend-data-vol
+    fileGroups:
+      - name: shards # => DR subtree "fileGroups/shards/<pvc>"
+        snapshotClass: csi-hostpath-groupsnapclass
+        selector:
+          matchLabels:
+            app: dummy-fileshard
     s3:
       - name: bucket1 # => DR subdir "bucket1"
         path: s3://dummy-bucket1/

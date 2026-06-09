@@ -160,6 +160,75 @@ func TestGetPVC(t *testing.T) {
 	}
 }
 
+func TestListPVCs(t *testing.T) {
+	namespace := "test-ns"
+
+	pvcWithLabels := func(name string, labels map[string]string) *corev1.PersistentVolumeClaim {
+		return &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: labels},
+		}
+	}
+
+	initialPVCs := []*corev1.PersistentVolumeClaim{
+		pvcWithLabels("app-a", map[string]string{"app": "test"}),
+		pvcWithLabels("app-b", map[string]string{"app": "test"}),
+		pvcWithLabels("other", map[string]string{"app": "other"}),
+	}
+
+	tests := []struct {
+		name                string
+		opts                ListPVCsOptions
+		expectedNames       []string
+		simulateClientError bool
+	}{
+		{
+			name:          "filters by label selector",
+			opts:          ListPVCsOptions{LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}}},
+			expectedNames: []string{"app-a", "app-b"},
+		},
+		{
+			name:          "empty selector matches all",
+			expectedNames: []string{"app-a", "app-b", "other"},
+		},
+		{
+			name:                "client error",
+			simulateClientError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, mockK8s := createTestClient()
+			ctx := th.NewTestContext()
+
+			for _, pvc := range initialPVCs {
+				_, err := mockK8s.CoreV1().PersistentVolumeClaims(namespace).Create(ctx, pvc, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
+
+			if tt.simulateClientError {
+				mockK8s.PrependReactor("list", "persistentvolumeclaims", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, assert.AnError
+				})
+			}
+
+			pvcs, err := c.ListPVCs(ctx, namespace, tt.opts)
+			if tt.simulateClientError {
+				require.Error(t, err)
+				require.Nil(t, pvcs)
+				return
+			}
+			require.NoError(t, err)
+
+			names := make([]string, 0, len(pvcs))
+			for _, pvc := range pvcs {
+				names = append(names, pvc.Name)
+			}
+			require.ElementsMatch(t, tt.expectedNames, names)
+		})
+	}
+}
+
 func TestDoesPVCExist(t *testing.T) {
 	namespace := "test-ns"
 	pvcName := "test-pvc"

@@ -1,4 +1,0 @@
----
-controller:
-  args:
-    feature-gates: CSIVolumeGroupSnapshot=true

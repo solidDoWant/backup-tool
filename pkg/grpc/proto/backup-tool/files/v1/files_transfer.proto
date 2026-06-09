@@ -15,3 +15,11 @@ message SyncFilesRequest {
 }
 
 message SyncFilesResponse {}
+
+message ListDirectoryRequest {
+  string path = 1;
+}
+
+message ListDirectoryResponse {
+  repeated string entries = 1;
+}

@@ -60,6 +60,28 @@ func (kc *Client) GetPVC(ctx *contexts.Context, namespace, name string) (*corev1
 	return pvc, nil
 }
 
+type ListPVCsOptions struct {
+	// LabelSelector filters the returned PVCs. The zero value matches every PVC in the namespace.
+	LabelSelector meta_v1.LabelSelector
+}
+
+// ListPVCs returns the PVCs in the namespace matching opts.LabelSelector.
+func (c *Client) ListPVCs(ctx *contexts.Context, namespace string, opts ListPVCsOptions) ([]corev1.PersistentVolumeClaim, error) {
+	ctx.Log.With("selector", meta_v1.FormatLabelSelector(&opts.LabelSelector)).Info("Listing PVCs")
+
+	labelSelector, err := meta_v1.LabelSelectorAsSelector(&opts.LabelSelector)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to convert label selector")
+	}
+
+	pvcList, err := c.client.CoreV1().PersistentVolumeClaims(namespace).List(ctx, meta_v1.ListOptions{LabelSelector: labelSelector.String()})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to list PVCs in namespace %q", namespace)
+	}
+
+	return pvcList.Items, nil
+}
+
 func (c *Client) DoesPVCExist(ctx *contexts.Context, namespace, name string) (doesExist bool, err error) {
 	ctx.Log.With("name", name).Info("Checking if PVC exists")
 	defer ctx.Log.Debug("PVC status", "exists", doesExist, contexts.ErrorKeyvals(&err))

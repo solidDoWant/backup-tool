@@ -46,6 +46,22 @@
         "secretAccessKey"
       ]
     },
+    "GenericFileGroupSource": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/$defs/LabelSelector"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "selector"
+      ]
+    },
     "GenericFilesSource": {
       "properties": {
         "name": {
@@ -115,6 +131,12 @@
           },
           "type": "array"
         },
+        "fileGroups": {
+          "items": {
+            "$ref": "#/$defs/GenericFileGroupSource"
+          },
+          "type": "array"
+        },
         "s3": {
           "items": {
             "$ref": "#/$defs/GenericS3Source"
@@ -147,6 +169,42 @@
         "name",
         "path"
       ]
+    },
+    "LabelSelector": {
+      "properties": {
+        "MatchLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "MatchExpressions": {
+          "items": {
+            "$ref": "#/$defs/LabelSelectorRequirement"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "LabelSelectorRequirement": {
+      "properties": {
+        "Key": {
+          "type": "string"
+        },
+        "Operator": {
+          "type": "string"
+        },
+        "Values": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
     },
     "NewClusterUserCertOptsCRP": {
       "properties": {

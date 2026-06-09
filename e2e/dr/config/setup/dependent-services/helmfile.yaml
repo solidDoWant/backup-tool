@@ -11,8 +11,6 @@ helmDefaults:
   timeout: 600 # Increased due to throttling
 
 repositories:
-  - name: piraeus-charts
-    url: https://piraeus.io/helm-charts/
   - name: openebs-charts
     url: https://openebs.github.io/openebs
   # SeaweedFS is used instead of Minio for object storage because Minio
@@ -29,18 +27,14 @@ repositories:
     url: https://bjw-s-labs.github.io/helm-charts
 
 releases:
-  - name: volume-snapshot-controller
-    chart: piraeus-charts/snapshot-controller
-    version: 4.0.0
-    atomic: true
-    values:
-      - ./snapshot-controller.values.yaml
+  # NOTE: the snapshot-controller + snapshot CRDs are NOT installed here - the DeploySnapshotVGS setup step
+  # installs them out-of-band (external-snapshotter v8.6.0, for the GA VolumeGroupSnapshot API; see
+  # setup_test.go for why). It runs before this helmfile, so the CRDs exist before openebs' csi-snapshotter
+  # sidecar starts.
   - name: openebs
     chart: openebs-charts/openebs
     version: 4.1.1
     atomic: true
-    needs:
-      - volume-snapshot-controller
     values:
       - ./openebs.values.yaml
   - name: seeweedfs
@@ -91,7 +85,6 @@ releases:
     version: 5.0.1
     atomic: true
     needs:
-      - volume-snapshot-controller
       - openebs
       - cert-manager
       - approver-policy

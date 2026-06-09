@@ -26,6 +26,7 @@ type ClientInterface interface {
 	// PVCs
 	CreatePVC(ctx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error)
 	GetPVC(ctx *contexts.Context, namespace, name string) (*corev1.PersistentVolumeClaim, error)
+	ListPVCs(ctx *contexts.Context, namespace string, opts ListPVCsOptions) ([]corev1.PersistentVolumeClaim, error)
 	DoesPVCExist(ctx *contexts.Context, namespace, name string) (bool, error)
 	EnsurePVCExists(ctx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error)
 	DeletePVC(ctx *contexts.Context, namespace, volumeName string) error

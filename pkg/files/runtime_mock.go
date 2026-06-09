@@ -68,6 +68,65 @@ func (_c *MockRuntime_CopyFiles_Call) RunAndReturn(run func(*contexts.Context, s
 	return _c
 }
 
+// ListDirectory provides a mock function with given fields: ctx, path
+func (_m *MockRuntime) ListDirectory(ctx *contexts.Context, path string) ([]string, error) {
+	ret := _m.Called(ctx, path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListDirectory")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string) ([]string, error)); ok {
+		return rf(ctx, path)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string) []string); ok {
+		r0 = rf(ctx, path)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string) error); ok {
+		r1 = rf(ctx, path)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntime_ListDirectory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListDirectory'
+type MockRuntime_ListDirectory_Call struct {
+	*mock.Call
+}
+
+// ListDirectory is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - path string
+func (_e *MockRuntime_Expecter) ListDirectory(ctx interface{}, path interface{}) *MockRuntime_ListDirectory_Call {
+	return &MockRuntime_ListDirectory_Call{Call: _e.mock.On("ListDirectory", ctx, path)}
+}
+
+func (_c *MockRuntime_ListDirectory_Call) Run(run func(ctx *contexts.Context, path string)) *MockRuntime_ListDirectory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRuntime_ListDirectory_Call) Return(_a0 []string, _a1 error) *MockRuntime_ListDirectory_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntime_ListDirectory_Call) RunAndReturn(run func(*contexts.Context, string) ([]string, error)) *MockRuntime_ListDirectory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SyncFiles provides a mock function with given fields: ctx, src, dest
 func (_m *MockRuntime) SyncFiles(ctx *contexts.Context, src string, dest string) error {
 	ret := _m.Called(ctx, src, dest)

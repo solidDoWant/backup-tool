@@ -23,6 +23,32 @@ rawResources:
           snapshot.storage.kubernetes.io/is-default-class: "true"
       driver: zfs.csi.openebs.io
       deletionPolicy: Delete
+  # Host-path CSI driver storage classes (the driver itself is installed by the DeploySnapshotVGS setup
+  # step). openebs zfs-localpv can't take VolumeGroupSnapshots, so the generic app's fileGroups coverage uses
+  # the host-path driver instead; these stay NON-default so the existing apps keep openebs-zfs. Defined here
+  # rather than in the csi-snapshot-vgs kustomize so the snapshot CRDs exist before the VolumeGroupSnapshotClass.
+  hostpathStorageClass:
+    forceRename: csi-hostpath-sc
+    manifest:
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      provisioner: hostpath.csi.k8s.io
+      reclaimPolicy: Delete
+      volumeBindingMode: Immediate
+  hostpathVolumeSnapshotClass:
+    forceRename: csi-hostpath-snapclass
+    manifest:
+      kind: VolumeSnapshotClass
+      apiVersion: snapshot.storage.k8s.io/v1
+      driver: hostpath.csi.k8s.io
+      deletionPolicy: Delete
+  hostpathVolumeGroupSnapshotClass:
+    forceRename: csi-hostpath-groupsnapclass
+    manifest:
+      kind: VolumeGroupSnapshotClass
+      apiVersion: groupsnapshot.storage.k8s.io/v1
+      driver: hostpath.csi.k8s.io
+      deletionPolicy: Delete
   # x509
   selfSignedCert:
     forceRename: self-signed

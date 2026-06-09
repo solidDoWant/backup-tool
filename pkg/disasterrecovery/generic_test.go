@@ -9,6 +9,8 @@ import (
 	cnpgbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/backup"
 	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
 	filesbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/backup"
+	filesgroupbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/groupbackup"
+	filesgrouprestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/grouprestore"
 	filesrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/restore"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
@@ -22,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // validBackupConfig returns a minimal, valid Vaultwarden-shaped backup config.
@@ -37,6 +40,10 @@ func validBackupConfig() GenericBackupConfig {
 			ServingCertIssuer: "cnpg-serving-ca",
 		}},
 		Files: []GenericFilesBackupSource{{GenericFilesSource: GenericFilesSource{Name: "data", PVC: "vw-data"}, SnapshotClass: "ceph-block-snap"}},
+		FileGroups: []GenericFileGroupBackupSource{{
+			GenericFileGroupSource: GenericFileGroupSource{Name: "shards", Selector: metav1.LabelSelector{MatchLabels: map[string]string{"app": "vw-shard"}}},
+			SnapshotClass:          "ceph-block-group-snap",
+		}},
 		S3: []GenericS3Source{{
 			Name:        "media",
 			Path:        "s3://media-bucket/vw",
@@ -56,6 +63,10 @@ func validRestoreConfig() GenericRestoreConfig {
 			ServingCert:    "vw-db-serving",
 		}},
 		Files: []GenericFilesSource{{Name: "data", PVC: "vw-data"}},
+		FileGroups: []GenericFileGroupSource{{
+			Name:     "shards",
+			Selector: metav1.LabelSelector{MatchLabels: map[string]string{"app": "vw-shard"}},
+		}},
 		S3: []GenericS3Source{{
 			Name:        "media",
 			Path:        "s3://media-bucket/vw",
@@ -91,7 +102,7 @@ func TestGenericBackupConfigValidate(t *testing.T) {
 	}{
 		{
 			name:      "no sources",
-			mutate:    func(c *GenericBackupConfig) { c.Postgres = nil; c.Files = nil; c.S3 = nil },
+			mutate:    func(c *GenericBackupConfig) { c.Postgres = nil; c.Files = nil; c.FileGroups = nil; c.S3 = nil },
 			errSubstr: "at least one source",
 		},
 		{
@@ -104,9 +115,30 @@ func TestGenericBackupConfigValidate(t *testing.T) {
 			mutate: func(c *GenericBackupConfig) {
 				c.Postgres = nil
 				c.Files = nil
+				c.FileGroups = nil
 				c.BackupVolume.Size = resource.Quantity{}
 			},
 			errSubstr: "backupVolume.size is required",
+		},
+		{
+			name: "size required with fileGroup source only",
+			mutate: func(c *GenericBackupConfig) {
+				c.Postgres = nil
+				c.Files = nil
+				c.S3 = nil
+				c.BackupVolume.Size = resource.Quantity{}
+			},
+			errSubstr: "backupVolume.size is required",
+		},
+		{
+			name:      "duplicate fileGroup slot name",
+			mutate:    func(c *GenericBackupConfig) { c.FileGroups = append(c.FileGroups, c.FileGroups[0]) },
+			errSubstr: "duplicate fileGroup slot name",
+		},
+		{
+			name:      "empty fileGroup selector",
+			mutate:    func(c *GenericBackupConfig) { c.FileGroups[0].Selector = metav1.LabelSelector{} },
+			errSubstr: "selector must match",
 		},
 		{
 			name:      "duplicate postgres slot name",
@@ -163,7 +195,7 @@ func TestGenericRestoreConfigValidate(t *testing.T) {
 	}{
 		{
 			name:      "no sources",
-			mutate:    func(c *GenericRestoreConfig) { c.Postgres = nil; c.Files = nil; c.S3 = nil },
+			mutate:    func(c *GenericRestoreConfig) { c.Postgres = nil; c.Files = nil; c.FileGroups = nil; c.S3 = nil },
 			errSubstr: "at least one source",
 		},
 		{
@@ -175,6 +207,11 @@ func TestGenericRestoreConfigValidate(t *testing.T) {
 			name:      "duplicate s3 slot name",
 			mutate:    func(c *GenericRestoreConfig) { c.S3 = append(c.S3, c.S3[0]) },
 			errSubstr: "duplicate s3 slot name",
+		},
+		{
+			name:      "empty fileGroup selector",
+			mutate:    func(c *GenericRestoreConfig) { c.FileGroups[0].Selector = metav1.LabelSelector{} },
+			errSubstr: "selector must match",
 		},
 	}
 
@@ -210,6 +247,12 @@ postgres:
 files:
   - name: data
     pvc: vw-data
+fileGroups:
+  - name: shards
+    snapshotClass: ceph-block-group-snap
+    selector:
+      matchLabels:
+        app: vw-shard
 s3:
   - name: media
     path: s3://media-bucket/vw
@@ -233,6 +276,11 @@ postgres:
 files:
   - name: data
     pvc: vw-data
+fileGroups:
+  - name: shards
+    selector:
+      matchLabels:
+        app: vw-shard
 s3:
   - name: media
     path: s3://media-bucket/vw
@@ -246,6 +294,9 @@ s3:
 		assert.Equal(t, "ceph-block-snap", c.BackupVolume.SnapshotClass)
 		require.Len(t, c.Postgres, 1)
 		assert.Equal(t, "vw-db", c.Postgres[0].Cluster)
+		require.Len(t, c.FileGroups, 1)
+		assert.Equal(t, "ceph-block-group-snap", c.FileGroups[0].SnapshotClass)
+		assert.Equal(t, map[string]string{"app": "vw-shard"}, c.FileGroups[0].Selector.MatchLabels)
 	})
 
 	t.Run("restore", func(t *testing.T) {
@@ -255,6 +306,8 @@ s3:
 		require.Len(t, c.Postgres, 1)
 		require.NotNil(t, c.Postgres[0].PostgresUserCert.Subject)
 		assert.Equal(t, []string{"vw"}, c.Postgres[0].PostgresUserCert.Subject.Organizations)
+		require.Len(t, c.FileGroups, 1)
+		assert.Equal(t, map[string]string{"app": "vw-shard"}, c.FileGroups[0].Selector.MatchLabels)
 	})
 
 	t.Run("backup-only field rejected in restore file", func(t *testing.T) {
@@ -274,6 +327,8 @@ func TestNewGenericApp(t *testing.T) {
 	assert.NotNil(t, g.newCNPGRestore)
 	assert.NotNil(t, g.newFilesBackup)
 	assert.NotNil(t, g.newFilesRestore)
+	assert.NotNil(t, g.newFilesGroupBackup)
+	assert.NotNil(t, g.newFilesGroupRestore)
 	assert.NotNil(t, g.newS3Sync)
 	assert.NotNil(t, g.newRemoteStage)
 }
@@ -348,18 +403,20 @@ func TestGenericAppBackupVolumeSize(t *testing.T) {
 
 func TestGenericAppBackup(t *testing.T) {
 	tests := []struct {
-		desc                      string
-		simulateNewDRVolumeError  bool
-		simulateConfigurePgErr    bool
-		simulateConfigureFilesErr bool
-		simulateConfigureS3Err    bool
-		simulateRunError          bool
-		simulateSnapshotError     bool
+		desc                          string
+		simulateNewDRVolumeError      bool
+		simulateConfigurePgErr        bool
+		simulateConfigureFilesErr     bool
+		simulateConfigureFileGroupErr bool
+		simulateConfigureS3Err        bool
+		simulateRunError              bool
+		simulateSnapshotError         bool
 	}{
 		{desc: "success"},
 		{desc: "error creating DR volume", simulateNewDRVolumeError: true},
 		{desc: "error configuring postgres", simulateConfigurePgErr: true},
 		{desc: "error configuring files", simulateConfigureFilesErr: true},
+		{desc: "error configuring fileGroup", simulateConfigureFileGroupErr: true},
 		{desc: "error configuring s3", simulateConfigureS3Err: true},
 		{desc: "error running", simulateRunError: true},
 		{desc: "error snapshotting", simulateSnapshotError: true},
@@ -376,15 +433,17 @@ func TestGenericAppBackup(t *testing.T) {
 			mockStage := remote.NewMockRemoteStageInterface(t)
 			mockPg := cnpgbackup.NewMockCNPGBackupInterface(t)
 			mockFiles := filesbackup.NewMockFilesBackupInterface(t)
+			mockFilesGroup := filesgroupbackup.NewMockFilesGroupBackupInterface(t)
 			mockS3 := s3sync.NewMockS3SyncInterface(t)
 
 			var registered []string
 
 			g := &GenericApp{
-				kubeClusterClient: mockClient,
-				newCNPGBackup:     func() cnpgbackup.CNPGBackupInterface { return mockPg },
-				newFilesBackup:    func() filesbackup.FilesBackupInterface { return mockFiles },
-				newS3Sync:         func() s3sync.S3SyncInterface { return mockS3 },
+				kubeClusterClient:   mockClient,
+				newCNPGBackup:       func() cnpgbackup.CNPGBackupInterface { return mockPg },
+				newFilesBackup:      func() filesbackup.FilesBackupInterface { return mockFiles },
+				newFilesGroupBackup: func() filesgroupbackup.FilesGroupBackupInterface { return mockFilesGroup },
+				newS3Sync:           func() s3sync.S3SyncInterface { return mockS3 },
 				newRemoteStage: func(c kubecluster.ClientInterface, ns, eventName string, opts remote.RemoteStageOptions) remote.RemoteStageInterface {
 					assert.Equal(t, mockClient, c)
 					assert.Equal(t, namespace, ns)
@@ -399,6 +458,7 @@ func TestGenericAppBackup(t *testing.T) {
 				tt.simulateNewDRVolumeError,
 				tt.simulateConfigurePgErr,
 				tt.simulateConfigureFilesErr,
+				tt.simulateConfigureFileGroupErr,
 				tt.simulateConfigureS3Err,
 				tt.simulateRunError,
 				tt.simulateSnapshotError,
@@ -438,6 +498,14 @@ func TestGenericAppBackup(t *testing.T) {
 					return
 				}
 
+				mockFilesGroup.EXPECT().Configure(mockClient, namespace, config.FileGroups[0].Selector, backupName, "shards", filesgroupbackup.FilesGroupBackupOptions{
+					SnapshotClass:  config.FileGroups[0].SnapshotClass,
+					CleanupTimeout: config.CleanupTimeout,
+				}).Return(th.ErrIfTrue(tt.simulateConfigureFileGroupErr))
+				if tt.simulateConfigureFileGroupErr {
+					return
+				}
+
 				mockS3.EXPECT().Configure(mockClient, namespace, backupName, "media", "s3://media-bucket/vw", mock.Anything, s3sync.DirectionDownload, s3sync.S3SyncOptions{}).
 					RunAndReturn(func(c kubecluster.ClientInterface, ns, drVolName, backupDirRelPath, s3Path string, creds s3.CredentialsInterface, direction s3sync.Direction, opts s3sync.S3SyncOptions) error {
 						assert.Equal(t, "AKIA", creds.GetAccessKeyID())
@@ -470,8 +538,8 @@ func TestGenericAppBackup(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				// Fixed, consistency-correct registration order: postgres, then files, then s3.
-				assert.Equal(t, []string{`postgres "main" backup`, `files "data" backup`, `s3 "media" sync`}, registered)
+				// Fixed, consistency-correct registration order: postgres, then files, then fileGroups, then s3.
+				assert.Equal(t, []string{`postgres "main" backup`, `files "data" backup`, `fileGroup "shards" backup`, `s3 "media" sync`}, registered)
 			}
 		})
 	}
@@ -487,15 +555,17 @@ func TestGenericAppBackupInvalidConfig(t *testing.T) {
 
 func TestGenericAppRestore(t *testing.T) {
 	tests := []struct {
-		desc                      string
-		simulateConfigurePgErr    bool
-		simulateConfigureFilesErr bool
-		simulateConfigureS3Err    bool
-		simulateRunError          bool
+		desc                          string
+		simulateConfigurePgErr        bool
+		simulateConfigureFilesErr     bool
+		simulateConfigureFileGroupErr bool
+		simulateConfigureS3Err        bool
+		simulateRunError              bool
 	}{
 		{desc: "success"},
 		{desc: "error configuring postgres", simulateConfigurePgErr: true},
 		{desc: "error configuring files", simulateConfigureFilesErr: true},
+		{desc: "error configuring fileGroup", simulateConfigureFileGroupErr: true},
 		{desc: "error configuring s3", simulateConfigureS3Err: true},
 		{desc: "error running", simulateRunError: true},
 	}
@@ -510,15 +580,17 @@ func TestGenericAppRestore(t *testing.T) {
 			mockStage := remote.NewMockRemoteStageInterface(t)
 			mockPg := cnpgrestore.NewMockCNPGRestoreInterface(t)
 			mockFiles := filesrestore.NewMockFilesRestoreInterface(t)
+			mockFilesGroup := filesgrouprestore.NewMockFilesGroupRestoreInterface(t)
 			mockS3 := s3sync.NewMockS3SyncInterface(t)
 
 			var registered []string
 
 			g := &GenericApp{
-				kubeClusterClient: mockClient,
-				newCNPGRestore:    func() cnpgrestore.CNPGRestoreInterface { return mockPg },
-				newFilesRestore:   func() filesrestore.FilesRestoreInterface { return mockFiles },
-				newS3Sync:         func() s3sync.S3SyncInterface { return mockS3 },
+				kubeClusterClient:    mockClient,
+				newCNPGRestore:       func() cnpgrestore.CNPGRestoreInterface { return mockPg },
+				newFilesRestore:      func() filesrestore.FilesRestoreInterface { return mockFiles },
+				newFilesGroupRestore: func() filesgrouprestore.FilesGroupRestoreInterface { return mockFilesGroup },
+				newS3Sync:            func() s3sync.S3SyncInterface { return mockS3 },
 				newRemoteStage: func(c kubecluster.ClientInterface, ns, eventName string, opts remote.RemoteStageOptions) remote.RemoteStageInterface {
 					assert.Equal(t, mockClient, c)
 					assert.Equal(t, namespace, ns)
@@ -531,6 +603,7 @@ func TestGenericAppRestore(t *testing.T) {
 			wantErr := th.ErrExpected(
 				tt.simulateConfigurePgErr,
 				tt.simulateConfigureFilesErr,
+				tt.simulateConfigureFileGroupErr,
 				tt.simulateConfigureS3Err,
 				tt.simulateRunError,
 			)
@@ -557,6 +630,12 @@ func TestGenericAppRestore(t *testing.T) {
 					return
 				}
 
+				mockFilesGroup.EXPECT().Configure(mockClient, namespace, config.FileGroups[0].Selector, restoreName, "shards", filesgrouprestore.FilesGroupRestoreOptions{}).
+					Return(th.ErrIfTrue(tt.simulateConfigureFileGroupErr))
+				if tt.simulateConfigureFileGroupErr {
+					return
+				}
+
 				mockS3.EXPECT().Configure(mockClient, namespace, restoreName, "media", "s3://media-bucket/vw", mock.Anything, s3sync.DirectionUpload, s3sync.S3SyncOptions{}).
 					RunAndReturn(func(c kubecluster.ClientInterface, ns, drVolName, backupDirRelPath, s3Path string, creds s3.CredentialsInterface, direction s3sync.Direction, opts s3sync.S3SyncOptions) error {
 						assert.Equal(t, "AKIA", creds.GetAccessKeyID())
@@ -579,7 +658,7 @@ func TestGenericAppRestore(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, []string{`postgres "main" restore`, `files "data" restore`, `s3 "media" sync`}, registered)
+				assert.Equal(t, []string{`postgres "main" restore`, `files "data" restore`, `fileGroup "shards" restore`, `s3 "media" sync`}, registered)
 			}
 		})
 	}

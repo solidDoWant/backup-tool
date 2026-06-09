@@ -393,3 +393,34 @@ func TestSyncFiles(t *testing.T) {
 		})
 	}
 }
+
+func TestListDirectory(t *testing.T) {
+	runtime := NewLocalRuntime()
+
+	t.Run("returns subdirectory names only", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.Mkdir(filepath.Join(dir, "subdir-a"), 0755))
+		require.NoError(t, os.Mkdir(filepath.Join(dir, "subdir-b"), 0755))
+		setupTestFileWithContents(t, dir, "not a directory")
+
+		entries, err := runtime.ListDirectory(th.NewTestContext(), dir)
+		require.NoError(t, err)
+		require.ElementsMatch(t, []string{"subdir-a", "subdir-b"}, entries)
+	})
+
+	t.Run("empty directory", func(t *testing.T) {
+		entries, err := runtime.ListDirectory(th.NewTestContext(), t.TempDir())
+		require.NoError(t, err)
+		require.Empty(t, entries)
+	})
+
+	t.Run("empty path", func(t *testing.T) {
+		_, err := runtime.ListDirectory(th.NewTestContext(), "  ")
+		require.Error(t, err)
+	})
+
+	t.Run("nonexistent path", func(t *testing.T) {
+		_, err := runtime.ListDirectory(th.NewTestContext(), filepath.Join(t.TempDir(), "does-not-exist"))
+		require.Error(t, err)
+	})
+}

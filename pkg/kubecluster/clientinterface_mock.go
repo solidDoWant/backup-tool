@@ -30,6 +30,8 @@ import (
 
 	externalsnapshotter "github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/externalsnapshotter"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	mock "github.com/stretchr/testify/mock"
 
 	resource "k8s.io/apimachinery/pkg/api/resource"
@@ -315,6 +317,67 @@ func (_c *MockClientInterface_ClonePVC_Call) Return(clonedPvc *corev1.Persistent
 }
 
 func (_c *MockClientInterface_ClonePVC_Call) RunAndReturn(run func(*contexts.Context, string, string, clonepvc.ClonePVCOptions) (*corev1.PersistentVolumeClaim, error)) *MockClientInterface_ClonePVC_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ClonePVCGroup provides a mock function with given fields: ctx, namespace, selector, opts
+func (_m *MockClientInterface) ClonePVCGroup(ctx *contexts.Context, namespace string, selector metav1.LabelSelector, opts clonepvc.ClonePVCGroupOptions) (*clonepvc.ClonePVCGroupResult, error) {
+	ret := _m.Called(ctx, namespace, selector, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClonePVCGroup")
+	}
+
+	var r0 *clonepvc.ClonePVCGroupResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, metav1.LabelSelector, clonepvc.ClonePVCGroupOptions) (*clonepvc.ClonePVCGroupResult, error)); ok {
+		return rf(ctx, namespace, selector, opts)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, metav1.LabelSelector, clonepvc.ClonePVCGroupOptions) *clonepvc.ClonePVCGroupResult); ok {
+		r0 = rf(ctx, namespace, selector, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*clonepvc.ClonePVCGroupResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, metav1.LabelSelector, clonepvc.ClonePVCGroupOptions) error); ok {
+		r1 = rf(ctx, namespace, selector, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_ClonePVCGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ClonePVCGroup'
+type MockClientInterface_ClonePVCGroup_Call struct {
+	*mock.Call
+}
+
+// ClonePVCGroup is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - selector metav1.LabelSelector
+//   - opts clonepvc.ClonePVCGroupOptions
+func (_e *MockClientInterface_Expecter) ClonePVCGroup(ctx interface{}, namespace interface{}, selector interface{}, opts interface{}) *MockClientInterface_ClonePVCGroup_Call {
+	return &MockClientInterface_ClonePVCGroup_Call{Call: _e.mock.On("ClonePVCGroup", ctx, namespace, selector, opts)}
+}
+
+func (_c *MockClientInterface_ClonePVCGroup_Call) Run(run func(ctx *contexts.Context, namespace string, selector metav1.LabelSelector, opts clonepvc.ClonePVCGroupOptions)) *MockClientInterface_ClonePVCGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(metav1.LabelSelector), args[3].(clonepvc.ClonePVCGroupOptions))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_ClonePVCGroup_Call) Return(result *clonepvc.ClonePVCGroupResult, err error) *MockClientInterface_ClonePVCGroup_Call {
+	_c.Call.Return(result, err)
+	return _c
+}
+
+func (_c *MockClientInterface_ClonePVCGroup_Call) RunAndReturn(run func(*contexts.Context, string, metav1.LabelSelector, clonepvc.ClonePVCGroupOptions) (*clonepvc.ClonePVCGroupResult, error)) *MockClientInterface_ClonePVCGroup_Call {
 	_c.Call.Return(run)
 	return _c
 }

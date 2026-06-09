@@ -40,3 +40,15 @@ func (fs *FilesServer) SyncFiles(ctx context.Context, req *files_v1.SyncFilesReq
 
 	return &files_v1.SyncFilesResponse{}, nil
 }
+
+func (fs *FilesServer) ListDirectory(ctx context.Context, req *files_v1.ListDirectoryRequest) (*files_v1.ListDirectoryResponse, error) {
+	grpcCtx := contexts.UnwrapHandlerContext(ctx)
+	entries, err := fs.runtime.ListDirectory(grpcCtx, req.GetPath())
+	if err != nil {
+		return nil, trail.Send(grpcCtx, err)
+	}
+
+	return files_v1.ListDirectoryResponse_builder{
+		Entries: entries,
+	}.Build(), nil
+}

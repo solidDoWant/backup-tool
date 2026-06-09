@@ -139,6 +139,12 @@
           },
           "type": "array"
         },
+        "fileGroups": {
+          "items": {
+            "$ref": "#/$defs/GenericFileGroupBackupSource"
+          },
+          "type": "array"
+        },
         "s3": {
           "items": {
             "$ref": "#/$defs/GenericS3Source"
@@ -170,6 +176,25 @@
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "GenericFileGroupBackupSource": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/$defs/LabelSelector"
+        },
+        "snapshotClass": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "selector"
+      ]
     },
     "GenericFilesBackupSource": {
       "properties": {
@@ -235,6 +260,42 @@
         "name",
         "path"
       ]
+    },
+    "LabelSelector": {
+      "properties": {
+        "MatchLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "MatchExpressions": {
+          "items": {
+            "$ref": "#/$defs/LabelSelectorRequirement"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "LabelSelectorRequirement": {
+      "properties": {
+        "Key": {
+          "type": "string"
+        },
+        "Operator": {
+          "type": "string"
+        },
+        "Values": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
     },
     "NewClusterUserCertOptsCRP": {
       "properties": {

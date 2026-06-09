@@ -91,3 +91,46 @@ func TestSyncFiles(t *testing.T) {
 
 	transferTest(t, onExpectCall, call)
 }
+
+func TestListDirectory(t *testing.T) {
+	tests := []struct {
+		desc        string
+		entries     []string
+		returnValue error
+		shouldError bool
+	}{
+		{
+			desc:    "successful",
+			entries: []string{"a", "b"},
+		},
+		{
+			desc:        "failure",
+			returnValue: assert.AnError,
+			shouldError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			runtime := files.NewMockRuntime(t)
+			server := NewFilesServer()
+			server.runtime = runtime
+
+			ctx := th.NewTestContext()
+			path := "path"
+			runtime.EXPECT().ListDirectory(contexts.UnwrapHandlerContext(ctx), path).Return(tt.entries, tt.returnValue)
+
+			resp, err := server.ListDirectory(ctx, files_v1.ListDirectoryRequest_builder{
+				Path: &path,
+			}.Build())
+			if tt.shouldError {
+				assert.Error(t, err)
+				assert.Nil(t, resp)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, resp)
+				assert.Equal(t, tt.entries, resp.GetEntries())
+			}
+		})
+	}
+}

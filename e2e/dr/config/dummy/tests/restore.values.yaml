@@ -23,6 +23,13 @@ jobConfig:
     files:
       - name: files
         pvc: dummy-restore-backend-data-vol
+    fileGroups:
+      # In-place restore: the same selector resolves the original source shard PVCs (still present), and each
+      # captured member dir restores onto its identically-named PVC.
+      - name: shards
+        selector:
+          matchLabels:
+            app: dummy-fileshard
     s3:
       - name: bucket1
         path: s3://dummy-bucket1/
