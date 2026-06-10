@@ -42,16 +42,32 @@ func TestFileFilterShouldTransfer(t *testing.T) {
 	}{
 		{desc: "empty filter transfers files", filter: FileFilter{}, relPath: "a.txt", want: true},
 		{desc: "empty filter transfers dirs", filter: FileFilter{}, relPath: "sub", isDir: true, want: true},
-		{desc: "exclude matches base name at any depth", filter: FileFilter{Exclude: globs("*.tmp")}, relPath: "a/b/c.tmp", want: false},
-		{desc: "exclude leaves non-matching files", filter: FileFilter{Exclude: globs("*.tmp")}, relPath: "a/b/c.db", want: true},
-		{desc: "exclude prunes matching directory subtree", filter: FileFilter{Exclude: globs("cache")}, relPath: "app/cache", isDir: true, want: false},
-		{desc: "include whitelists matching file", filter: FileFilter{Include: globs("*.db")}, relPath: "data/x.db", want: true},
-		{desc: "include drops non-matching file", filter: FileFilter{Include: globs("*.db")}, relPath: "data/x.txt", want: false},
-		{desc: "include always retains directories so descendants stay reachable", filter: FileFilter{Include: globs("*.db")}, relPath: "data", isDir: true, want: true},
-		{desc: "exclude wins over include for files", filter: FileFilter{Include: globs("*.db"), Exclude: globs("secret.db")}, relPath: "secret.db", want: false},
-		{desc: "exclude wins over include for dirs", filter: FileFilter{Include: globs("*.db"), Exclude: globs("cache")}, relPath: "cache", isDir: true, want: false},
-		{desc: "full relative path pattern", filter: FileFilter{Include: globs("data/*")}, relPath: "data/x.txt", want: true},
-		{desc: "full relative path pattern does not match deeper", filter: FileFilter{Include: globs("data/*")}, relPath: "data/nested/x.txt", want: false},
+
+		// Patterns are anchored at the sync root: "*" stays within a segment.
+		{desc: "anchored star matches top-level file", filter: FileFilter{Exclude: globs("*.tmp")}, relPath: "c.tmp", want: false},
+		{desc: "anchored star does not cross directories", filter: FileFilter{Exclude: globs("*.tmp")}, relPath: "a/b/c.tmp", want: true},
+		{desc: "anchored dir name matches only at root", filter: FileFilter{Exclude: globs("cache")}, relPath: "cache", isDir: true, want: false},
+		{desc: "anchored dir name does not match nested", filter: FileFilter{Exclude: globs("cache")}, relPath: "app/cache", isDir: true, want: true},
+
+		// "**" crosses any number of segments (including none).
+		{desc: "doublestar matches at any depth", filter: FileFilter{Exclude: globs("**/*.tmp")}, relPath: "a/b/c.tmp", want: false},
+		{desc: "doublestar also matches at root", filter: FileFilter{Exclude: globs("**/*.tmp")}, relPath: "c.tmp", want: false},
+		{desc: "doublestar dir match at any depth", filter: FileFilter{Exclude: globs("**/cache")}, relPath: "app/cache", isDir: true, want: false},
+		{desc: "doublestar leaves non-matching files", filter: FileFilter{Exclude: globs("**/*.tmp")}, relPath: "a/b/c.db", want: true},
+		{desc: "trailing doublestar matches subtree contents", filter: FileFilter{Exclude: globs("cache/**")}, relPath: "cache/deep/x", want: false},
+
+		// Include (whitelist) behaviour.
+		{desc: "include whitelists matching file", filter: FileFilter{Include: globs("**/*.db")}, relPath: "data/x.db", want: true},
+		{desc: "include drops non-matching file", filter: FileFilter{Include: globs("**/*.db")}, relPath: "data/x.txt", want: false},
+		{desc: "include always retains directories so descendants stay reachable", filter: FileFilter{Include: globs("**/*.db")}, relPath: "data", isDir: true, want: true},
+
+		// Exclude wins over include.
+		{desc: "exclude wins over include for files", filter: FileFilter{Include: globs("**/*.db"), Exclude: globs("**/secret.db")}, relPath: "secret.db", want: false},
+		{desc: "exclude wins over include for dirs", filter: FileFilter{Include: globs("**/*.db"), Exclude: globs("cache")}, relPath: "cache", isDir: true, want: false},
+
+		// Single-segment "*" within an anchored path.
+		{desc: "anchored path pattern matches direct child", filter: FileFilter{Include: globs("data/*")}, relPath: "data/x.txt", want: true},
+		{desc: "anchored path pattern does not match deeper", filter: FileFilter{Include: globs("data/*")}, relPath: "data/nested/x.txt", want: false},
 	}
 
 	for _, tC := range tests {
@@ -80,16 +96,23 @@ func TestSyncFilesFilter(t *testing.T) {
 		wantAbsent  []string
 	}{
 		{
-			desc:        "exclude omits matching files",
+			desc:        "doublestar exclude omits matching files at any depth",
 			srcFiles:    []string{"keep.db", "drop.tmp", "nested/also.tmp", "nested/keep.txt"},
-			filter:      FileFilter{Exclude: globs("*.tmp")},
+			filter:      FileFilter{Exclude: globs("**/*.tmp")},
 			wantPresent: []string{"keep.db", "nested/keep.txt"},
 			wantAbsent:  []string{"drop.tmp", "nested/also.tmp"},
 		},
 		{
+			desc:        "anchored exclude only omits top-level match",
+			srcFiles:    []string{"drop.tmp", "nested/keep.tmp"},
+			filter:      FileFilter{Exclude: globs("*.tmp")},
+			wantPresent: []string{"nested/keep.tmp"},
+			wantAbsent:  []string{"drop.tmp"},
+		},
+		{
 			desc:        "include keeps only whitelisted files",
 			srcFiles:    []string{"data/a.db", "data/b.db", "data/c.txt", "other.txt"},
-			filter:      FileFilter{Include: globs("*.db")},
+			filter:      FileFilter{Include: globs("**/*.db")},
 			wantPresent: []string{"data/a.db", "data/b.db"},
 			wantAbsent:  []string{"data/c.txt", "other.txt"},
 		},

@@ -1,10 +1,10 @@
 package files
 
 import (
-	"path"
 	"path/filepath"
 	"slices"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/gravitational/trace"
 )
 
@@ -12,9 +12,11 @@ import (
 // set; currently the only matcher is Glob. Modelling a pattern as an object (rather than a bare string)
 // leaves room to add alternative matchers later (e.g. a Regex field) without changing the config shape.
 type FilePattern struct {
-	// Glob is a path.Match glob (https://pkg.go.dev/path#Match), tested against both the entry's path
-	// relative to the sync root (slash-separated) and the entry's base name, so "*.tmp" matches at any
-	// depth while "cache/*" matches only the direct children of a top-level "cache" directory.
+	// Glob is a doublestar glob (https://pkg.go.dev/github.com/bmatcuk/doublestar/v4#Match), matched
+	// against the entry's slash-separated path relative to the sync root and anchored there. "*" matches
+	// within a single path segment; "**" matches across segments (any depth, including none). So "logs"
+	// matches only a top-level "logs", "**/logs" matches a "logs" at any depth, "**/*.tmp" matches ".tmp"
+	// files anywhere, and "cache/**" matches everything under a top-level "cache".
 	Glob string `yaml:"glob,omitempty"`
 }
 
@@ -25,10 +27,8 @@ func (p FilePattern) Validate() error {
 		return trace.BadParameter("a file filter pattern must specify a glob")
 	}
 
-	// path.Match only returns ErrBadPattern (never a match error) for a malformed pattern, so the
-	// empty-name probe is enough to surface a bad pattern up front.
-	if _, err := path.Match(p.Glob, ""); err != nil {
-		return trace.Wrap(err, "invalid glob pattern %q", p.Glob)
+	if !doublestar.ValidatePattern(p.Glob) {
+		return trace.BadParameter("invalid glob pattern %q", p.Glob)
 	}
 
 	return nil
@@ -41,13 +41,10 @@ func (p FilePattern) matches(slashPath string) bool {
 		return false
 	}
 
-	// path.Match errors are pattern-syntax errors, surfaced eagerly by Validate; treat a malformed
-	// pattern as a non-match here so a bad pattern never silently drops files.
-	if matched, _ := path.Match(p.Glob, slashPath); matched {
-		return true
-	}
-
-	matched, _ := path.Match(p.Glob, path.Base(slashPath))
+	// doublestar.Match errors are pattern-syntax errors, surfaced eagerly by Validate; treat a malformed
+	// pattern as a non-match here so a bad pattern never silently drops files. The pattern is anchored at
+	// the sync root: "*" matches within a path segment, "**" matches across segments (any depth).
+	matched, _ := doublestar.Match(p.Glob, slashPath)
 	return matched
 }
 
@@ -57,7 +54,7 @@ func (p FilePattern) matches(slashPath string) bool {
 // transferred. Exclude is a blacklist: any entry matching an Exclude pattern is omitted, and for a
 // directory its whole subtree is pruned. Exclude takes precedence over Include.
 //
-// Directories are always traversed when only Include patterns are set, so a whitelist of "data/*.db"
+// Directories are always traversed when only Include patterns are set, so a whitelist of "data/**/*.db"
 // still reaches the nested files (intermediate directories may be left empty). A zero FileFilter (no
 // patterns) transfers everything.
 type FileFilter struct {

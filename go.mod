@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.41.9
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.19
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.102.2
+	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/cert-manager/approver-policy v0.25.1
 	github.com/cert-manager/cert-manager v1.20.2
 	github.com/charmbracelet/log v1.0.0
