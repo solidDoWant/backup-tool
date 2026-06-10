@@ -3,7 +3,9 @@ jobConfig:
   configFile:
     backupName: vw-e2e
     dataPVCName: vaultwarden
-    cnpgClusterName: vaultwarden
-    backupToolPodCreationTimeout: 10m
+    cluster:
+      name: vaultwarden
+    backupToolInstance:
+      podWaitTimeout: 10m
     backupSnapshot:
       snapshotClass: openebs-zfs

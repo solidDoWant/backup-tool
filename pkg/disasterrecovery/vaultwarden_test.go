@@ -268,13 +268,11 @@ func TestVaultWardenRestore(t *testing.T) {
 		{
 			desc: "success - all options set",
 			opts: VaultWardenRestoreOptions{
-				Certificates: vaultWardenRestoreOptionsCertificates{
-					PostgresUserCert: OptionsClusterUserCert{
-						Subject: &v1.X509Subject{
-							Organizations: []string{"test-org"},
-						},
-						WaitForReadyTimeout: helpers.MaxWaitTime(4 * time.Second),
+				PostgresUserCert: cnpgrestore.CNPGRestoreOptionsCert{
+					Subject: &v1.X509Subject{
+						Organizations: []string{"test-org"},
 					},
+					WaitForCertTimeout: helpers.MaxWaitTime(4 * time.Second),
 				},
 				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{},
 				CleanupTimeout:          helpers.MaxWaitTime(3 * time.Second),
@@ -330,12 +328,8 @@ func TestVaultWardenRestore(t *testing.T) {
 
 			func() {
 				mockCNPGRestore.EXPECT().Configure(mockClient, namespace, clusterName, servingCertName, clientCAIssuer, restoreName, "dump.sql", cnpgrestore.CNPGRestoreOptions{
-					PostgresUserCert: cnpgrestore.CNPGRestoreOptionsCert{
-						Subject:            tt.opts.Certificates.PostgresUserCert.Subject,
-						CRPOpts:            tt.opts.Certificates.PostgresUserCert.CRPOpts,
-						WaitForCertTimeout: tt.opts.Certificates.PostgresUserCert.WaitForReadyTimeout,
-					},
-					CleanupTimeout: tt.opts.CleanupTimeout,
+					PostgresUserCert: tt.opts.PostgresUserCert,
+					CleanupTimeout:   tt.opts.CleanupTimeout,
 				}).Return(th.ErrIfTrue(tt.simulateCNPGRestoreError))
 				if tt.simulateCNPGRestoreError {
 					return

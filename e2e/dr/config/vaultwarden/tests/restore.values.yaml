@@ -4,7 +4,8 @@ jobConfig:
   configFile:
     backupName: vw-e2e
     dataPVCName: vaultwarden-restore-backend-restore-data-vol
-    cnpgClusterName: vaultwarden-restore
-    servingCertName: postgres-restore-serving-cert
-    clientCAIssuer:
-      name: postgres-restore-auth-ca-issuer
+    cluster:
+      name: vaultwarden-restore
+      servingCertName: postgres-restore-serving-cert
+      clientCAIssuer:
+        name: postgres-restore-auth-ca-issuer

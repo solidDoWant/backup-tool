@@ -60,6 +60,21 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "CNPGRestoreOptionsCert": {
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/X509Subject"
+        },
+        "certificateRequestPolicy": {
+          "$ref": "#/$defs/NewClusterUserCertOptsCRP"
+        },
+        "waitForCertTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "CSIVolumeSource": {
       "properties": {
         "Driver": {
@@ -150,6 +165,27 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "ConfigBTI": {
+      "properties": {
+        "namePrefix": {
+          "type": "string"
+        },
+        "volumes": {
+          "items": {
+            "$ref": "#/$defs/SingleContainerVolume"
+          },
+          "type": "array"
+        },
+        "cleanupTimeout": {
+          "type": "integer"
+        },
+        "podWaitTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "ConfigMapProjection": {
       "properties": {
         "Name": {
@@ -184,27 +220,6 @@
         },
         "Optional": {
           "type": "boolean"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "CreateBackupToolInstanceOptions": {
-      "properties": {
-        "namePrefix": {
-          "type": "string"
-        },
-        "volumes": {
-          "items": {
-            "$ref": "#/$defs/SingleContainerVolume"
-          },
-          "type": "array"
-        },
-        "cleanupTimeout": {
-          "type": "integer"
-        },
-        "podWaitTimeout": {
-          "type": "integer"
         }
       },
       "additionalProperties": false,
@@ -596,21 +611,6 @@
         },
         "FieldPath": {
           "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "OptionsClusterUserCert": {
-      "properties": {
-        "subject": {
-          "$ref": "#/$defs/X509Subject"
-        },
-        "waitForReadyTimeout": {
-          "type": "integer"
-        },
-        "certificateRequestPolicy": {
-          "$ref": "#/$defs/NewClusterUserCertOptsCRP"
         }
       },
       "additionalProperties": false,
@@ -1090,15 +1090,6 @@
     },
     "VaultWardenRestoreConfig": {
       "properties": {
-        "certificates": {
-          "$ref": "#/$defs/vaultWardenRestoreOptionsCertificates"
-        },
-        "cleanupTimeout": {
-          "type": "integer"
-        },
-        "remoteBackupToolOptions": {
-          "$ref": "#/$defs/CreateBackupToolInstanceOptions"
-        },
         "namespace": {
           "type": "string"
         },
@@ -1108,14 +1099,14 @@
         "dataPVCName": {
           "type": "string"
         },
-        "cnpgClusterName": {
-          "type": "string"
+        "cluster": {
+          "$ref": "#/$defs/VaultWardenRestoreConfigCNPG"
         },
-        "servingCertName": {
-          "type": "string"
+        "backupToolInstance": {
+          "$ref": "#/$defs/ConfigBTI"
         },
-        "clientCAIssuer": {
-          "$ref": "#/$defs/IssuerReference"
+        "cleanupTimeout": {
+          "type": "integer"
         }
       },
       "additionalProperties": false,
@@ -1124,7 +1115,28 @@
         "namespace",
         "backupName",
         "dataPVCName",
-        "cnpgClusterName",
+        "cluster"
+      ]
+    },
+    "VaultWardenRestoreConfigCNPG": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "servingCertName": {
+          "type": "string"
+        },
+        "clientCAIssuer": {
+          "$ref": "#/$defs/IssuerReference"
+        },
+        "postgresUserCert": {
+          "$ref": "#/$defs/CNPGRestoreOptionsCert"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
         "servingCertName",
         "clientCAIssuer"
       ]
@@ -1325,15 +1337,6 @@
         },
         "SerialNumber": {
           "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "vaultWardenRestoreOptionsCertificates": {
-      "properties": {
-        "postgresUserCert": {
-          "$ref": "#/$defs/OptionsClusterUserCert"
         }
       },
       "additionalProperties": false,

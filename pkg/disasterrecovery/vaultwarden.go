@@ -25,12 +25,12 @@ const (
 
 // TODO plumb a lot more options through to here
 type VaultWardenBackupOptions struct {
-	VolumeSize                   resource.Quantity                 `yaml:"volumeSize,omitempty"`
-	VolumeStorageClass           string                            `yaml:"volumeStorageClass,omitempty"`
-	CloneClusterOptions          clonedcluster.CloneClusterOptions `yaml:"clusterCloning,omitempty"`
-	BackupToolPodCreationTimeout helpers.MaxWaitTime               `yaml:"backupToolPodCreationTimeout,omitempty"`
-	BackupSnapshot               OptionsBackupSnapshot             `yaml:"backupSnapshot,omitempty"`
-	CleanupTimeout               helpers.MaxWaitTime               `yaml:"cleanupTimeout,omitempty"`
+	VolumeSize              resource.Quantity                                  `yaml:"volumeSize,omitempty"`
+	VolumeStorageClass      string                                             `yaml:"volumeStorageClass,omitempty"`
+	CloneClusterOptions     clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
+	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
+	BackupSnapshot          OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
+	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
 type VaultWarden struct {
@@ -154,14 +154,10 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 	return backup, nil
 }
 
-type vaultWardenRestoreOptionsCertificates struct {
-	PostgresUserCert OptionsClusterUserCert `yaml:"postgresUserCert,omitempty"`
-}
-
 type VaultWardenRestoreOptions struct {
-	Certificates            vaultWardenRestoreOptionsCertificates              `yaml:"certificates,omitempty"`
-	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
+	PostgresUserCert        cnpgrestore.CNPGRestoreOptionsCert                 `yaml:"postgresUserCert,omitempty"`
 	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
+	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
 // Restore requirements:
@@ -202,12 +198,8 @@ func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, da
 	// directory.
 	cnpgRestore := vw.newCNPGRestore()
 	if err := cnpgRestore.Configure(vw.kubeClusterClient, namespace, cnpgClusterName, servingCertName, clientCAIssuer, restoreName, vaultwardenSQLFileName, cnpgrestore.CNPGRestoreOptions{
-		PostgresUserCert: cnpgrestore.CNPGRestoreOptionsCert{
-			Subject:            opts.Certificates.PostgresUserCert.Subject,
-			CRPOpts:            opts.Certificates.PostgresUserCert.CRPOpts,
-			WaitForCertTimeout: opts.Certificates.PostgresUserCert.WaitForReadyTimeout,
-		},
-		CleanupTimeout: opts.CleanupTimeout,
+		PostgresUserCert: opts.PostgresUserCert,
+		CleanupTimeout:   opts.CleanupTimeout,
 	}); err != nil {
 		return restore, trace.Wrap(err, "failed to configure CNPG cluster restoration")
 	}
