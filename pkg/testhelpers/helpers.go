@@ -26,7 +26,7 @@ func ErrIfTrue(condition bool) error {
 	return nil
 }
 
-func ErrOr1Val[T interface{}](val T, condition bool) (T, error) {
+func ErrOr1Val[T any](val T, condition bool) (T, error) {
 	if condition {
 		var defaultVal T
 		return defaultVal, assert.AnError
@@ -57,7 +57,7 @@ type runnableTB interface {
 	Run(name string, f func(t *testing.T)) bool
 }
 
-func OptStructTest[T interface{}](t runnableTB) {
+func OptStructTest[T any](t runnableTB) {
 	var defaultVal T
 	reflectType := reflect.TypeOf(defaultVal)
 

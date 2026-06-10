@@ -69,8 +69,8 @@ func streamLoggingInterceptor(ctx context.Context, desc *grpc.StreamDesc, cc *gr
 	return streamer(ctx, desc, cc, method, opts...)
 }
 
-func grpcKeyvals(method string) []interface{} {
-	return []interface{}{"method", method}
+func grpcKeyvals(method string) []any {
+	return []any{"method", method}
 }
 
 // Verify the client _can_ connect to the server
@@ -78,7 +78,7 @@ func grpcKeyvals(method string) []interface{} {
 func verifyConnection(ctx *contexts.Context, serverAddress string) (err error) {
 	ctx.Log.Info("Verifying connection to server")
 	defer func() {
-		keyvals := []interface{}{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
+		keyvals := []any{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
 		if err != nil {
 			ctx.Log.Warn("Failed to verify connection to server", keyvals...)
 			return

@@ -16,35 +16,35 @@ var nullLogger = log.NewWithOptions(io.Discard, log.Options{
 })
 
 type DeferredKeyvalInterface interface {
-	Keyval() []interface{}
+	Keyval() []any
 }
 
 type DeferredKeyval struct {
 	Key   string
-	Value func() interface{}
+	Value func() any
 }
 
-func NewDeferredKeyval(key string, value func() interface{}) *DeferredKeyval {
+func NewDeferredKeyval(key string, value func() any) *DeferredKeyval {
 	return &DeferredKeyval{
 		Key:   key,
 		Value: value,
 	}
 }
 
-func (dk *DeferredKeyval) Keyval() []interface{} {
-	return []interface{}{dk.Key, dk.Value()}
+func (dk *DeferredKeyval) Keyval() []any {
+	return []any{dk.Key, dk.Value()}
 }
 
 type deferredErrorKeyvals struct {
 	err *error
 }
 
-func (dek *deferredErrorKeyvals) Keyval() []interface{} {
+func (dek *deferredErrorKeyvals) Keyval() []any {
 	if dek.err == nil || *dek.err == nil {
 		return nil
 	}
 
-	return []interface{}{"error", *dek.err}
+	return []any{"error", *dek.err}
 }
 
 // Creates a common keyval for a future error. If the error is nil, the keyval will be
@@ -96,7 +96,7 @@ func (lc *LoggerContext) GetPrefix() string {
 }
 
 // Simple wrapper for the underlying logger `With` that returns the logger context.
-func (lc *LoggerContext) With(keyvals ...interface{}) *LoggerContext {
+func (lc *LoggerContext) With(keyvals ...any) *LoggerContext {
 	lc.Logger = lc.Logger.With(keyvals...)
 	return lc
 }
@@ -127,8 +127,8 @@ func (lc *LoggerContext) Step() *LoggerContext {
 
 // Take a slice of keyvals and process any DeferredKeyvals, returning a new
 // slice with the DeferredKeyvals expanded. Order is preserved.
-func processDeferredKeyvals(keyvals []interface{}) []interface{} {
-	processedKeyvals := make([]interface{}, 0, len(keyvals))
+func processDeferredKeyvals(keyvals []any) []any {
+	processedKeyvals := make([]any, 0, len(keyvals))
 	for _, keyval := range keyvals {
 		if dk, ok := keyval.(DeferredKeyvalInterface); ok {
 			processedKeyvals = append(processedKeyvals, dk.Keyval()...)
@@ -142,7 +142,7 @@ func processDeferredKeyvals(keyvals []interface{}) []interface{} {
 // Process a logf-based call, changing the parameters as needed to support the custom functionality
 // of this logger. The input should be logf-style, with a format string and a slice of arguments.
 // The outputs will be the processed version of these arguments.
-func (lc *LoggerContext) processLogfCall(msg string, args []interface{}) (string, []interface{}) {
+func (lc *LoggerContext) processLogfCall(msg string, args []any) (string, []any) {
 	args = processDeferredKeyvals(args)
 	prefix := lc.GetPrefix()
 	if prefix != "" {
@@ -154,7 +154,7 @@ func (lc *LoggerContext) processLogfCall(msg string, args []interface{}) (string
 // Process a log-based call, changing the parameters as needed to support the custom functionality
 // of this logger. The input should be log-style, with a message and a slice of keyvals. The outputs
 // will be the processed version of these arguments.
-func (lc *LoggerContext) processLogCall(msg interface{}, keyvals []interface{}) (interface{}, []interface{}) {
+func (lc *LoggerContext) processLogCall(msg any, keyvals []any) (any, []any) {
 	formattedMessage := ""
 	if msg != nil {
 		formattedMessage = fmt.Sprint(msg)
@@ -167,85 +167,85 @@ func (lc *LoggerContext) processLogCall(msg interface{}, keyvals []interface{}) 
 // log.Logger methods. Unforunately, the logger library doesn't provide a "hook"
 // for this, which would greatly reduce the boilerplate code here.
 
-func (lc *LoggerContext) Log(level log.Level, msg interface{}, keyvals ...interface{}) {
+func (lc *LoggerContext) Log(level log.Level, msg any, keyvals ...any) {
 	lc.Helper() // Needed so that the formatter uses the correct stack frame
 	msg, keyvals = lc.processLogCall(msg, keyvals)
 	lc.Logger.Log(level, msg, keyvals...)
 }
 
-func (lc *LoggerContext) Debug(msg interface{}, keyvals ...interface{}) {
+func (lc *LoggerContext) Debug(msg any, keyvals ...any) {
 	lc.Helper()
 	msg, keyvals = lc.processLogCall(msg, keyvals)
 	lc.Logger.Debug(msg, keyvals...)
 }
 
-func (lc *LoggerContext) Info(msg interface{}, keyvals ...interface{}) {
+func (lc *LoggerContext) Info(msg any, keyvals ...any) {
 	lc.Helper()
 	msg, keyvals = lc.processLogCall(msg, keyvals)
 	lc.Logger.Info(msg, keyvals...)
 }
 
-func (lc *LoggerContext) Warn(msg interface{}, keyvals ...interface{}) {
+func (lc *LoggerContext) Warn(msg any, keyvals ...any) {
 	lc.Helper()
 	msg, keyvals = lc.processLogCall(msg, keyvals)
 	lc.Logger.Warn(msg, keyvals...)
 }
 
-func (lc *LoggerContext) Error(msg interface{}, keyvals ...interface{}) {
+func (lc *LoggerContext) Error(msg any, keyvals ...any) {
 	lc.Helper()
 	msg, keyvals = lc.processLogCall(msg, keyvals)
 	lc.Logger.Error(msg, keyvals...)
 }
 
-func (lc *LoggerContext) Fatal(msg interface{}, keyvals ...interface{}) {
+func (lc *LoggerContext) Fatal(msg any, keyvals ...any) {
 	lc.Helper()
 	msg, keyvals = lc.processLogCall(msg, keyvals)
 	lc.Logger.Fatal(msg, keyvals...)
 }
 
-func (lc *LoggerContext) Print(msg interface{}, keyvals ...interface{}) {
+func (lc *LoggerContext) Print(msg any, keyvals ...any) {
 	lc.Helper()
 	msg, keyvals = lc.processLogCall(msg, keyvals)
 	lc.Logger.Print(msg, keyvals...)
 }
 
-func (lc *LoggerContext) Logf(level log.Level, format string, args ...interface{}) {
+func (lc *LoggerContext) Logf(level log.Level, format string, args ...any) {
 	lc.Helper()
 	format, args = lc.processLogfCall(format, args)
 	lc.Logger.Logf(level, format, args...)
 }
 
-func (lc *LoggerContext) Debugf(format string, args ...interface{}) {
+func (lc *LoggerContext) Debugf(format string, args ...any) {
 	lc.Helper()
 	format, args = lc.processLogfCall(format, args)
 	lc.Logger.Debugf(format, args...)
 }
 
-func (lc *LoggerContext) Infof(format string, args ...interface{}) {
+func (lc *LoggerContext) Infof(format string, args ...any) {
 	lc.Helper()
 	format, args = lc.processLogfCall(format, args)
 	lc.Logger.Infof(format, args...)
 }
 
-func (lc *LoggerContext) Warnf(format string, args ...interface{}) {
+func (lc *LoggerContext) Warnf(format string, args ...any) {
 	lc.Helper()
 	format, args = lc.processLogfCall(format, args)
 	lc.Logger.Warnf(format, args...)
 }
 
-func (lc *LoggerContext) Errorf(format string, args ...interface{}) {
+func (lc *LoggerContext) Errorf(format string, args ...any) {
 	lc.Helper()
 	format, args = lc.processLogfCall(format, args)
 	lc.Logger.Errorf(format, args...)
 }
 
-func (lc *LoggerContext) Fatalf(format string, args ...interface{}) {
+func (lc *LoggerContext) Fatalf(format string, args ...any) {
 	lc.Helper()
 	format, args = lc.processLogfCall(format, args)
 	lc.Logger.Fatalf(format, args...)
 }
 
-func (lc *LoggerContext) Printf(format string, args ...interface{}) {
+func (lc *LoggerContext) Printf(format string, args ...any) {
 	lc.Helper()
 	format, args = lc.processLogfCall(format, args)
 	lc.Logger.Printf(format, args...)

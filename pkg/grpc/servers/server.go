@@ -105,6 +105,6 @@ func streamLoggingInterceptor(ctx *contexts.Context) func(srv any, ss gogrpc.Ser
 	}
 }
 
-func grpcKeyvals(method string) []interface{} {
-	return []interface{}{"method", method}
+func grpcKeyvals(method string) []any {
+	return []any{"method", method}
 }

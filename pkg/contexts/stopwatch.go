@@ -17,7 +17,7 @@ func (sc *StopwatchContext) Elapsed() time.Duration {
 }
 
 func (sc *StopwatchContext) Keyval() *DeferredKeyval {
-	return NewDeferredKeyval("runtime", func() interface{} {
+	return NewDeferredKeyval("runtime", func() any {
 		return sc.Elapsed()
 	})
 }

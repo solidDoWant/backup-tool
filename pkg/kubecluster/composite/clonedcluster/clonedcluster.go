@@ -151,7 +151,7 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 	cluster = p.newClonedCluster()
 
 	// Prepare to handle resource cleanup in the event of an error
-	errHandler := func(originalErr error, args ...interface{}) (*ClonedCluster, error) {
+	errHandler := func(originalErr error, args ...any) (*ClonedCluster, error) {
 		originalErr = trace.Wrap(originalErr, args...)
 		return nil, cleanup.To(cluster.Delete).
 			WithErrMessage("failed to cleanup cloned cluster %q in namespace %q", newClusterName, namespace).

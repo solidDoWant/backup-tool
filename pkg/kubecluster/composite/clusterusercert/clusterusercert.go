@@ -54,7 +54,7 @@ func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username
 
 	cuc = p.newClusterUserCert()
 
-	errHandler := func(originalErr error, args ...interface{}) (*ClusterUserCert, error) {
+	errHandler := func(originalErr error, args ...any) (*ClusterUserCert, error) {
 		originalErr = trace.Wrap(originalErr, args...)
 		return nil, cleanup.To(cuc.Delete).
 			WithErrMessage("failed to cleanup user cert %q in namespace %q", username, namespace).

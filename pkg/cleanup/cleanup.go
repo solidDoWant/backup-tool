@@ -16,7 +16,7 @@ var DefaultCleanupTimeout = 10 * time.Minute
 // Usage: defer cleanup.To(func() error { return nil }).WithErrMessage("some message").WithOriginalErr(&err).Done()
 type Cleanup struct {
 	cleanupLogic func(*contexts.Context) error
-	onErrArgs    []interface{}
+	onErrArgs    []any
 	originalErr  *error
 	parentCtx    *contexts.Context
 	timeout      time.Duration
@@ -28,8 +28,8 @@ func To(cleanupLogic func(*contexts.Context) error) *Cleanup {
 	}
 }
 
-func (c *Cleanup) WithErrMessage(errMessage string, args ...interface{}) *Cleanup {
-	c.onErrArgs = append([]interface{}{errMessage}, args...)
+func (c *Cleanup) WithErrMessage(errMessage string, args ...any) *Cleanup {
+	c.onErrArgs = append([]any{errMessage}, args...)
 	return c
 }
 

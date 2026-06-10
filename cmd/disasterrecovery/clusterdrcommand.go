@@ -10,11 +10,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ClusterDREventCommandRun[TConfig interface{}] func(ctx *contexts.Context, config TConfig, kubeCluster kubecluster.ClientInterface) error
+type ClusterDREventCommandRun[TConfig any] func(ctx *contexts.Context, config TConfig, kubeCluster kubecluster.ClientInterface) error
 
 // Used for cluster-targeted disaster recovery operations. Others (like managing ZFS backups on tape) will follow
 // a different process.
-type ClusterDREventCommand[TConfig interface{}] struct {
+type ClusterDREventCommand[TConfig any] struct {
 	name        string
 	run         ClusterDREventCommandRun[TConfig]
 	kubeCluster features.KubeClusterCommandInterface
@@ -22,7 +22,7 @@ type ClusterDREventCommand[TConfig interface{}] struct {
 	configFile  features.ConfigFileCommandInterface[TConfig]
 }
 
-func NewClusterDREventCommand[TConfig interface{}](name string, run ClusterDREventCommandRun[TConfig]) *ClusterDREventCommand[TConfig] {
+func NewClusterDREventCommand[TConfig any](name string, run ClusterDREventCommandRun[TConfig]) *ClusterDREventCommand[TConfig] {
 	return &ClusterDREventCommand[TConfig]{
 		name:        name,
 		run:         run,
@@ -71,13 +71,13 @@ func (cdrec *ClusterDREventCommand[TConfig]) Run() error {
 	return trace.Wrap(err, "failed to backup %s", cdrec.name)
 }
 
-type ClusterDRCommand[TBackupConfig, TRestoreConfig interface{}] struct {
+type ClusterDRCommand[TBackupConfig, TRestoreConfig any] struct {
 	name           string
 	backupCommand  ClusterDREventCommandRun[TBackupConfig]
 	restoreCommand ClusterDREventCommandRun[TRestoreConfig]
 }
 
-func NewClusterDRCommand[TBackupConfig, TRestoreConfig interface{}](name string, backupCommand ClusterDREventCommandRun[TBackupConfig], restoreCommand ClusterDREventCommandRun[TRestoreConfig]) *ClusterDRCommand[TBackupConfig, TRestoreConfig] {
+func NewClusterDRCommand[TBackupConfig, TRestoreConfig any](name string, backupCommand ClusterDREventCommandRun[TBackupConfig], restoreCommand ClusterDREventCommandRun[TRestoreConfig]) *ClusterDRCommand[TBackupConfig, TRestoreConfig] {
 	return &ClusterDRCommand[TBackupConfig, TRestoreConfig]{
 		name:           name,
 		backupCommand:  backupCommand,

@@ -382,7 +382,7 @@ func (g *GenericApp) Backup(ctx *contexts.Context, config GenericBackupConfig) (
 	ctx.Log.With("backupName", backup.GetFullName(), "namespace", config.Namespace).Info("Starting backup process")
 	defer func() {
 		backup.Stop()
-		keyvals := []interface{}{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
+		keyvals := []any{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
 		if err != nil {
 			ctx.Log.Warn("Backup process failed", keyvals...)
 		} else {
@@ -512,7 +512,7 @@ func (g *GenericApp) Restore(ctx *contexts.Context, config GenericRestoreConfig)
 	ctx.Log.With("restoreName", restore.GetFullName(), "namespace", config.Namespace).Info("Starting restore process")
 	defer func() {
 		restore.Stop()
-		keyvals := []interface{}{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
+		keyvals := []any{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
 		if err != nil {
 			ctx.Log.Warn("Restore process failed", keyvals...)
 		} else {

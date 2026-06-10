@@ -50,7 +50,7 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 	}
 
 	// Prepare to handle resource cleanup in the event of an error
-	errHandler := func(originalErr error, args ...interface{}) (BackupToolInstanceInterface, error) {
+	errHandler := func(originalErr error, args ...any) (BackupToolInstanceInterface, error) {
 		originalErr = trace.Wrap(originalErr, args...)
 		return nil, cleanup.To(btInstance.Delete).
 			WithErrMessage("failed to cleanup backup tool instance %q in namespace %q", namePrefix, namespace).

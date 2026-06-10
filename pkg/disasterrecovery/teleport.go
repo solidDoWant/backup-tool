@@ -84,7 +84,7 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 	ctx.Log.With("backupName", backup.GetFullName(), "namespace", namespace).Info("Starting backup process")
 	defer func() {
 		backup.Stop()
-		keyvals := []interface{}{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
+		keyvals := []any{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
 		if err != nil {
 			ctx.Log.Warn("Backup process failed", keyvals...)
 		} else {
@@ -197,7 +197,7 @@ func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreCl
 	ctx.Log.With("restoreName", restore.GetFullName(), "namespace", namespace).Info("Starting restore process")
 	defer func() {
 		restore.Stop()
-		keyvals := []interface{}{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
+		keyvals := []any{ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err)}
 		if err != nil {
 			ctx.Log.Warn("Restore process failed", keyvals...)
 		} else {

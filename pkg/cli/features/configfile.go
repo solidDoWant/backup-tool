@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ConfigFileCommandInterface[T interface{}] interface {
+type ConfigFileCommandInterface[T any] interface {
 	ConfigureFlags(cmd *cobra.Command)
 	ReadConfigFile(ctx context.Context) (T, error)
 	GenerateConfigSchema() ([]byte, error)
@@ -26,11 +26,11 @@ type ConfigFileCommandInterface[T interface{}] interface {
 // Gets a config file path from the command line and reads the config file into a struct of type T.
 // The flag is required.
 // The struct is then validated using the "jsonschema" and "validate" tags.
-type ConfigFileCommand[T interface{}] struct {
+type ConfigFileCommand[T any] struct {
 	ConfigFilePath string
 }
 
-func NewConfigFileCommand[T interface{}]() *ConfigFileCommand[T] {
+func NewConfigFileCommand[T any]() *ConfigFileCommand[T] {
 	return &ConfigFileCommand[T]{}
 }
 
@@ -146,7 +146,7 @@ func translateJsonSchemaTagsToValidateTags(reflectType reflect.Type) (reflect.Ty
 
 // Given a struct of type T, create an instance of a new type with the "jsonschema" tags translated to "validate" tags.
 // All field names will be the same. Fields that are structs will be recursively translated, and may also be a new type.
-func newTranslatedConfigStruct[T interface{}]() (interface{}, error) {
+func newTranslatedConfigStruct[T any]() (any, error) {
 	var defaultVal T
 	reflectType := reflect.TypeOf(defaultVal)
 
