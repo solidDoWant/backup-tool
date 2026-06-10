@@ -1,6 +1,7 @@
 package disasterrecovery
 
 import (
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
@@ -78,7 +79,7 @@ func NewTeleport(kubeClusterClient kubecluster.ClientInterface) *Teleport {
 // 6. Perform a logical backup of the Audit cluster (if enabled)
 // 7. Sync the audit session logs from object storage (if enabled)
 // 8. Snapshot the backup PVC
-func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClusterName, servingCertIssuerName, clientCertIssuerName string, opts TeleportBackupOptions) (backup *DREvent, err error) {
+func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClusterName string, opts TeleportBackupOptions) (backup *DREvent, err error) {
 	backup = NewDREventNow(backupName)
 	ctx.Log.With("backupName", backup.GetFullName(), "namespace", namespace).Info("Starting backup process")
 	defer func() {
@@ -118,14 +119,14 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 	}
 
 	coreBackup := t.newCNPGBackup()
-	if err := coreBackup.Configure(t.kubeClusterClient, namespace, coreClusterName, servingCertIssuerName, clientCertIssuerName, backupName, teleportCoreSQLFileName, backupOpts); err != nil {
+	if err := coreBackup.Configure(t.kubeClusterClient, namespace, coreClusterName, backupName, teleportCoreSQLFileName, backupOpts); err != nil {
 		return backup, trace.Wrap(err, "failed to configure core cluster backup")
 	}
 	stage.WithAction("Teleport core CNPG backup", coreBackup)
 
 	auditBackup := t.newCNPGBackup()
 	if opts.AuditCluster.Enabled {
-		if err := auditBackup.Configure(t.kubeClusterClient, namespace, opts.AuditCluster.Name, servingCertIssuerName, clientCertIssuerName, backupName, teleportAuditSQLFileName, backupOpts); err != nil {
+		if err := auditBackup.Configure(t.kubeClusterClient, namespace, opts.AuditCluster.Name, backupName, teleportAuditSQLFileName, backupOpts); err != nil {
 			return backup, trace.Wrap(err, "failed to configure audit cluster backup")
 		}
 		stage.WithAction("Teleport audit CNPG backup", auditBackup)
@@ -160,16 +161,14 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 
 type TeleportRestoreOptionsAudit struct {
 	TeleportOptionsAudit
-	ServingCertName      string                             `yaml:"servingCertName,omitempty"`
-	ClientCertIssuerName string                             `yaml:"clientCertIssuerName,omitempty"`
-	PostgresUserCert     cnpgrestore.CNPGRestoreOptionsCert `yaml:"postgresUserCert,omitempty"`
-	IssuerKind           string                             `yaml:"issuerKind,omitempty"`
+	ServingCertName  string                             `yaml:"servingCertName,omitempty"`
+	ClientCAIssuer   cmmeta.IssuerReference             `yaml:"clientCAIssuer,omitempty"`
+	PostgresUserCert cnpgrestore.CNPGRestoreOptionsCert `yaml:"postgresUserCert,omitempty"`
 }
 
 type TeleportRestoreOptions struct {
 	AuditCluster            TeleportRestoreOptionsAudit                        `yaml:"auditCluster,omitempty"`
 	PostgresUserCert        cnpgrestore.CNPGRestoreOptionsCert                 `yaml:"postgresUserCert,omitempty"`
-	IssuerKind              string                                             `yaml:"issuerKind,omitempty"`
 	AuditSessionLogs        TeleportOptionsS3Sync                              `yaml:"auditSessionLogs,omitempty"`
 	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
@@ -193,7 +192,7 @@ type TeleportRestoreOptions struct {
 // 3. 2. Spawn a new backup-tool pod with postgres auth and serving certs, and DR mount attached
 // 3. 3. Perform a Postgres logical recovery of the cluster
 // 4. Restore the audit session logs (if enabled)
-func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreClusterName, coreServingCertName, coreClientCertIssuerName string, opts TeleportRestoreOptions) (restore *DREvent, err error) {
+func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreClusterName, coreServingCertName string, coreClientCAIssuer cmmeta.IssuerReference, opts TeleportRestoreOptions) (restore *DREvent, err error) {
 	restore = NewDREventNow(restoreName)
 	ctx.Log.With("restoreName", restore.GetFullName(), "namespace", namespace).Info("Starting restore process")
 	defer func() {
@@ -213,8 +212,7 @@ func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreCl
 	})
 
 	coreRestore := t.newCNPGRestore()
-	if err := coreRestore.Configure(t.kubeClusterClient, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, teleportCoreSQLFileName, cnpgrestore.CNPGRestoreOptions{
-		IssuerKind:       opts.IssuerKind,
+	if err := coreRestore.Configure(t.kubeClusterClient, namespace, coreClusterName, coreServingCertName, coreClientCAIssuer, restoreName, teleportCoreSQLFileName, cnpgrestore.CNPGRestoreOptions{
 		PostgresUserCert: opts.PostgresUserCert,
 		CleanupTimeout:   opts.CleanupTimeout,
 	}); err != nil {
@@ -224,8 +222,7 @@ func (t *Teleport) Restore(ctx *contexts.Context, namespace, restoreName, coreCl
 
 	auditRestore := t.newCNPGRestore()
 	if opts.AuditCluster.Enabled {
-		if err := auditRestore.Configure(t.kubeClusterClient, namespace, opts.AuditCluster.Name, opts.AuditCluster.ServingCertName, opts.AuditCluster.ClientCertIssuerName, restoreName, teleportAuditSQLFileName, cnpgrestore.CNPGRestoreOptions{
-			IssuerKind:       opts.AuditCluster.IssuerKind,
+		if err := auditRestore.Configure(t.kubeClusterClient, namespace, opts.AuditCluster.Name, opts.AuditCluster.ServingCertName, opts.AuditCluster.ClientCAIssuer, restoreName, teleportAuditSQLFileName, cnpgrestore.CNPGRestoreOptions{
 			PostgresUserCert: opts.AuditCluster.PostgresUserCert,
 			CleanupTimeout:   opts.CleanupTimeout,
 		}); err != nil {

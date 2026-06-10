@@ -1,6 +1,7 @@
 package disasterrecovery
 
 import (
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery"
 	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
@@ -25,24 +26,22 @@ type TeleportBackupConfigClustersConfig struct {
 }
 
 type TeleportBackupConfig struct {
-	Namespace              string                                 `yaml:"namespace" jsonschema:"required"`
-	BackupName             string                                 `yaml:"backupName" jsonschema:"required"`
-	CNPGClusters           TeleportBackupConfigClustersConfig     `yaml:"cnpgClusters" jsonschema:"required"`
-	ServingCertIssuerName  string                                 `yaml:"servingCertIssuerName" jsonschema:"required"`
-	ClientCACertIssuerName string                                 `yaml:"clientCACertIssuerName" jsonschema:"required"`
-	AuditSessionLogs       TeleportConfigAuditSessionLogs         `yaml:"auditSessionLogs,omitempty"`
-	BackupVolume           ConfigBackupVolume                     `yaml:"backupVolume" jsonschema:"omitempty"`
-	BackupSnapshot         disasterrecovery.OptionsBackupSnapshot `yaml:"backupSnapshot" jsonschema:"omitempty"`
-	CloneClusterOptions    clonedcluster.CloneClusterOptions      `yaml:"clusterCloning,omitempty"`
-	BackupToolInstance     ConfigBTI                              `yaml:"backupToolInstance,omitempty"`
-	CleanupTimeout         helpers.MaxWaitTime                    `yaml:"cleanupTimeout,omitempty"`
+	Namespace           string                                 `yaml:"namespace" jsonschema:"required"`
+	BackupName          string                                 `yaml:"backupName" jsonschema:"required"`
+	CNPGClusters        TeleportBackupConfigClustersConfig     `yaml:"cnpgClusters" jsonschema:"required"`
+	AuditSessionLogs    TeleportConfigAuditSessionLogs         `yaml:"auditSessionLogs,omitempty"`
+	BackupVolume        ConfigBackupVolume                     `yaml:"backupVolume" jsonschema:"omitempty"`
+	BackupSnapshot      disasterrecovery.OptionsBackupSnapshot `yaml:"backupSnapshot" jsonschema:"omitempty"`
+	CloneClusterOptions clonedcluster.CloneClusterOptions      `yaml:"clusterCloning,omitempty"`
+	BackupToolInstance  ConfigBTI                              `yaml:"backupToolInstance,omitempty"`
+	CleanupTimeout      helpers.MaxWaitTime                    `yaml:"cleanupTimeout,omitempty"`
 }
 
 type TeleportRestoreClusterConfig struct {
-	Name             string                             `yaml:"name" jsonschema:"required"`
-	ServingCertName  string                             `yaml:"servingCertName" jsonschema:"required"`
-	ClientCertIssuer ConfigIssuer                       `yaml:"clientCertIssuer" jsonschema:"required"`
-	ClusterUserCert  cnpgrestore.CNPGRestoreOptionsCert `yaml:"clusterUserCert,omitempty"`
+	Name            string                             `yaml:"name" jsonschema:"required"`
+	ServingCertName string                             `yaml:"servingCertName" jsonschema:"required"`
+	ClientCAIssuer  cmmeta.IssuerReference             `yaml:"clientCAIssuer" jsonschema:"required"`
+	ClusterUserCert cnpgrestore.CNPGRestoreOptionsCert `yaml:"clusterUserCert,omitempty"`
 }
 
 type TeleportRestoreClustersConfig struct {
@@ -88,8 +87,7 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 			CleanupTimeout:          config.CleanupTimeout,
 		}
 
-		_, err := t.Backup(ctx, config.Namespace, config.BackupName, config.CNPGClusters.Core.CNPGClusterName,
-			config.ServingCertIssuerName, config.ClientCACertIssuerName, opts)
+		_, err := t.Backup(ctx, config.Namespace, config.BackupName, config.CNPGClusters.Core.CNPGClusterName, opts)
 
 		return err
 	}
@@ -98,16 +96,15 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 		t := disasterrecovery.NewTeleport(kubeCluster)
 
 		_, err := t.Restore(ctx, config.Namespace, config.BackupName, config.CNPGClusters.Core.Name, config.CNPGClusters.Core.ServingCertName,
-			config.CNPGClusters.Core.ClientCertIssuer.Name, disasterrecovery.TeleportRestoreOptions{
+			config.CNPGClusters.Core.ClientCAIssuer, disasterrecovery.TeleportRestoreOptions{
 				AuditCluster: disasterrecovery.TeleportRestoreOptionsAudit{
 					TeleportOptionsAudit: disasterrecovery.TeleportOptionsAudit{
 						Enabled: config.CNPGClusters.Audit.Name != "",
 						Name:    config.CNPGClusters.Audit.Name,
 					},
-					ServingCertName:      config.CNPGClusters.Audit.ServingCertName,
-					ClientCertIssuerName: config.CNPGClusters.Audit.ClientCertIssuer.Name,
-					PostgresUserCert:     config.CNPGClusters.Audit.ClusterUserCert,
-					IssuerKind:           config.CNPGClusters.Audit.ClientCertIssuer.Kind,
+					ServingCertName:  config.CNPGClusters.Audit.ServingCertName,
+					ClientCAIssuer:   config.CNPGClusters.Audit.ClientCAIssuer,
+					PostgresUserCert: config.CNPGClusters.Audit.ClusterUserCert,
 				},
 				AuditSessionLogs: disasterrecovery.TeleportOptionsS3Sync{
 					Enabled:     config.AuditSessionLogs.S3Path != "",
@@ -115,7 +112,6 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 					Credentials: config.AuditSessionLogs.Credentials,
 				},
 				PostgresUserCert:        config.CNPGClusters.Core.ClusterUserCert,
-				IssuerKind:              config.CNPGClusters.Core.ClientCertIssuer.Kind,
 				RemoteBackupToolOptions: config.BackupToolInstance.CreationOptions,
 				CleanupTimeout:          config.CleanupTimeout,
 			})

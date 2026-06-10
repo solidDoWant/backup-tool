@@ -6,7 +6,8 @@ jobConfig:
     dataPVCName: vaultwarden-restore-backend-restore-data-vol
     cnpgClusterName: vaultwarden-restore
     servingCertName: postgres-restore-serving-cert
-    clientCertIssuerName: postgres-restore-auth-ca-issuer
+    clientCAIssuer:
+      name: postgres-restore-auth-ca-issuer
     certificates:
       postgresUserCert:
         certificateRequestPolicy:

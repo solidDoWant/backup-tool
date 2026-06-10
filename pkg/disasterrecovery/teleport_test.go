@@ -1,6 +1,7 @@
 package disasterrecovery
 
 import (
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"strings"
 	"testing"
 	"time"
@@ -43,8 +44,6 @@ func TestTeleportBackup(t *testing.T) {
 	namespace := "test-ns"
 	coreClusterName := "test-core-cluster"
 	auditClusterName := "test-audit-cluster"
-	servingIssuerName := "serving-cert-issuer"
-	clientIssuerName := "client-cert-issuer"
 	auditSessionLogsS3Path := "s3://audit-session-logs"
 	auditSessionLogsS3Credentials := s3.NewCredentials("accessKeyID", "secretAccessKey")
 
@@ -192,14 +191,15 @@ func TestTeleportBackup(t *testing.T) {
 					return
 				}
 
-				// Configuration
+				// Configuration. The serving/client-CA issuers are part of the cloning options
+				// (clusterCloning.certificates.*) and pass through to each action verbatim.
 				backupOpts := cnpgbackup.CNPGBackupOptions{
 					CloningOpts:    tt.opts.CloneClusterOptions,
 					CleanupTimeout: tt.opts.CleanupTimeout,
 				}
 
-				mockCoreCNPGBackup.EXPECT().Configure(mockClient, namespace, coreClusterName, servingIssuerName, clientIssuerName, backupName, "backup-core.sql", mock.Anything).
-					RunAndReturn(func(kubeClient kubecluster.ClientInterface, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, drVolName, backupFileRelPath string, opts cnpgbackup.CNPGBackupOptions) error {
+				mockCoreCNPGBackup.EXPECT().Configure(mockClient, namespace, coreClusterName, backupName, "backup-core.sql", mock.Anything).
+					RunAndReturn(func(kubeClient kubecluster.ClientInterface, namespace, clusterName, drVolName, backupFileRelPath string, opts cnpgbackup.CNPGBackupOptions) error {
 						assert.Equal(t, backupOpts, opts)
 
 						return th.ErrIfTrue(tt.simulateConfigureCoreBackupError)
@@ -210,8 +210,8 @@ func TestTeleportBackup(t *testing.T) {
 				mockRemoteStage.EXPECT().WithAction(mock.Anything, mockCoreCNPGBackup).Return(mockRemoteStage)
 
 				if tt.opts.AuditCluster.Enabled {
-					mockAuditCNPGBackup.EXPECT().Configure(mockClient, namespace, auditClusterName, servingIssuerName, clientIssuerName, backupName, "backup-audit.sql", mock.Anything).
-						RunAndReturn(func(kubeClient kubecluster.ClientInterface, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, drVolName, backupFileRelPath string, opts cnpgbackup.CNPGBackupOptions) error {
+					mockAuditCNPGBackup.EXPECT().Configure(mockClient, namespace, auditClusterName, backupName, "backup-audit.sql", mock.Anything).
+						RunAndReturn(func(kubeClient kubecluster.ClientInterface, namespace, clusterName, drVolName, backupFileRelPath string, opts cnpgbackup.CNPGBackupOptions) error {
 							assert.Equal(t, backupOpts, opts)
 
 							return th.ErrIfTrue(tt.simulateConfigureAuditBackupError)
@@ -257,8 +257,7 @@ func TestTeleportBackup(t *testing.T) {
 				}
 			}()
 
-			backup, err := teleport.Backup(rootCtx, namespace, backupName, coreClusterName,
-				servingIssuerName, clientIssuerName, tt.opts)
+			backup, err := teleport.Backup(rootCtx, namespace, backupName, coreClusterName, tt.opts)
 
 			require.NotNil(t, backup)
 			assert.NotEmpty(t, backup.StartTime)
@@ -282,12 +281,10 @@ func TestTeleportRestore(t *testing.T) {
 	restoreName := "test-restore"
 	coreClusterName := "test-core-cluster"
 	coreServingCertName := "test-core-serving-cert"
-	coreClientCertIssuerName := "test-core-client-cert-issuer"
-	coreClientCertIssuerKind := "ClusterIssuer"
+	coreClientCAIssuer := cmmeta.IssuerReference{Name: "test-core-client-cert-issuer", Kind: "ClusterIssuer"}
 	auditClusterName := "test-audit-cluster"
 	auditServingCertName := "test-audit-serving-cert"
-	auditClientCertIssuerName := "test-audit-client-cert-issuer"
-	auditClientCertIssuerKind := "ClusterIssuer"
+	auditClientCAIssuer := cmmeta.IssuerReference{Name: "test-audit-client-cert-issuer", Kind: "ClusterIssuer"}
 	auditSessionLogsS3Path := "s3://audit-session-logs"
 	auditSessionLogsS3Credentials := s3.NewCredentials("accessKeyID", "secretAccessKey")
 
@@ -296,9 +293,8 @@ func TestTeleportRestore(t *testing.T) {
 			Name:    auditClusterName,
 			Enabled: true,
 		},
-		ServingCertName:      auditServingCertName,
-		ClientCertIssuerName: auditClientCertIssuerName,
-		IssuerKind:           auditClientCertIssuerKind,
+		ServingCertName: auditServingCertName,
+		ClientCAIssuer:  auditClientCAIssuer,
 	}
 
 	auditSessionLogsOptions := TeleportOptionsS3Sync{
@@ -324,7 +320,6 @@ func TestTeleportRestore(t *testing.T) {
 				AuditCluster:     auditClusterOptions,
 				AuditSessionLogs: auditSessionLogsOptions,
 				CleanupTimeout:   helpers.MaxWaitTime(3 * time.Second),
-				IssuerKind:       coreClientCertIssuerKind,
 			},
 		},
 	}
@@ -377,9 +372,8 @@ func TestTeleportRestore(t *testing.T) {
 			)
 
 			func() {
-				mockCoreCNPGRestore.EXPECT().Configure(mockClient, namespace, coreClusterName, coreServingCertName, coreClientCertIssuerName, restoreName, "backup-core.sql", cnpgrestore.CNPGRestoreOptions{
+				mockCoreCNPGRestore.EXPECT().Configure(mockClient, namespace, coreClusterName, coreServingCertName, coreClientCAIssuer, restoreName, "backup-core.sql", cnpgrestore.CNPGRestoreOptions{
 					PostgresUserCert: tt.opts.PostgresUserCert,
-					IssuerKind:       tt.opts.IssuerKind,
 					CleanupTimeout:   tt.opts.CleanupTimeout,
 				}).Return(th.ErrIfTrue(tt.simulateCoreConfigError))
 				if tt.simulateCoreConfigError {
@@ -388,9 +382,8 @@ func TestTeleportRestore(t *testing.T) {
 				mockRemoteStage.EXPECT().WithAction(mock.Anything, mockCoreCNPGRestore).Return(mockRemoteStage)
 
 				if tt.opts.AuditCluster.Enabled {
-					mockAuditCNPGRestore.EXPECT().Configure(mockClient, namespace, auditClusterName, auditServingCertName, auditClientCertIssuerName, restoreName, "backup-audit.sql", cnpgrestore.CNPGRestoreOptions{
+					mockAuditCNPGRestore.EXPECT().Configure(mockClient, namespace, auditClusterName, auditServingCertName, tt.opts.AuditCluster.ClientCAIssuer, restoreName, "backup-audit.sql", cnpgrestore.CNPGRestoreOptions{
 						PostgresUserCert: tt.opts.AuditCluster.PostgresUserCert,
-						IssuerKind:       tt.opts.AuditCluster.IssuerKind,
 						CleanupTimeout:   tt.opts.CleanupTimeout,
 					}).Return(th.ErrIfTrue(tt.simulateAuditConfigError))
 					if tt.simulateAuditConfigError {
@@ -416,7 +409,7 @@ func TestTeleportRestore(t *testing.T) {
 					})
 			}()
 
-			restore, err := teleport.Restore(rootCtx, namespace, restoreName, coreClusterName, coreServingCertName, coreClientCertIssuerName, tt.opts)
+			restore, err := teleport.Restore(rootCtx, namespace, restoreName, coreClusterName, coreServingCertName, coreClientCAIssuer, tt.opts)
 
 			require.NotNil(t, restore)
 			assert.NotEmpty(t, restore.StartTime)

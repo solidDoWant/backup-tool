@@ -86,14 +86,11 @@
         "cluster": {
           "type": "string"
         },
-        "clientCAIssuer": {
-          "type": "string"
-        },
         "servingCert": {
           "type": "string"
         },
-        "issuerKind": {
-          "type": "string"
+        "clientCAIssuer": {
+          "$ref": "#/$defs/IssuerReference"
         },
         "postgresUserCert": {
           "$ref": "#/$defs/CNPGRestoreOptionsCert"
@@ -104,8 +101,8 @@
       "required": [
         "name",
         "cluster",
-        "clientCAIssuer",
-        "servingCert"
+        "servingCert",
+        "clientCAIssuer"
       ]
     },
     "GenericRestoreConfig": {
@@ -169,6 +166,21 @@
         "name",
         "path"
       ]
+    },
+    "IssuerReference": {
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Kind": {
+          "type": "string"
+        },
+        "Group": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
     },
     "LabelSelector": {
       "properties": {

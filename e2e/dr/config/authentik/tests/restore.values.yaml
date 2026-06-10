@@ -5,7 +5,7 @@ jobConfig:
     cluster:
       name: ar-postgres
       servingCertName: ar-postgres-serving-cert
-      clientCertIssuer:
+      clientCAIssuer:
         name: ar-postgres-auth-ca-issuer
       postgresUserCert:
         certificateRequestPolicy:

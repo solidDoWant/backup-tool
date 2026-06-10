@@ -8,7 +8,6 @@ import (
 	"time"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
@@ -38,21 +37,13 @@ func TestCNPGBackupOptions(t *testing.T) {
 
 func TestConfigure(t *testing.T) {
 	expectedState := &configureState{
-		kubeClusterClient:     kubecluster.NewMockClientInterface(t),
-		namespace:             "namespace",
-		drVolName:             "drVolName",
-		backupFileRelPath:     "backupFileRelPath",
-		clusterName:           "clusterName",
-		servingCertIssuerName: "servingCertIssuerName",
-		clientCertIssuerName:  "clientCertIssuerName",
+		kubeClusterClient: kubecluster.NewMockClientInterface(t),
+		namespace:         "namespace",
+		drVolName:         "drVolName",
+		backupFileRelPath: "backupFileRelPath",
+		clusterName:       "clusterName",
 		opts: CNPGBackupOptions{
-			CloningOpts: clonedcluster.CloneClusterOptions{
-				Certificates: clonedcluster.CloneClusterOptionsCertificates{
-					ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
-						IssuerKind: "ClusterIssuer",
-					},
-				},
-			},
+			CloningOpts:    clonedcluster.CloneClusterOptions{},
 			CleanupTimeout: helpers.ShortWaitTime,
 		},
 	}
@@ -62,8 +53,6 @@ func TestConfigure(t *testing.T) {
 		expectedState.kubeClusterClient,
 		expectedState.namespace,
 		expectedState.clusterName,
-		expectedState.servingCertIssuerName,
-		expectedState.clientCertIssuerName,
 		expectedState.drVolName,
 		expectedState.backupFileRelPath,
 		expectedState.opts,
@@ -91,8 +80,6 @@ func TestConfigure(t *testing.T) {
 			expectedState.kubeClusterClient,
 			expectedState.namespace,
 			expectedState.clusterName,
-			expectedState.servingCertIssuerName,
-			expectedState.clientCertIssuerName,
 			expectedState.drVolName,
 			expectedState.backupFileRelPath,
 			expectedState.opts,
@@ -115,27 +102,12 @@ func TestValidate(t *testing.T) {
 	notReadyCluster := readyCluster.DeepCopy()
 	notReadyCluster.Status.Conditions[0].Status = metav1.ConditionFalse
 
-	readyIssuer := &certmanagerv1.Issuer{
-		Status: certmanagerv1.IssuerStatus{
-			Conditions: []certmanagerv1.IssuerCondition{
-				{
-					Type:   certmanagerv1.IssuerConditionReady,
-					Status: cmmeta.ConditionTrue,
-				},
-			},
-		},
-	}
-	notReadyIssuer := readyIssuer.DeepCopy()
-	notReadyIssuer.Status.Conditions[0].Status = cmmeta.ConditionFalse
-
 	notConfiguredState := &configureState{}
 	configuredState := &configureState{}
 	err := configuredState.Configure(
 		nil,
 		"namespace",
 		"clusterName",
-		"servingCertIssuerName",
-		"clientCertIssuerName",
 		"drVolName",
 		"backupFileRelPath",
 		CNPGBackupOptions{},
@@ -143,16 +115,12 @@ func TestValidate(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		desc                            string
-		configState                     *configureState
-		isAlreadyValidated              bool
-		simulateGetClusterError         bool
-		returnClusterNotReady           bool
-		simulateGetServingCertIssuer    bool
-		returnServingCertIssuerNotReady bool
-		simulateGetClientCertIssuer     bool
-		returnClientCertIssuerNotReady  bool
-		simulateGetPVCErr               bool
+		desc                    string
+		configState             *configureState
+		isAlreadyValidated      bool
+		simulateGetClusterError bool
+		returnClusterNotReady   bool
+		simulateGetPVCErr       bool
 	}{
 		{
 			desc: "succeeds",
@@ -172,22 +140,6 @@ func TestValidate(t *testing.T) {
 		{
 			desc:                  "fails because cluster is not ready",
 			returnClusterNotReady: true,
-		},
-		{
-			desc:                         "fails to get serving cert issuer",
-			simulateGetServingCertIssuer: true,
-		},
-		{
-			desc:                            "fails because serving cert issuer is not ready",
-			returnServingCertIssuerNotReady: true,
-		},
-		{
-			desc:                        "fails to get client cert issuer",
-			simulateGetClientCertIssuer: true,
-		},
-		{
-			desc:                           "fails because client cert issuer is not ready",
-			returnClientCertIssuerNotReady: true,
 		},
 		{
 			desc:              "fails to get DR PVC",
@@ -221,10 +173,6 @@ func TestValidate(t *testing.T) {
 				!currentState.isConfigured,
 				tt.simulateGetClusterError,
 				tt.returnClusterNotReady,
-				tt.simulateGetServingCertIssuer,
-				tt.returnServingCertIssuerNotReady,
-				tt.simulateGetClientCertIssuer,
-				tt.returnClientCertIssuerNotReady,
 				tt.simulateGetPVCErr,
 			)
 
@@ -245,36 +193,6 @@ func TestValidate(t *testing.T) {
 						return th.ErrOr1Val(retCluster, tt.simulateGetClusterError)
 					})
 				if tt.simulateGetClusterError || tt.returnClusterNotReady {
-					return
-				}
-
-				mockCMClient.EXPECT().GetIssuer(mock.Anything, currentState.namespace, currentState.servingCertIssuerName).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*certmanagerv1.Issuer, error) {
-						assert.True(t, calledCtx.IsChildOf(ctx))
-
-						retIssuer := readyIssuer
-						if tt.returnServingCertIssuerNotReady {
-							retIssuer = notReadyIssuer
-						}
-
-						return th.ErrOr1Val(retIssuer, tt.simulateGetServingCertIssuer)
-					})
-				if tt.simulateGetServingCertIssuer || tt.returnServingCertIssuerNotReady {
-					return
-				}
-
-				mockCMClient.EXPECT().GetIssuer(mock.Anything, currentState.namespace, currentState.clientCertIssuerName).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*certmanagerv1.Issuer, error) {
-						assert.True(t, calledCtx.IsChildOf(ctx))
-
-						retIssuer := readyIssuer
-						if tt.returnClientCertIssuerNotReady {
-							retIssuer = notReadyIssuer
-						}
-
-						return th.ErrOr1Val(retIssuer, tt.simulateGetClientCertIssuer)
-					})
-				if tt.simulateGetClientCertIssuer || tt.returnClientCertIssuerNotReady {
 					return
 				}
 
@@ -332,23 +250,15 @@ func TestBeforeConsistencyPoint(t *testing.T) {
 			currentState := &baseBackupState{
 				validateState: validateState{
 					configureState: configureState{
-						uid:                   "uid",
-						isConfigured:          true,
-						kubeClusterClient:     mockClient,
-						namespace:             "namespace",
-						clusterName:           "clusterName",
-						servingCertIssuerName: "servingCertIssuerName",
-						clientCertIssuerName:  "clientCertIssuerName",
-						drVolName:             "drVolName",
-						backupFileRelPath:     "backupFileRelPath",
+						uid:               "uid",
+						isConfigured:      true,
+						kubeClusterClient: mockClient,
+						namespace:         "namespace",
+						clusterName:       "clusterName",
+						drVolName:         "drVolName",
+						backupFileRelPath: "backupFileRelPath",
 						opts: CNPGBackupOptions{
-							CloningOpts: clonedcluster.CloneClusterOptions{
-								Certificates: clonedcluster.CloneClusterOptionsCertificates{
-									ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
-										IssuerKind: "ClusterIssuer",
-									},
-								},
-							},
+							CloningOpts:    clonedcluster.CloneClusterOptions{},
 							CleanupTimeout: helpers.ShortWaitTime,
 						},
 					},
@@ -460,23 +370,15 @@ func TestSetup(t *testing.T) {
 				baseBackupState: baseBackupState{
 					validateState: validateState{
 						configureState: configureState{
-							uid:                   "uid",
-							isConfigured:          true,
-							kubeClusterClient:     mockClient,
-							namespace:             "namespace",
-							clusterName:           "clusterName",
-							servingCertIssuerName: "servingCertIssuerName",
-							clientCertIssuerName:  "clientCertIssuerName",
-							drVolName:             "drVolName",
-							backupFileRelPath:     "backupFileRelPath",
+							uid:               "uid",
+							isConfigured:      true,
+							kubeClusterClient: mockClient,
+							namespace:         "namespace",
+							clusterName:       "clusterName",
+							drVolName:         "drVolName",
+							backupFileRelPath: "backupFileRelPath",
 							opts: CNPGBackupOptions{
-								CloningOpts: clonedcluster.CloneClusterOptions{
-									Certificates: clonedcluster.CloneClusterOptionsCertificates{
-										ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
-											IssuerKind: "ClusterIssuer",
-										},
-									},
-								},
+								CloningOpts:    clonedcluster.CloneClusterOptions{},
 								CleanupTimeout: helpers.ShortWaitTime,
 							},
 						},
@@ -522,8 +424,8 @@ func TestSetup(t *testing.T) {
 						}
 					})
 
-				mockClient.EXPECT().CloneClusterFromBackup(mock.Anything, currentState.namespace, currentState.clusterName, mock.Anything, currentState.servingCertIssuerName, currentState.clientCertIssuerName, baseBackup, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, backup *apiv1.Backup, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
+				mockClient.EXPECT().CloneClusterFromBackup(mock.Anything, currentState.namespace, currentState.clusterName, mock.Anything, baseBackup, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, existingClusterName, newClusterName string, backup *apiv1.Backup, opts clonedcluster.CloneClusterOptions) (clonedcluster.ClonedClusterInterface, error) {
 						assert.True(t, calledCtx.IsChildOf(ctx))
 						assert.Contains(t, newClusterName, currentState.uid)
 						assert.LessOrEqual(t, len(newClusterName), 50)
@@ -627,15 +529,13 @@ func TestCleanup(t *testing.T) {
 				baseBackupState: baseBackupState{
 					validateState: validateState{
 						configureState: configureState{
-							uid:                   "uid",
-							isConfigured:          true,
-							kubeClusterClient:     mockClient,
-							namespace:             "namespace",
-							clusterName:           "clusterName",
-							servingCertIssuerName: "servingCertIssuerName",
-							clientCertIssuerName:  "clientCertIssuerName",
-							drVolName:             "drVolName",
-							backupFileRelPath:     "backupFileRelPath",
+							uid:               "uid",
+							isConfigured:      true,
+							kubeClusterClient: mockClient,
+							namespace:         "namespace",
+							clusterName:       "clusterName",
+							drVolName:         "drVolName",
+							backupFileRelPath: "backupFileRelPath",
 							opts: CNPGBackupOptions{
 								CleanupTimeout: helpers.ShortWaitTime,
 							},
@@ -700,23 +600,15 @@ func TestExecute(t *testing.T) {
 					baseBackupState: baseBackupState{
 						validateState: validateState{
 							configureState: configureState{
-								uid:                   "uid",
-								isConfigured:          true,
-								kubeClusterClient:     mockClient,
-								namespace:             "namespace",
-								clusterName:           "clusterName",
-								servingCertIssuerName: "servingCertIssuerName",
-								clientCertIssuerName:  "clientCertIssuerName",
-								drVolName:             "drVolName",
-								backupFileRelPath:     "backupFileRelPath",
+								uid:               "uid",
+								isConfigured:      true,
+								kubeClusterClient: mockClient,
+								namespace:         "namespace",
+								clusterName:       "clusterName",
+								drVolName:         "drVolName",
+								backupFileRelPath: "backupFileRelPath",
 								opts: CNPGBackupOptions{
-									CloningOpts: clonedcluster.CloneClusterOptions{
-										Certificates: clonedcluster.CloneClusterOptionsCertificates{
-											ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
-												IssuerKind: "ClusterIssuer",
-											},
-										},
-									},
+									CloningOpts:    clonedcluster.CloneClusterOptions{},
 									CleanupTimeout: helpers.ShortWaitTime,
 								},
 							},

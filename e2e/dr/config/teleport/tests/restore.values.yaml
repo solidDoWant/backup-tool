@@ -6,12 +6,12 @@ jobConfig:
       core:
         name: tpr-core
         servingCertName: tpr-core-postgres-serving-cert
-        clientCertIssuer:
+        clientCAIssuer:
           name: tpr-core-postgres-auth-ca-issuer
       audit:
         name: tpr-audit
         servingCertName: tpr-audit-postgres-serving-cert
-        clientCertIssuer:
+        clientCAIssuer:
           name: tpr-audit-postgres-auth-ca-issuer
     auditSessionLogs:
       s3Path: s3://teleport-audit-session-logs/

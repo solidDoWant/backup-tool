@@ -22,9 +22,9 @@ func (_m *MockProviderInterface) EXPECT() *MockProviderInterface_Expecter {
 	return &MockProviderInterface_Expecter{mock: &_m.Mock}
 }
 
-// CloneClusterFromBackup provides a mock function with given fields: ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts
-func (_m *MockProviderInterface) CloneClusterFromBackup(ctx *contexts.Context, namespace string, existingClusterName string, newClusterName string, servingCertIssuerName string, clientCertIssuerName string, backup *v1.Backup, opts CloneClusterOptions) (ClonedClusterInterface, error) {
-	ret := _m.Called(ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts)
+// CloneClusterFromBackup provides a mock function with given fields: ctx, namespace, existingClusterName, newClusterName, backup, opts
+func (_m *MockProviderInterface) CloneClusterFromBackup(ctx *contexts.Context, namespace string, existingClusterName string, newClusterName string, backup *v1.Backup, opts CloneClusterOptions) (ClonedClusterInterface, error) {
+	ret := _m.Called(ctx, namespace, existingClusterName, newClusterName, backup, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CloneClusterFromBackup")
@@ -32,19 +32,19 @@ func (_m *MockProviderInterface) CloneClusterFromBackup(ctx *contexts.Context, n
 
 	var r0 ClonedClusterInterface
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, string, string, *v1.Backup, CloneClusterOptions) (ClonedClusterInterface, error)); ok {
-		return rf(ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts)
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, *v1.Backup, CloneClusterOptions) (ClonedClusterInterface, error)); ok {
+		return rf(ctx, namespace, existingClusterName, newClusterName, backup, opts)
 	}
-	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, string, string, *v1.Backup, CloneClusterOptions) ClonedClusterInterface); ok {
-		r0 = rf(ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts)
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, *v1.Backup, CloneClusterOptions) ClonedClusterInterface); ok {
+		r0 = rf(ctx, namespace, existingClusterName, newClusterName, backup, opts)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(ClonedClusterInterface)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, string, string, string, *v1.Backup, CloneClusterOptions) error); ok {
-		r1 = rf(ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts)
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, string, *v1.Backup, CloneClusterOptions) error); ok {
+		r1 = rf(ctx, namespace, existingClusterName, newClusterName, backup, opts)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -62,17 +62,15 @@ type MockProviderInterface_CloneClusterFromBackup_Call struct {
 //   - namespace string
 //   - existingClusterName string
 //   - newClusterName string
-//   - servingCertIssuerName string
-//   - clientCertIssuerName string
 //   - backup *v1.Backup
 //   - opts CloneClusterOptions
-func (_e *MockProviderInterface_Expecter) CloneClusterFromBackup(ctx interface{}, namespace interface{}, existingClusterName interface{}, newClusterName interface{}, servingCertIssuerName interface{}, clientCertIssuerName interface{}, backup interface{}, opts interface{}) *MockProviderInterface_CloneClusterFromBackup_Call {
-	return &MockProviderInterface_CloneClusterFromBackup_Call{Call: _e.mock.On("CloneClusterFromBackup", ctx, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCertIssuerName, backup, opts)}
+func (_e *MockProviderInterface_Expecter) CloneClusterFromBackup(ctx interface{}, namespace interface{}, existingClusterName interface{}, newClusterName interface{}, backup interface{}, opts interface{}) *MockProviderInterface_CloneClusterFromBackup_Call {
+	return &MockProviderInterface_CloneClusterFromBackup_Call{Call: _e.mock.On("CloneClusterFromBackup", ctx, namespace, existingClusterName, newClusterName, backup, opts)}
 }
 
-func (_c *MockProviderInterface_CloneClusterFromBackup_Call) Run(run func(ctx *contexts.Context, namespace string, existingClusterName string, newClusterName string, servingCertIssuerName string, clientCertIssuerName string, backup *v1.Backup, opts CloneClusterOptions)) *MockProviderInterface_CloneClusterFromBackup_Call {
+func (_c *MockProviderInterface_CloneClusterFromBackup_Call) Run(run func(ctx *contexts.Context, namespace string, existingClusterName string, newClusterName string, backup *v1.Backup, opts CloneClusterOptions)) *MockProviderInterface_CloneClusterFromBackup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(string), args[6].(*v1.Backup), args[7].(CloneClusterOptions))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(*v1.Backup), args[5].(CloneClusterOptions))
 	})
 	return _c
 }
@@ -82,7 +80,7 @@ func (_c *MockProviderInterface_CloneClusterFromBackup_Call) Return(cluster Clon
 	return _c
 }
 
-func (_c *MockProviderInterface_CloneClusterFromBackup_Call) RunAndReturn(run func(*contexts.Context, string, string, string, string, string, *v1.Backup, CloneClusterOptions) (ClonedClusterInterface, error)) *MockProviderInterface_CloneClusterFromBackup_Call {
+func (_c *MockProviderInterface_CloneClusterFromBackup_Call) RunAndReturn(run func(*contexts.Context, string, string, string, *v1.Backup, CloneClusterOptions) (ClonedClusterInterface, error)) *MockProviderInterface_CloneClusterFromBackup_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -6,13 +6,16 @@ import (
 	"path/filepath"
 	"time"
 
+	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/certmanager"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg"
@@ -30,6 +33,10 @@ var ErrRecoveryTargetNotReached = errors.New("recovery target not reachable from
 type ClonedClusterInterface interface {
 	GetCredentials(servingCertMountDirectory, clientCertMountDirectory string) postgres.Credentials
 	Delete(ctx *contexts.Context) error
+	setSelfSignedIssuer(issuer *certmanagerv1.Issuer)
+	GetSelfSignedIssuer() *certmanagerv1.Issuer
+	addCertificateRequestPolicy(crp *policyv1alpha1.CertificateRequestPolicy)
+	GetCertificateRequestPolicies() []*policyv1alpha1.CertificateRequestPolicy
 	setServingCert(cert *certmanagerv1.Certificate)
 	GetServingCert() *certmanagerv1.Certificate
 	setClientCACert(cert *certmanagerv1.Certificate)
@@ -47,35 +54,32 @@ type ClonedClusterInterface interface {
 type ClonedCluster struct {
 	p                               providerInterfaceInternal
 	cluster                         *apiv1.Cluster
+	selfSignedIssuer                *certmanagerv1.Issuer
 	servingCertificate              *certmanagerv1.Certificate
 	clientCACertificate             *certmanagerv1.Certificate
 	clientCAIssuer                  *certmanagerv1.Issuer
 	postgresUserCertificate         clusterusercert.ClusterUserCertInterface
 	streamingReplicaUserCertificate clusterusercert.ClusterUserCertInterface
+	// certificateRequestPolicies are the CRPs created for the serving and client-CA certs (the user
+	// certs own their own CRPs via clusterusercert). Tracked here so Delete can tear them down.
+	certificateRequestPolicies []*policyv1alpha1.CertificateRequestPolicy
 }
 
+// CloneClusterOptionsCertificate describes options for one of the clone's certificates. Every cert the
+// clone creates is issued by an issuer the backup tool creates (the serving and client-CA certs from an
+// internal self-signed issuer; the user certs from the client-CA issuer), so each can carry an optional
+// CertificateRequestPolicy (required only when approver-policy is enforcing).
 type CloneClusterOptionsCertificate struct {
-	Subject             *certmanagerv1.X509Subject `yaml:"subject,omitempty"`
-	WaitForReadyTimeout helpers.MaxWaitTime        `yaml:"waitForReadyTimeout,omitempty"`
-}
-
-// Describes options for a certificate that is issued by an issuer created by the backup tool.
-type CloneClusterOptionsInternallyIssuedCertificate struct {
-	CloneClusterOptionsCertificate `yaml:",inline"`
-	CRPOpts                        clusterusercert.NewClusterUserCertOptsCRP `yaml:"certificateRequestPolicy,omitempty"`
-}
-
-// Describes options for a certificate that is issued by an issuer that was not created by the backup tool.
-type CloneClusterOptionsExternallyIssuedCertificate struct {
-	CloneClusterOptionsCertificate `yaml:",inline"`
-	IssuerKind                     string `yaml:"issuerKind,omitempty"`
+	Subject             *certmanagerv1.X509Subject                `yaml:"subject,omitempty"`
+	CRPOpts             clusterusercert.NewClusterUserCertOptsCRP `yaml:"certificateRequestPolicy,omitempty"`
+	WaitForReadyTimeout helpers.MaxWaitTime                       `yaml:"waitForReadyTimeout,omitempty"`
 }
 
 type CloneClusterOptionsCertificates struct {
-	ServingCert              CloneClusterOptionsExternallyIssuedCertificate `yaml:"servingCert,omitempty"`
-	ClientCACert             CloneClusterOptionsExternallyIssuedCertificate `yaml:"clientCACert,omitempty"`
-	PostgresUserCert         CloneClusterOptionsInternallyIssuedCertificate `yaml:"postgresUserCert,omitempty"`
-	StreamingReplicaUserCert CloneClusterOptionsInternallyIssuedCertificate `yaml:"streamingReplicaUserCert,omitempty"`
+	ServingCert              CloneClusterOptionsCertificate `yaml:"servingCert,omitempty"`
+	ClientCACert             CloneClusterOptionsCertificate `yaml:"clientCACert,omitempty"`
+	PostgresUserCert         CloneClusterOptionsCertificate `yaml:"postgresUserCert,omitempty"`
+	StreamingReplicaUserCert CloneClusterOptionsCertificate `yaml:"streamingReplicaUserCert,omitempty"`
 }
 
 type CloneClusterOptionsCAIssuer struct {
@@ -84,6 +88,7 @@ type CloneClusterOptionsCAIssuer struct {
 
 type CloneClusterOptions struct {
 	WaitForBackupTimeout  helpers.MaxWaitTime             `yaml:"waitForBackupTimeout,omitempty"`
+	SelfSignedIssuer      CloneClusterOptionsCAIssuer     `yaml:"selfSignedIssuer,omitempty"`
 	Certificates          CloneClusterOptionsCertificates `yaml:"certificates,omitempty"`
 	ClientCAIssuer        CloneClusterOptionsCAIssuer     `yaml:"clientCAIssuer,omitempty"`
 	RecoveryTargetTime    string                          `yaml:"recoveryTargetTime,omitempty" jsonschema:"description=The time to roll back to in RFC3339 format"`
@@ -135,7 +140,7 @@ func (p *Provider) CreateClusterBackup(ctx *contexts.Context, namespace, existin
 // forward to that wall-clock instant (recoveryTarget.targetTime); if the source had no WAL at/after the
 // target (an idle database), it falls back to the backup's consistency point. Otherwise it recovers to
 // the consistency point directly.
-func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, existingClusterName, newClusterName, servingCertIssuerName, clientCACertIssuerName string, readyBackup *apiv1.Backup, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
+func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, existingClusterName, newClusterName string, readyBackup *apiv1.Backup, opts CloneClusterOptions) (cluster ClonedClusterInterface, err error) {
 	if len(newClusterName) > 40 { // Max length that CNPG allows for cloned cluster names, see https://github.com/cloudnative-pg/cloudnative-pg/pull/6755
 		return nil, trace.Errorf("newClusterName must be 40 characters or less")
 	}
@@ -167,41 +172,53 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 		return errHandler(err, "failed to parse the existing cluster %q storage volume size %q", helpers.FullName(existingCluster), existingCluster.Spec.StorageConfiguration.Size)
 	}
 
-	// 2. Create the serving certificate (short lived)
+	// 1. Create the self-signed issuer that mints the clone's short-lived root certificates: its serving
+	// cert and the client-auth CA cert. A self-signed cert-manager issuer holds no key of its own (it
+	// signs each request with that certificate's own key), so a single issuer backs both certs with no
+	// downside. It is internal to this clone — created here and torn down with it — so no issuer needs
+	// to be supplied.
+	selfSignedIssuerName := helpers.CleanName(newClusterName + "-self-signed-issuer")
+	ctx.Log.Step().Info("Creating self-signed issuer for the new cluster", "issuerName", selfSignedIssuerName)
+	selfSignedIssuer, err := p.cmClient.CreateIssuer(ctx.Child(), namespace, selfSignedIssuerName, certmanagerv1.IssuerConfig{SelfSigned: &certmanagerv1.SelfSignedIssuer{}}, certmanager.CreateIssuerOptions{})
+	if err != nil {
+		return errHandler(err, "failed to create self-signed issuer %q", helpers.FullNameStr(namespace, selfSignedIssuerName))
+	}
+	cluster.setSelfSignedIssuer(selfSignedIssuer)
+
+	readySelfSignedIssuer, err := p.cmClient.WaitForReadyIssuer(ctx.Child(), namespace, selfSignedIssuerName, certmanager.WaitForReadyIssuerOpts{MaxWaitTime: opts.SelfSignedIssuer.WaitForReadyTimeout})
+	if err != nil {
+		return errHandler(err, "failed to wait for self-signed issuer %q to be ready", helpers.FullName(selfSignedIssuer))
+	}
+	cluster.setSelfSignedIssuer(readySelfSignedIssuer)
+	selfSignedIssuerRef := cmmeta.IssuerReference{Name: readySelfSignedIssuer.Name}
+
+	// 2. Create the serving certificate (short lived), minted from the self-signed issuer.
 	servingCertNameSuffix := "-serving-cert"
 	servingCertName := helpers.CleanName(helpers.TruncateStringEllipsis(newClusterName, 64-len(servingCertNameSuffix)) + servingCertNameSuffix)
 	ctx.Log.Step().Info("Creating serving certificate for the new cluster", "certificateName", servingCertName)
-	certOptions := certmanager.CreateCertificateOptions{
+	servingCertOptions := certmanager.CreateCertificateOptions{
 		CommonName: servingCertName,
 		Subject:    opts.Certificates.ServingCert.Subject,
 		Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageServerAuth},
 		SecretLabels: map[string]string{
 			utils.WatchedLabelName: "true",
 		},
-		DNSNames:   getClusterDomainNames(ctx.Child(), newClusterName, namespace),
-		IssuerKind: opts.Certificates.ServingCert.IssuerKind,
+		DNSNames: getClusterDomainNames(ctx.Child(), newClusterName, namespace),
 	}
 
-	servingCert, err := p.cmClient.CreateCertificate(ctx.Child(), namespace, servingCertName, servingCertIssuerName, certOptions)
+	readyServingCert, err := p.createClonedClusterCertificate(ctx.Child(), namespace, servingCertName, selfSignedIssuerRef, servingCertOptions, opts.Certificates.ServingCert, cluster, cluster.setServingCert)
 	if err != nil {
 		return errHandler(err, "failed to create cluster serving cert %q", helpers.FullNameStr(namespace, servingCertName))
 	}
-	cluster.setServingCert(servingCert)
-
-	readyServingCert, err := p.cmClient.WaitForReadyCertificate(ctx.Child(), namespace, servingCertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.Certificates.ServingCert.WaitForReadyTimeout})
-	if err != nil {
-		return errHandler(err, "failed to wait for serving certificate %q to be ready", helpers.FullName(servingCert))
-	}
-	cluster.setServingCert(readyServingCert)
 
 	// 3. Create the client CA certificate (short lived) and issuer
 	clientCACertName := helpers.CleanName(newClusterName + "-client-ca")
 	clientCAIssuerName := helpers.CleanName(clientCACertName + "-issuer")
 	ctx.Log.Step().Info("Creating PKI for client certificates for the new cluster", "certificateName", clientCACertName, "issuerName", clientCAIssuerName)
 
-	// 3.1 Client CA certificate
+	// 3.1 Client CA certificate, minted from the self-signed issuer.
 	clientCACNSuffix := " CNPC CA"
-	certOptions = certmanager.CreateCertificateOptions{
+	clientCACertOptions := certmanager.CreateCertificateOptions{
 		IsCA: true,
 		// Permit nothing. The certs should only be authoritive for the common name, which stores the postgres username.
 		CAConstraints: &certmanagerv1.NameConstraints{
@@ -219,23 +236,15 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 		SecretLabels: map[string]string{
 			utils.WatchedLabelName: "true",
 		},
-		IssuerKind: opts.Certificates.ClientCACert.IssuerKind,
 	}
 
-	clientCACert, err := p.cmClient.CreateCertificate(ctx.Child(), namespace, clientCACertName, clientCACertIssuerName, certOptions)
+	readyClientCACert, err := p.createClonedClusterCertificate(ctx.Child(), namespace, clientCACertName, selfSignedIssuerRef, clientCACertOptions, opts.Certificates.ClientCACert, cluster, cluster.setClientCACert)
 	if err != nil {
 		return errHandler(err, "failed to create client CA cert %q", helpers.FullNameStr(namespace, clientCACertName))
 	}
-	cluster.setClientCACert(clientCACert)
-
-	readyClientCACert, err := p.cmClient.WaitForReadyCertificate(ctx.Child(), namespace, clientCACertName, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: opts.Certificates.ClientCACert.WaitForReadyTimeout})
-	if err != nil {
-		return errHandler(err, "failed to wait for client CA cert %q to be ready", helpers.FullName(readyServingCert))
-	}
-	cluster.setClientCACert(readyClientCACert)
 
 	// 3.2 Client CA issuer
-	clientCAIssuer, err := p.cmClient.CreateIssuer(ctx.Child(), namespace, clientCAIssuerName, readyClientCACert.Name, certmanager.CreateIssuerOptions{})
+	clientCAIssuer, err := p.cmClient.CreateIssuer(ctx.Child(), namespace, clientCAIssuerName, certmanagerv1.IssuerConfig{CA: &certmanagerv1.CAIssuer{SecretName: readyClientCACert.Name}}, certmanager.CreateIssuerOptions{})
 	if err != nil {
 		return errHandler(err, "failed to create client CA issuer %q", helpers.FullNameStr(namespace, clientCAIssuerName))
 	}
@@ -257,7 +266,7 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 		WaitForCertTimeout: opts.Certificates.PostgresUserCert.WaitForReadyTimeout,
 		CleanupTimeout:     opts.CleanupTimeout,
 	}
-	postgresUserCert, err := p.cucp.NewClusterUserCert(ctx.Child(), namespace, "postgres", clientCAIssuerName, newClusterName, cucOptions)
+	postgresUserCert, err := p.cucp.NewClusterUserCert(ctx.Child(), namespace, "postgres", cmmeta.IssuerReference{Name: clientCAIssuerName}, newClusterName, cucOptions)
 	if err != nil {
 		return errHandler(err, "failed to create postgres user cert resources")
 	}
@@ -270,7 +279,7 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 		WaitForCertTimeout: opts.Certificates.StreamingReplicaUserCert.WaitForReadyTimeout,
 		CleanupTimeout:     opts.CleanupTimeout,
 	}
-	replicationUserCert, err := p.cucp.NewClusterUserCert(ctx.Child(), namespace, "streaming_replica", clientCAIssuerName, newClusterName, cucOptions)
+	replicationUserCert, err := p.cucp.NewClusterUserCert(ctx.Child(), namespace, "streaming_replica", cmmeta.IssuerReference{Name: clientCAIssuerName}, newClusterName, cucOptions)
 	if err != nil {
 		return errHandler(err, "failed to create streaming_replica user cert resources")
 	}
@@ -355,6 +364,45 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 	cluster.setCluster(readyCluster)
 
 	return cluster, nil
+}
+
+// createClonedClusterCertificate creates one of the clone's certificates and, when its
+// CertificateRequestPolicy is enabled, a tight policy derived from the cert (via createcrpforcertificate)
+// so approver-policy approves it. This mirrors the clusterusercert flow: because the policy is derived
+// from the cert it must be created after the cert, so the first issuance is denied and the cert is
+// reissued once the policy exists. The cert and any policy are recorded on the cluster (via setCert and
+// addCertificateRequestPolicy) as they are created, so a failure mid-way is cleaned up by the caller's
+// cluster.Delete. Returns the ready certificate.
+func (p *Provider) createClonedClusterCertificate(ctx *contexts.Context, namespace, certName string, issuerRef cmmeta.IssuerReference, certOpts certmanager.CreateCertificateOptions, clusterCertOpts CloneClusterOptionsCertificate, cluster ClonedClusterInterface, setCert func(*certmanagerv1.Certificate)) (*certmanagerv1.Certificate, error) {
+	cert, err := p.cmClient.CreateCertificate(ctx.Child(), namespace, certName, issuerRef, certOpts)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to create certificate %q", helpers.FullNameStr(namespace, certName))
+	}
+	setCert(cert)
+
+	if clusterCertOpts.CRPOpts.Enabled {
+		crp, err := p.ccfp.CreateCRPForCertificate(ctx.Child(), cert, createcrpforcertificate.CreateCRPForCertificateOpts{MaxWaitTime: clusterCertOpts.CRPOpts.WaitForCRPTimeout})
+		if err != nil {
+			return nil, trace.Wrap(err, "failed to create certificate request policy for certificate %q", helpers.FullName(cert))
+		}
+		cluster.addCertificateRequestPolicy(crp)
+
+		// The initial request was likely denied (the policy didn't exist yet), so reissue now that it does.
+		reissuedCert, err := p.cmClient.ReissueCertificate(ctx.Child(), cert.Namespace, cert.Name)
+		if err != nil {
+			return nil, trace.Wrap(err, "failed to re-issue certificate %q", helpers.FullName(cert))
+		}
+		cert = reissuedCert
+		setCert(cert)
+	}
+
+	readyCert, err := p.cmClient.WaitForReadyCertificate(ctx.Child(), cert.Namespace, cert.Name, certmanager.WaitForReadyCertificateOpts{MaxWaitTime: clusterCertOpts.WaitForReadyTimeout})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to wait for certificate %q to be ready", helpers.FullName(cert))
+	}
+	setCert(readyCert)
+
+	return readyCert, nil
 }
 
 // waitForCloneRecovery waits for the cloned cluster to become ready, watching the API server rather
@@ -514,6 +562,22 @@ func getClusterDomainNames(ctx *contexts.Context, clusterName, namespace string)
 	return domainNames
 }
 
+func (cc *ClonedCluster) setSelfSignedIssuer(issuer *certmanagerv1.Issuer) {
+	cc.selfSignedIssuer = issuer
+}
+
+func (cc *ClonedCluster) GetSelfSignedIssuer() *certmanagerv1.Issuer {
+	return cc.selfSignedIssuer
+}
+
+func (cc *ClonedCluster) addCertificateRequestPolicy(crp *policyv1alpha1.CertificateRequestPolicy) {
+	cc.certificateRequestPolicies = append(cc.certificateRequestPolicies, crp)
+}
+
+func (cc *ClonedCluster) GetCertificateRequestPolicies() []*policyv1alpha1.CertificateRequestPolicy {
+	return cc.certificateRequestPolicies
+}
+
 func (cc *ClonedCluster) setServingCert(cert *certmanagerv1.Certificate) {
 	cc.servingCertificate = cert
 }
@@ -575,7 +639,7 @@ func (cc *ClonedCluster) Delete(ctx *contexts.Context) (err error) {
 	ctx.Log.Info("Cleaning up cloned cluster resources")
 	defer ctx.Log.Info("Finished cleaning up cloned cluster resources", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
 
-	cleanupErrs := make([]error, 0, 6)
+	cleanupErrs := make([]error, 0, 7+len(cc.certificateRequestPolicies))
 
 	if cc.cluster != nil {
 		err := cc.p.cnpg().DeleteCluster(ctx.Child(), cc.cluster.Namespace, cc.cluster.Name)
@@ -616,6 +680,21 @@ func (cc *ClonedCluster) Delete(ctx *contexts.Context) (err error) {
 		err := cc.p.cm().DeleteCertificate(ctx.Child(), cc.servingCertificate.Namespace, cc.servingCertificate.Name)
 		if err != nil {
 			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster serving cert %q", helpers.FullName(cc.servingCertificate)))
+		}
+	}
+
+	// Delete the CertificateRequestPolicies created for the serving and client-CA certs (the user certs
+	// own their own CRPs, deleted above via their Delete).
+	for _, crp := range cc.certificateRequestPolicies {
+		if err := cc.p.ap().DeleteCertificateRequestPolicy(ctx.Child(), crp.Name); err != nil {
+			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster certificate request policy %q", helpers.FullName(crp)))
+		}
+	}
+
+	// Delete the self-signed issuer last: it backs the serving and client CA certs, so it outlives them.
+	if cc.selfSignedIssuer != nil {
+		if err := cc.p.cm().DeleteIssuer(ctx.Child(), cc.selfSignedIssuer.Namespace, cc.selfSignedIssuer.Name); err != nil {
+			cleanupErrs = append(cleanupErrs, trace.Wrap(err, "failed to delete cloned cluster self-signed issuer %q", helpers.FullName(cc.selfSignedIssuer)))
 		}
 	}
 

@@ -62,7 +62,7 @@ func TestValidateIssuer(t *testing.T) {
 				}
 				wantErr := issuerSetup(cmClient, status)
 
-				err := ValidateIssuer(ctx, kubeClusterClient, namespace, issuerType, issuerName)
+				err := ValidateIssuer(ctx, kubeClusterClient, namespace, cmmeta.IssuerReference{Kind: issuerType, Name: issuerName})
 
 				if issuerReadyCondition == cmmeta.ConditionTrue && !wantErr {
 					assert.NoError(t, err)

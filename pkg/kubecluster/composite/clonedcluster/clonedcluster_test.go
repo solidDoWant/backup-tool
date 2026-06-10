@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	barmanapi "github.com/cloudnative-pg/barman-cloud/pkg/api"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -146,7 +147,7 @@ func TestGetCredentials(t *testing.T) {
 
 func TestNewClonedCluster(t *testing.T) {
 	t.Run("returns new ClonedCluster with client reference set", func(t *testing.T) {
-		p := NewProvider(nil, nil, nil, nil, nil)
+		p := NewProvider(nil, nil, nil, nil, nil, nil, nil)
 		cc := newClonedCluster(p)
 		casted := cc.(*ClonedCluster)
 
@@ -342,7 +343,7 @@ func TestClonedClusterWhenFailToParseExistingClusterStorageSize(t *testing.T) {
 
 	// Call CloneClusterFromBackup directly so the test focuses on the storage-size parse failure
 	// without needing to drive the base backup creation that CloneCluster performs first.
-	clonedCluster, err := p.CloneClusterFromBackup(ctx, "test-ns", "existing-cluster", "new-cluster", "issuer-1", "issuer-2", &apiv1.Backup{}, CloneClusterOptions{})
+	clonedCluster, err := p.CloneClusterFromBackup(ctx, "test-ns", "existing-cluster", "new-cluster", &apiv1.Backup{}, CloneClusterOptions{})
 	require.Error(t, err)
 	require.Nil(t, clonedCluster)
 }
@@ -364,11 +365,22 @@ func TestClonedClusterDelete(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "client-ca-issuer", Namespace: "test-ns"},
 	}
 
+	selfSignedIssuer := &certmanagerv1.Issuer{
+		ObjectMeta: metav1.ObjectMeta{Name: "self-signed-issuer", Namespace: "test-ns"},
+	}
+
+	crps := []*policyv1alpha1.CertificateRequestPolicy{
+		{ObjectMeta: metav1.ObjectMeta{Name: "serving-cert-crp"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "client-ca-cert-crp"}},
+	}
+
 	allResourcesCluster := ClonedCluster{
-		cluster:             cluster,
-		servingCertificate:  servingCert,
-		clientCACertificate: clientCACert,
-		clientCAIssuer:      clientCAIssuer,
+		cluster:                    cluster,
+		selfSignedIssuer:           selfSignedIssuer,
+		servingCertificate:         servingCert,
+		clientCACertificate:        clientCACert,
+		clientCAIssuer:             clientCAIssuer,
+		certificateRequestPolicies: crps,
 	}
 
 	tests := []struct {
@@ -382,6 +394,8 @@ func TestClonedClusterDelete(t *testing.T) {
 		simulateClientCAIssuerDeleteError           bool
 		simulateClientCACertDeleteError             bool
 		simulateServingCertDeleteError              bool
+		simulateCRPDeleteError                      bool
+		simulateSelfSignedIssuerDeleteError         bool
 		expectedErrorsInMessage                     int
 	}{
 		{
@@ -430,7 +444,9 @@ func TestClonedClusterDelete(t *testing.T) {
 			simulateClientCAIssuerDeleteError:           true,
 			simulateClientCACertDeleteError:             true,
 			simulateServingCertDeleteError:              true,
-			expectedErrorsInMessage:                     6,
+			simulateCRPDeleteError:                      true,
+			simulateSelfSignedIssuerDeleteError:         true,
+			expectedErrorsInMessage:                     9,
 		},
 		{
 			desc:                       "cluster deletion fails",
@@ -508,6 +524,22 @@ func TestClonedClusterDelete(t *testing.T) {
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) error {
 						assert.True(t, calledCtx.IsChildOf(ctx))
 						return th.ErrIfTrue(tt.simulateServingCertDeleteError)
+					})
+			}
+
+			for _, crp := range tt.cc.certificateRequestPolicies {
+				p.apClient.EXPECT().DeleteCertificateRequestPolicy(mock.Anything, crp.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, name string) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulateCRPDeleteError)
+					})
+			}
+
+			if tt.cc.selfSignedIssuer != nil {
+				p.cmClient.EXPECT().DeleteIssuer(mock.Anything, tt.cc.selfSignedIssuer.Namespace, tt.cc.selfSignedIssuer.Name).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) error {
+						assert.True(t, calledCtx.IsChildOf(ctx))
+						return th.ErrIfTrue(tt.simulateSelfSignedIssuerDeleteError)
 					})
 			}
 
@@ -721,6 +753,33 @@ func TestClonedClusterGetClientCACert(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestClonedClusterSetSelfSignedIssuer(t *testing.T) {
+	issuer := &certmanagerv1.Issuer{ObjectMeta: metav1.ObjectMeta{Name: "self-signed", Namespace: "test-ns"}}
+
+	cc := &ClonedCluster{}
+	cc.setSelfSignedIssuer(issuer)
+	assert.Equal(t, issuer, cc.selfSignedIssuer)
+}
+
+func TestClonedClusterGetSelfSignedIssuer(t *testing.T) {
+	issuer := &certmanagerv1.Issuer{ObjectMeta: metav1.ObjectMeta{Name: "self-signed", Namespace: "test-ns"}}
+
+	cc := &ClonedCluster{selfSignedIssuer: issuer}
+	assert.Equal(t, issuer, cc.GetSelfSignedIssuer())
+}
+
+func TestClonedClusterAddAndGetCertificateRequestPolicies(t *testing.T) {
+	crp1 := &policyv1alpha1.CertificateRequestPolicy{ObjectMeta: metav1.ObjectMeta{Name: "crp-1"}}
+	crp2 := &policyv1alpha1.CertificateRequestPolicy{ObjectMeta: metav1.ObjectMeta{Name: "crp-2"}}
+
+	cc := &ClonedCluster{}
+	assert.Empty(t, cc.GetCertificateRequestPolicies())
+
+	cc.addCertificateRequestPolicy(crp1)
+	cc.addCertificateRequestPolicy(crp2)
+	assert.Equal(t, []*policyv1alpha1.CertificateRequestPolicy{crp1, crp2}, cc.GetCertificateRequestPolicies())
 }
 
 func TestClonedClusterSetClientCAIssuer(t *testing.T) {

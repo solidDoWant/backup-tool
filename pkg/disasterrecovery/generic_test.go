@@ -1,6 +1,7 @@
 package disasterrecovery
 
 import (
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"testing"
 
 	"github.com/goccy/go-yaml"
@@ -14,6 +15,8 @@ import (
 	filesrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/restore"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clusterusercert"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/core"
@@ -34,10 +37,14 @@ func validBackupConfig() GenericBackupConfig {
 		BackupName:   "vaultwarden",
 		BackupVolume: GenericBackupVolume{Size: resource.MustParse("10Gi")},
 		Postgres: []GenericPostgresBackupSource{{
-			Name:              "main",
-			Cluster:           "vw-db",
-			ClientCAIssuer:    "cnpg-client-ca",
-			ServingCertIssuer: "cnpg-serving-ca",
+			Name:    "main",
+			Cluster: "vw-db",
+			ClusterCloning: clonedcluster.CloneClusterOptions{
+				Certificates: clonedcluster.CloneClusterOptionsCertificates{
+					ServingCert:  clonedcluster.CloneClusterOptionsCertificate{CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{Enabled: true}},
+					ClientCACert: clonedcluster.CloneClusterOptionsCertificate{CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{Enabled: true}},
+				},
+			},
 		}},
 		Files: []GenericFilesBackupSource{{GenericFilesSource: GenericFilesSource{Name: "data", PVC: "vw-data"}, SnapshotClass: "ceph-block-snap"}},
 		FileGroups: []GenericFileGroupBackupSource{{
@@ -59,7 +66,7 @@ func validRestoreConfig() GenericRestoreConfig {
 		Postgres: []GenericPostgresRestoreSource{{
 			Name:           "main",
 			Cluster:        "vw-db",
-			ClientCAIssuer: "cnpg-client-ca",
+			ClientCAIssuer: cmmeta.IssuerReference{Name: "cnpg-client-ca"},
 			ServingCert:    "vw-db-serving",
 		}},
 		Files: []GenericFilesSource{{Name: "data", PVC: "vw-data"}},
@@ -151,11 +158,6 @@ func TestGenericBackupConfigValidate(t *testing.T) {
 			errSubstr: "cluster is required",
 		},
 		{
-			name:      "missing postgres servingCertIssuer",
-			mutate:    func(c *GenericBackupConfig) { c.Postgres[0].ServingCertIssuer = "" },
-			errSubstr: "servingCertIssuer is required",
-		},
-		{
 			name:      "missing files pvc",
 			mutate:    func(c *GenericBackupConfig) { c.Files[0].PVC = "" },
 			errSubstr: "pvc is required",
@@ -241,9 +243,14 @@ cleanupTimeout: 5m
 postgres:
   - name: main
     cluster: vw-db
-    clientCAIssuer: cnpg-client-ca
-    servingCertIssuer: cnpg-serving-ca
-    clusterCloning: {}
+    clusterCloning:
+      certificates:
+        servingCert:
+          certificateRequestPolicy:
+            enabled: true
+        clientCACert:
+          certificateRequestPolicy:
+            enabled: true
 files:
   - name: data
     pvc: vw-data
@@ -268,9 +275,8 @@ cleanupTimeout: 5m
 postgres:
   - name: main
     cluster: vw-db
-    clientCAIssuer: cnpg-client-ca
+    clientCAIssuer: { name: cnpg-client-ca, kind: ClusterIssuer }
     servingCert: vw-db-serving
-    issuerKind: ClusterIssuer
     postgresUserCert:
       subject: { organizations: [vw] }
 files:
@@ -482,7 +488,7 @@ func TestGenericAppBackup(t *testing.T) {
 					return
 				}
 
-				mockPg.EXPECT().Configure(mockClient, namespace, "vw-db", "cnpg-serving-ca", "cnpg-client-ca", backupName, "main.sql", cnpgbackup.CNPGBackupOptions{
+				mockPg.EXPECT().Configure(mockClient, namespace, "vw-db", backupName, "main.sql", cnpgbackup.CNPGBackupOptions{
 					CloningOpts:    config.Postgres[0].ClusterCloning,
 					CleanupTimeout: config.CleanupTimeout,
 				}).Return(th.ErrIfTrue(tt.simulateConfigurePgErr))
@@ -615,8 +621,7 @@ func TestGenericAppRestore(t *testing.T) {
 				}).Maybe()
 
 			func() {
-				mockPg.EXPECT().Configure(mockClient, namespace, "vw-db", "vw-db-serving", "cnpg-client-ca", restoreName, "main.sql", cnpgrestore.CNPGRestoreOptions{
-					IssuerKind:       config.Postgres[0].IssuerKind,
+				mockPg.EXPECT().Configure(mockClient, namespace, "vw-db", "vw-db-serving", config.Postgres[0].ClientCAIssuer, restoreName, "main.sql", cnpgrestore.CNPGRestoreOptions{
 					PostgresUserCert: config.Postgres[0].PostgresUserCert,
 					CleanupTimeout:   config.CleanupTimeout,
 				}).Return(th.ErrIfTrue(tt.simulateConfigurePgErr))

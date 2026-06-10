@@ -11,14 +11,16 @@ jobConfig:
     postgres:
       - name: db1 # => db1.sql
         cluster: dummy-db1
-        clientCAIssuer: self-signed
-        servingCertIssuer: self-signed
         clusterCloning: &clusterCloning
+          # The clone mints its serving + client-CA certs from an internally-created self-signed issuer;
+          # approver-policy is enforcing in e2e, so enable each cert's CertificateRequestPolicy.
           certificates:
             servingCert:
-              issuerKind: Issuer
+              certificateRequestPolicy:
+                enabled: true
             clientCACert:
-              issuerKind: Issuer
+              certificateRequestPolicy:
+                enabled: true
             postgresUserCert:
               certificateRequestPolicy:
                 enabled: true
@@ -27,8 +29,6 @@ jobConfig:
                 enabled: true
       - name: db2 # => db2.sql
         cluster: dummy-db2
-        clientCAIssuer: self-signed
-        servingCertIssuer: self-signed
         clusterCloning: *clusterCloning
     files:
       - name: files # => DR subdir "files"

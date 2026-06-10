@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
@@ -88,22 +89,22 @@ type GenericS3Source struct {
 	Credentials s3.Credentials `yaml:"credentials,omitempty"`
 }
 
-// GenericPostgresBackupSource clones a CNPG cluster and logically dumps it to the DR volume.
+// GenericPostgresBackupSource clones a CNPG cluster and logically dumps it to the DR volume. The clone's
+// serving cert and client-CA cert are minted from a self-signed issuer created internally during
+// cloning, so no issuer needs to be supplied; clusterCloning carries the remaining cloning options
+// (recovery target, snapshot/cert timeouts, and the self-signed issuer's CertificateRequestPolicy).
 type GenericPostgresBackupSource struct {
-	Name              string                            `yaml:"name" jsonschema:"required"`              // slot id => dump file "<name>.sql"
-	Cluster           string                            `yaml:"cluster" jsonschema:"required"`           // clusterName
-	ClientCAIssuer    string                            `yaml:"clientCAIssuer" jsonschema:"required"`    // clientCertIssuerName
-	ServingCertIssuer string                            `yaml:"servingCertIssuer" jsonschema:"required"` // issuer that mints the clone's serving cert
-	ClusterCloning    clonedcluster.CloneClusterOptions `yaml:"clusterCloning,omitempty"`                // CNPGBackupOptions.CloningOpts
+	Name           string                            `yaml:"name" jsonschema:"required"`           // slot id => dump file "<name>.sql"
+	Cluster        string                            `yaml:"cluster" jsonschema:"required"`        // clusterName
+	ClusterCloning clonedcluster.CloneClusterOptions `yaml:"clusterCloning" jsonschema:"required"` // CNPGBackupOptions.CloningOpts
 }
 
 // GenericPostgresRestoreSource logically restores a SQL dump from the DR volume into a live cluster.
 type GenericPostgresRestoreSource struct {
 	Name             string                             `yaml:"name" jsonschema:"required"`           // slot id => dump file "<name>.sql"
 	Cluster          string                             `yaml:"cluster" jsonschema:"required"`        // clusterName (v1: same target as backup)
-	ClientCAIssuer   string                             `yaml:"clientCAIssuer" jsonschema:"required"` // clientCertIssuerName
 	ServingCert      string                             `yaml:"servingCert" jsonschema:"required"`    // existing serving cert on the live target cluster
-	IssuerKind       string                             `yaml:"issuerKind,omitempty"`
+	ClientCAIssuer   cmmeta.IssuerReference             `yaml:"clientCAIssuer" jsonschema:"required"` // issuer that mints the postgres user cert (name + kind + group)
 	PostgresUserCert cnpgrestore.CNPGRestoreOptionsCert `yaml:"postgresUserCert,omitempty"`
 }
 
@@ -244,12 +245,8 @@ func (c GenericBackupConfig) Validate() error {
 		if src.Cluster == "" {
 			return trace.BadParameter("postgres source %q: cluster is required", src.Name)
 		}
-		if src.ClientCAIssuer == "" {
-			return trace.BadParameter("postgres source %q: clientCAIssuer is required", src.Name)
-		}
-		if src.ServingCertIssuer == "" {
-			return trace.BadParameter("postgres source %q: servingCertIssuer is required", src.Name)
-		}
+		// The clone's serving and client-CA certs are minted from an internally-created self-signed
+		// issuer, so there is no issuer to require here.
 	}
 
 	filesSources := make([]GenericFilesSource, len(c.Files))
@@ -309,8 +306,8 @@ func (c GenericRestoreConfig) Validate() error {
 		if src.Cluster == "" {
 			return trace.BadParameter("postgres source %q: cluster is required", src.Name)
 		}
-		if src.ClientCAIssuer == "" {
-			return trace.BadParameter("postgres source %q: clientCAIssuer is required", src.Name)
+		if src.ClientCAIssuer.Name == "" {
+			return trace.BadParameter("postgres source %q: clientCAIssuer.name is required", src.Name)
 		}
 		if src.ServingCert == "" {
 			return trace.BadParameter("postgres source %q: servingCert is required", src.Name)
@@ -419,7 +416,7 @@ func (g *GenericApp) Backup(ctx *contexts.Context, config GenericBackupConfig) (
 
 	for _, src := range config.Postgres {
 		action := g.newCNPGBackup()
-		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.Cluster, src.ServingCertIssuer, src.ClientCAIssuer, backup.Name, dumpFileName(src.Name), cnpgbackup.CNPGBackupOptions{
+		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.Cluster, backup.Name, dumpFileName(src.Name), cnpgbackup.CNPGBackupOptions{
 			CloningOpts:    src.ClusterCloning,
 			CleanupTimeout: config.CleanupTimeout,
 		}); err != nil {
@@ -531,7 +528,6 @@ func (g *GenericApp) Restore(ctx *contexts.Context, config GenericRestoreConfig)
 	for _, src := range config.Postgres {
 		action := g.newCNPGRestore()
 		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.Cluster, src.ServingCert, src.ClientCAIssuer, restore.Name, dumpFileName(src.Name), cnpgrestore.CNPGRestoreOptions{
-			IssuerKind:       src.IssuerKind,
 			PostgresUserCert: src.PostgresUserCert,
 			CleanupTimeout:   config.CleanupTimeout,
 		}); err != nil {

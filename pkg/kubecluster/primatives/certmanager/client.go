@@ -2,6 +2,7 @@ package certmanager
 
 import (
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/cert-manager/cert-manager/pkg/client/clientset/versioned"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
@@ -10,14 +11,14 @@ import (
 
 type ClientInterface interface {
 	// Issuers
-	CreateIssuer(ctx *contexts.Context, namespace, name, caCertSecretName string, opts CreateIssuerOptions) (*certmanagerv1.Issuer, error)
+	CreateIssuer(ctx *contexts.Context, namespace, name string, config certmanagerv1.IssuerConfig, opts CreateIssuerOptions) (*certmanagerv1.Issuer, error)
 	WaitForReadyIssuer(ctx *contexts.Context, namespace, name string, opts WaitForReadyIssuerOpts) (*certmanagerv1.Issuer, error)
 	GetIssuer(ctx *contexts.Context, namespace, name string) (*certmanagerv1.Issuer, error)
 	DeleteIssuer(ctx *contexts.Context, namespace, name string) error
 	// Cluster issuers
 	GetClusterIssuer(ctx *contexts.Context, name string) (*certmanagerv1.ClusterIssuer, error)
 	// Certificates
-	CreateCertificate(ctx *contexts.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error)
+	CreateCertificate(ctx *contexts.Context, namespace, name string, issuerRef cmmeta.IssuerReference, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error)
 	WaitForReadyCertificate(ctx *contexts.Context, namespace, name string, opts WaitForReadyCertificateOpts) (*certmanagerv1.Certificate, error)
 	ReissueCertificate(ctx *contexts.Context, namespace, name string) (*certmanagerv1.Certificate, error)
 	GetCertificate(ctx *contexts.Context, namespace, name string) (*certmanagerv1.Certificate, error)

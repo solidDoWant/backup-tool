@@ -463,6 +463,21 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "IssuerReference": {
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Kind": {
+          "type": "string"
+        },
+        "Group": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "KeyToPath": {
       "properties": {
         "Key": {
@@ -1081,9 +1096,6 @@
         "certificates": {
           "$ref": "#/$defs/vaultWardenRestoreOptionsCertificates"
         },
-        "issuerKind": {
-          "type": "string"
-        },
         "cleanupTimeout": {
           "type": "integer"
         },
@@ -1105,8 +1117,8 @@
         "servingCertName": {
           "type": "string"
         },
-        "clientCertIssuerName": {
-          "type": "string"
+        "clientCAIssuer": {
+          "$ref": "#/$defs/IssuerReference"
         }
       },
       "additionalProperties": false,
@@ -1117,7 +1129,7 @@
         "dataPVCName",
         "cnpgClusterName",
         "servingCertName",
-        "clientCertIssuerName"
+        "clientCAIssuer"
       ]
     },
     "VolumeProjection": {

@@ -35,13 +35,13 @@ func TestCNPGRestoreOpts(t *testing.T) {
 
 func TestConfigure(t *testing.T) {
 	expectedState := &configureState{
-		kubeClusterClient:    kubecluster.NewMockClientInterface(t),
-		namespace:            "namespace",
-		drVolName:            "drVolName",
-		backupFileRelPath:    "backupFileRelPath",
-		clusterName:          "clusterName",
-		servingCertName:      "servingCertName",
-		clientCertIssuerName: "clientCertIssuerName",
+		kubeClusterClient: kubecluster.NewMockClientInterface(t),
+		namespace:         "namespace",
+		drVolName:         "drVolName",
+		backupFileRelPath: "backupFileRelPath",
+		clusterName:       "clusterName",
+		servingCertName:   "servingCertName",
+		clientCAIssuer:    cmmeta.IssuerReference{Name: "clientCertIssuerName"},
 		opts: CNPGRestoreOptions{
 			PostgresUserCert: CNPGRestoreOptionsCert{
 				Subject: &certmanagerv1.X509Subject{
@@ -62,7 +62,7 @@ func TestConfigure(t *testing.T) {
 		expectedState.namespace,
 		expectedState.clusterName,
 		expectedState.servingCertName,
-		expectedState.clientCertIssuerName,
+		expectedState.clientCAIssuer,
 		expectedState.drVolName,
 		expectedState.backupFileRelPath,
 		expectedState.opts,
@@ -91,7 +91,7 @@ func TestConfigure(t *testing.T) {
 			expectedState.namespace,
 			expectedState.clusterName,
 			expectedState.servingCertName,
-			expectedState.clientCertIssuerName,
+			expectedState.clientCAIssuer,
 			expectedState.drVolName,
 			expectedState.backupFileRelPath,
 			expectedState.opts,
@@ -136,7 +136,7 @@ func TestValidate(t *testing.T) {
 		"namespace",
 		"clusterName",
 		"servingCertName",
-		"clientCertIssuerName",
+		cmmeta.IssuerReference{Name: "clientCertIssuerName"},
 		"drVolName",
 		"backupFileRelPath",
 		CNPGRestoreOptions{},
@@ -253,7 +253,7 @@ func TestValidate(t *testing.T) {
 					return
 				}
 
-				mockCMClient.EXPECT().GetIssuer(mock.Anything, currentState.namespace, currentState.clientCertIssuerName).
+				mockCMClient.EXPECT().GetIssuer(mock.Anything, currentState.namespace, currentState.clientCAIssuer.Name).
 					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string) (*certmanagerv1.Issuer, error) {
 						assert.True(t, calledCtx.IsChildOf(ctx))
 
@@ -329,15 +329,15 @@ func TestSetup(t *testing.T) {
 			currentState := &setupState{
 				validateState: validateState{
 					configureState: configureState{
-						uid:                  "uid",
-						isConfigured:         true,
-						kubeClusterClient:    mockClient,
-						namespace:            "namespace",
-						clusterName:          "clusterName",
-						servingCertName:      "servingCertName",
-						clientCertIssuerName: "clientCertIssuerName",
-						drVolName:            "drVolName",
-						backupFileRelPath:    "backupFileRelPath",
+						uid:               "uid",
+						isConfigured:      true,
+						kubeClusterClient: mockClient,
+						namespace:         "namespace",
+						clusterName:       "clusterName",
+						servingCertName:   "servingCertName",
+						clientCAIssuer:    cmmeta.IssuerReference{Name: "clientCertIssuerName"},
+						drVolName:         "drVolName",
+						backupFileRelPath: "backupFileRelPath",
 						opts: CNPGRestoreOptions{
 							PostgresUserCert: CNPGRestoreOptionsCert{
 								Subject: &certmanagerv1.X509Subject{
@@ -369,12 +369,12 @@ func TestSetup(t *testing.T) {
 					return
 				}
 
-				mockClient.EXPECT().NewClusterUserCert(mock.Anything, currentState.namespace, "postgres", currentState.clientCertIssuerName, currentState.clusterName, clusterusercert.NewClusterUserCertOpts{
+				mockClient.EXPECT().NewClusterUserCert(mock.Anything, currentState.namespace, "postgres", currentState.clientCAIssuer, currentState.clusterName, clusterusercert.NewClusterUserCertOpts{
 					Subject:            currentState.opts.PostgresUserCert.Subject,
 					CRPOpts:            currentState.opts.PostgresUserCert.CRPOpts,
 					WaitForCertTimeout: currentState.opts.PostgresUserCert.WaitForCertTimeout,
 					CleanupTimeout:     currentState.opts.CleanupTimeout,
-				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, username, clientCertIssuerName, clusterName string, opts clusterusercert.NewClusterUserCertOpts) (clusterusercert.ClusterUserCertInterface, error) {
+				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, username string, clientCAIssuer cmmeta.IssuerReference, clusterName string, opts clusterusercert.NewClusterUserCertOpts) (clusterusercert.ClusterUserCertInterface, error) {
 					assert.True(t, calledCtx.IsChildOf(ctx))
 
 					return th.ErrOr1Val(mockCUC, tt.simulateCreatePostgresCertError)
@@ -460,15 +460,15 @@ func TestCleanup(t *testing.T) {
 			currentState := &setupState{
 				validateState: validateState{
 					configureState: configureState{
-						uid:                  "uid",
-						isConfigured:         true,
-						kubeClusterClient:    mockClient,
-						namespace:            "namespace",
-						clusterName:          "clusterName",
-						servingCertName:      "servingCertName",
-						clientCertIssuerName: "clientCertIssuerName",
-						drVolName:            "drVolName",
-						backupFileRelPath:    "backupFileRelPath",
+						uid:               "uid",
+						isConfigured:      true,
+						kubeClusterClient: mockClient,
+						namespace:         "namespace",
+						clusterName:       "clusterName",
+						servingCertName:   "servingCertName",
+						clientCAIssuer:    cmmeta.IssuerReference{Name: "clientCertIssuerName"},
+						drVolName:         "drVolName",
+						backupFileRelPath: "backupFileRelPath",
 						opts: CNPGRestoreOptions{
 							PostgresUserCert: CNPGRestoreOptionsCert{
 								Subject: &certmanagerv1.X509Subject{
@@ -574,15 +574,15 @@ func TestExecute(t *testing.T) {
 				setupState: setupState{
 					validateState: validateState{
 						configureState: configureState{
-							uid:                  "uid",
-							isConfigured:         true,
-							kubeClusterClient:    mockClient,
-							namespace:            "namespace",
-							clusterName:          "clusterName",
-							servingCertName:      "servingCertName",
-							clientCertIssuerName: "clientCertIssuerName",
-							drVolName:            "drVolName",
-							backupFileRelPath:    "backupFileRelPath",
+							uid:               "uid",
+							isConfigured:      true,
+							kubeClusterClient: mockClient,
+							namespace:         "namespace",
+							clusterName:       "clusterName",
+							servingCertName:   "servingCertName",
+							clientCAIssuer:    cmmeta.IssuerReference{Name: "clientCertIssuerName"},
+							drVolName:         "drVolName",
+							backupFileRelPath: "backupFileRelPath",
 							opts: CNPGRestoreOptions{
 								PostgresUserCert: CNPGRestoreOptionsCert{
 									Subject: &certmanagerv1.X509Subject{

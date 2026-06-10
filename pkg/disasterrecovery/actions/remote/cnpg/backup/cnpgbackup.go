@@ -12,7 +12,6 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/constants"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
-	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/common"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
@@ -37,23 +36,21 @@ type CNPGBackupInterface interface {
 	remote.CleanupAction
 	remote.PreConsistencyPointAction
 	remote.ConsistencyPointConsumer
-	Configure(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, drVolName, backupFileRelPath string, opts CNPGBackupOptions) error
+	Configure(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, drVolName, backupFileRelPath string, opts CNPGBackupOptions) error
 }
 
 type configureState struct {
-	uid                   string // Unique identifier to prevent accidental collisions between multiple instances
-	isConfigured          bool
-	kubeClusterClient     kubecluster.ClientInterface
-	clusterName           string
-	servingCertIssuerName string
-	clientCertIssuerName  string
-	namespace             string
-	drVolName             string
-	backupFileRelPath     string
-	opts                  CNPGBackupOptions
+	uid               string // Unique identifier to prevent accidental collisions between multiple instances
+	isConfigured      bool
+	kubeClusterClient kubecluster.ClientInterface
+	clusterName       string
+	namespace         string
+	drVolName         string
+	backupFileRelPath string
+	opts              CNPGBackupOptions
 }
 
-func (cs *configureState) Configure(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, drVolName, backupFileRelPath string, opts CNPGBackupOptions) error {
+func (cs *configureState) Configure(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, drVolName, backupFileRelPath string, opts CNPGBackupOptions) error {
 	if cs.isConfigured {
 		return trace.Errorf("attempted to configure multiple times")
 	}
@@ -62,8 +59,6 @@ func (cs *configureState) Configure(kubeClusterClient kubecluster.ClientInterfac
 	cs.kubeClusterClient = kubeClusterClient
 	cs.namespace = namespace
 	cs.clusterName = clusterName
-	cs.servingCertIssuerName = servingCertIssuerName
-	cs.clientCertIssuerName = clientCertIssuerName
 	cs.drVolName = drVolName
 	cs.backupFileRelPath = backupFileRelPath
 	cs.opts = opts
@@ -99,13 +94,9 @@ func (vs *validateState) Validate(ctx *contexts.Context) (err error) {
 	}
 	vs.cluster = cluster
 
-	if err := common.ValidateIssuer(ctx.Child(), vs.kubeClusterClient, vs.namespace, vs.opts.CloningOpts.Certificates.ServingCert.IssuerKind, vs.servingCertIssuerName); err != nil {
-		return trace.Wrap(err, "failed to validate CNPG cluster serving cert issuer %q", vs.servingCertIssuerName)
-	}
-
-	if err := common.ValidateIssuer(ctx.Child(), vs.kubeClusterClient, vs.namespace, vs.opts.CloningOpts.Certificates.ClientCACert.IssuerKind, vs.clientCertIssuerName); err != nil {
-		return trace.Wrap(err, "failed to validate CNPG cluster client CA cert issuer %q", vs.clientCertIssuerName)
-	}
+	// The clone's serving and client CA certificates are minted from a self-signed issuer that the clone
+	// creates internally (see clonedcluster.CloneClusterFromBackup), so there is no operator-supplied
+	// issuer to validate here.
 
 	if _, err := vs.kubeClusterClient.Core().GetPVC(ctx.Child(), vs.namespace, vs.drVolName); err != nil {
 		return trace.Wrap(err, "failed to get DR PVC %q", vs.drVolName)
@@ -204,7 +195,7 @@ func (ss *setupState) Setup(ctx *contexts.Context, btiOpts *backuptoolinstance.C
 	}
 
 	clonedCluster, err := ss.kubeClusterClient.CloneClusterFromBackup(ctx.Child(), ss.namespace, ss.clusterName,
-		clonedClusterName, ss.servingCertIssuerName, ss.clientCertIssuerName, ss.baseBackup, cloneOpts)
+		clonedClusterName, ss.baseBackup, cloneOpts)
 	if err != nil {
 		return trace.Wrap(err, "failed to clone cluster")
 	}

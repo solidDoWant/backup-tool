@@ -134,6 +134,9 @@
         "waitForBackupTimeout": {
           "type": "integer"
         },
+        "selfSignedIssuer": {
+          "$ref": "#/$defs/CloneClusterOptionsCAIssuer"
+        },
         "certificates": {
           "$ref": "#/$defs/CloneClusterOptionsCertificates"
         },
@@ -163,49 +166,34 @@
       "additionalProperties": false,
       "type": "object"
     },
-    "CloneClusterOptionsCertificates": {
-      "properties": {
-        "servingCert": {
-          "$ref": "#/$defs/CloneClusterOptionsExternallyIssuedCertificate"
-        },
-        "clientCACert": {
-          "$ref": "#/$defs/CloneClusterOptionsExternallyIssuedCertificate"
-        },
-        "postgresUserCert": {
-          "$ref": "#/$defs/CloneClusterOptionsInternallyIssuedCertificate"
-        },
-        "streamingReplicaUserCert": {
-          "$ref": "#/$defs/CloneClusterOptionsInternallyIssuedCertificate"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "CloneClusterOptionsExternallyIssuedCertificate": {
+    "CloneClusterOptionsCertificate": {
       "properties": {
         "subject": {
           "$ref": "#/$defs/X509Subject"
-        },
-        "waitForReadyTimeout": {
-          "type": "integer"
-        },
-        "issuerKind": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "CloneClusterOptionsInternallyIssuedCertificate": {
-      "properties": {
-        "subject": {
-          "$ref": "#/$defs/X509Subject"
-        },
-        "waitForReadyTimeout": {
-          "type": "integer"
         },
         "certificateRequestPolicy": {
           "$ref": "#/$defs/NewClusterUserCertOptsCRP"
+        },
+        "waitForReadyTimeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CloneClusterOptionsCertificates": {
+      "properties": {
+        "servingCert": {
+          "$ref": "#/$defs/CloneClusterOptionsCertificate"
+        },
+        "clientCACert": {
+          "$ref": "#/$defs/CloneClusterOptionsCertificate"
+        },
+        "postgresUserCert": {
+          "$ref": "#/$defs/CloneClusterOptionsCertificate"
+        },
+        "streamingReplicaUserCert": {
+          "$ref": "#/$defs/CloneClusterOptionsCertificate"
         }
       },
       "additionalProperties": false,
@@ -1168,12 +1156,6 @@
         "cnpgClusters": {
           "$ref": "#/$defs/TeleportBackupConfigClustersConfig"
         },
-        "servingCertIssuerName": {
-          "type": "string"
-        },
-        "clientCACertIssuerName": {
-          "type": "string"
-        },
         "auditSessionLogs": {
           "$ref": "#/$defs/TeleportConfigAuditSessionLogs"
         },
@@ -1198,9 +1180,7 @@
       "required": [
         "namespace",
         "backupName",
-        "cnpgClusters",
-        "servingCertIssuerName",
-        "clientCACertIssuerName"
+        "cnpgClusters"
       ]
     },
     "TeleportBackupConfigClusterConfig": {

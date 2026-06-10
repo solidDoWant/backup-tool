@@ -1,6 +1,7 @@
 package clusterusercert
 
 import (
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/approverpolicy"
@@ -8,7 +9,7 @@ import (
 )
 
 type ProviderInterface interface {
-	NewClusterUserCert(ctx *contexts.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error)
+	NewClusterUserCert(ctx *contexts.Context, namespace, username string, issuerRef cmmeta.IssuerReference, clusterName string, opts NewClusterUserCertOpts) (ClusterUserCertInterface, error)
 }
 
 type providerInterfaceInternal interface {

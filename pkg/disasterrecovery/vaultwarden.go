@@ -1,6 +1,7 @@
 package disasterrecovery
 
 import (
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
@@ -70,7 +71,7 @@ func NewVaultWarden(client kubecluster.ClientInterface) *VaultWarden {
 // recover forward to it from a base backup taken earlier. Recovering forward to exactly the filesystem
 // freeze reproduces the original Vaultwarden behaviour, where the database is aligned to the moment the
 // data directory was captured.
-func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, dataPVC, cnpgClusterName, servingCertIssuerName, clientCertIssuerName string, opts VaultWardenBackupOptions) (backup *DREvent, err error) {
+func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, dataPVC, cnpgClusterName string, opts VaultWardenBackupOptions) (backup *DREvent, err error) {
 	backup = NewDREventNow(backupName)
 	ctx.Log.With("backupName", backup.GetFullName(), "namespace", namespace).Info("Starting backup process")
 	defer func() {
@@ -122,7 +123,7 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 	}
 
 	cnpgBackup := vw.newCNPGBackup()
-	if err := cnpgBackup.Configure(vw.kubeClusterClient, namespace, cnpgClusterName, servingCertIssuerName, clientCertIssuerName, backup.Name, vaultwardenSQLFileName, backupOpts); err != nil {
+	if err := cnpgBackup.Configure(vw.kubeClusterClient, namespace, cnpgClusterName, backup.Name, vaultwardenSQLFileName, backupOpts); err != nil {
 		return backup, trace.Wrap(err, "failed to configure CNPG cluster backup")
 	}
 	stage.WithAction("Vaultwarden CNPG backup", cnpgBackup)
@@ -159,7 +160,6 @@ type vaultWardenRestoreOptionsCertificates struct {
 
 type VaultWardenRestoreOptions struct {
 	Certificates            vaultWardenRestoreOptionsCertificates              `yaml:"certificates,omitempty"`
-	IssuerKind              string                                             `yaml:"issuerKind,omitempty"`
 	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 }
@@ -178,7 +178,7 @@ type VaultWardenRestoreOptions struct {
 //  2. Run the stage. It sets up and executes each action against a single tool pod:
 //     - the CNPG action issues a postgres user cert and restores the SQL dump into the cluster
 //     - the files action syncs the DR volume's data-vol subdirectory back onto the data PVC
-func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, dataPVCName, cnpgClusterName, servingCertName, clientCertIssuerName string, opts VaultWardenRestoreOptions) (restore *DREvent, err error) {
+func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, dataPVCName, cnpgClusterName, servingCertName string, clientCAIssuer cmmeta.IssuerReference, opts VaultWardenRestoreOptions) (restore *DREvent, err error) {
 	restore = NewDREventNow(restoreName)
 	ctx.Log.With("restoreName", restore.GetFullName(), "namespace", namespace).Info("Starting restore process")
 	defer func() {
@@ -201,8 +201,7 @@ func (vw *VaultWarden) Restore(ctx *contexts.Context, namespace, restoreName, da
 	// registered in the same order as the backup actions for consistency: CNPG first, then the data
 	// directory.
 	cnpgRestore := vw.newCNPGRestore()
-	if err := cnpgRestore.Configure(vw.kubeClusterClient, namespace, cnpgClusterName, servingCertName, clientCertIssuerName, restoreName, vaultwardenSQLFileName, cnpgrestore.CNPGRestoreOptions{
-		IssuerKind: opts.IssuerKind,
+	if err := cnpgRestore.Configure(vw.kubeClusterClient, namespace, cnpgClusterName, servingCertName, clientCAIssuer, restoreName, vaultwardenSQLFileName, cnpgrestore.CNPGRestoreOptions{
 		PostgresUserCert: cnpgrestore.CNPGRestoreOptionsCert{
 			Subject:            opts.Certificates.PostgresUserCert.Subject,
 			CRPOpts:            opts.Certificates.PostgresUserCert.CRPOpts,

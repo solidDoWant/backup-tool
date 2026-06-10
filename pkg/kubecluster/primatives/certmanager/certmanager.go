@@ -23,7 +23,6 @@ type CreateCertificateOptions struct {
 	CommonName    string
 	DNSNames      []string
 	Duration      *time.Duration
-	IssuerKind    string // Default to "Issuer" (namespace-specific)
 	SecretLabels  map[string]string
 	SecretName    string
 	Subject       *certmanagerv1.X509Subject
@@ -31,9 +30,17 @@ type CreateCertificateOptions struct {
 	KeyAlgorithm  certmanagerv1.PrivateKeyAlgorithm
 }
 
-func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name, issuerName string, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name string, issuerRef cmmeta.IssuerReference, opts CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
 	ctx.Log.With("name", name).Info("Creating certificate")
-	ctx.Log.Debug("Call parameters", "issuerName", issuerName, "opts", opts)
+	ctx.Log.Debug("Call parameters", "issuerRef", issuerRef, "opts", opts)
+
+	// Default the issuer reference to a namespaced cert-manager Issuer, matching cert-manager's own defaults.
+	if issuerRef.Kind == "" {
+		issuerRef.Kind = "Issuer"
+	}
+	if issuerRef.Group == "" {
+		issuerRef.Group = certmanager.GroupName
+	}
 
 	certificate := &certmanagerv1.Certificate{
 		Spec: certmanagerv1.CertificateSpec{
@@ -50,11 +57,7 @@ func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name, iss
 				RotationPolicy: certmanagerv1.RotationPolicyAlways,
 			},
 			SecretName: name,
-			IssuerRef: cmmeta.IssuerReference{
-				Group: certmanager.GroupName,
-				Kind:  "Issuer",
-				Name:  issuerName,
-			},
+			IssuerRef:  issuerRef,
 		},
 	}
 
@@ -67,10 +70,6 @@ func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name, iss
 	}
 	certificate.Spec.Duration = &metav1.Duration{
 		Duration: *certDuration,
-	}
-
-	if opts.IssuerKind != "" {
-		certificate.Spec.IssuerRef.Kind = opts.IssuerKind
 	}
 
 	if opts.SecretName != "" {
@@ -176,17 +175,17 @@ type CreateIssuerOptions struct {
 	helpers.GenerateName
 }
 
-func (cmc *Client) CreateIssuer(ctx *contexts.Context, namespace, name, caCertSecretName string, opts CreateIssuerOptions) (*certmanagerv1.Issuer, error) {
+// CreateIssuer creates a cert-manager Issuer with the given config. The config is the discriminated
+// union cert-manager uses to choose the issuer's backend, e.g. certmanagerv1.IssuerConfig{CA:
+// &certmanagerv1.CAIssuer{SecretName: …}} for a CA issuer backed by a certificate secret, or
+// certmanagerv1.IssuerConfig{SelfSigned: &certmanagerv1.SelfSignedIssuer{}} for a self-signed root.
+func (cmc *Client) CreateIssuer(ctx *contexts.Context, namespace, name string, config certmanagerv1.IssuerConfig, opts CreateIssuerOptions) (*certmanagerv1.Issuer, error) {
 	ctx.Log.With("name", name).Info("Creating issuer")
-	ctx.Log.Debug("Call parameters", "caCertSecretName", caCertSecretName, "opts", opts)
+	ctx.Log.Debug("Call parameters", "config", config, "opts", opts)
 
 	issuer := &certmanagerv1.Issuer{
 		Spec: certmanagerv1.IssuerSpec{
-			IssuerConfig: certmanagerv1.IssuerConfig{
-				CA: &certmanagerv1.CAIssuer{
-					SecretName: caCertSecretName,
-				},
-			},
+			IssuerConfig: config,
 		},
 	}
 

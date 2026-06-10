@@ -1,6 +1,7 @@
 package disasterrecovery
 
 import (
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"strings"
 	"testing"
 	"time"
@@ -48,8 +49,6 @@ func TestVaultWardenBackup(t *testing.T) {
 	namespace := "test-ns"
 	dataPVCName := "test-data-pvc"
 	clusterName := "test-cluster"
-	servingIssuerName := "serving-cert-issuer"
-	clientIssuerName := "client-cert-issuer"
 
 	tests := []struct {
 		desc                             string
@@ -70,14 +69,6 @@ func TestVaultWardenBackup(t *testing.T) {
 				VolumeSize:         resource.MustParse("10Gi"),
 				VolumeStorageClass: "custom-storage-class",
 				CloneClusterOptions: clonedcluster.CloneClusterOptions{
-					Certificates: clonedcluster.CloneClusterOptionsCertificates{
-						ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
-							IssuerKind: "ClusterIssuer",
-						},
-						ClientCACert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
-							IssuerKind: "Issuer",
-						},
-					},
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
 				BackupSnapshot: OptionsBackupSnapshot{
@@ -193,8 +184,9 @@ func TestVaultWardenBackup(t *testing.T) {
 				}
 
 				// Configuration - the CNPG capture is registered before the data directory capture so the
-				// base backup is taken before the data PVC clone that pins the consistency point.
-				mockCNPGBackup.EXPECT().Configure(mockClient, namespace, clusterName, servingIssuerName, clientIssuerName, backupName, "dump.sql", cnpgbackup.CNPGBackupOptions{
+				// base backup is taken before the data PVC clone that pins the consistency point. The issuers
+				// are now part of the cloning options (clusterCloning.certificates.*), passed through verbatim.
+				mockCNPGBackup.EXPECT().Configure(mockClient, namespace, clusterName, backupName, "dump.sql", cnpgbackup.CNPGBackupOptions{
 					CloningOpts:    tt.opts.CloneClusterOptions,
 					CleanupTimeout: tt.opts.CleanupTimeout,
 				}).Return(th.ErrIfTrue(tt.simulateConfigureCNPGBackupError))
@@ -236,8 +228,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				}
 			}()
 
-			backup, err := vw.Backup(rootCtx, namespace, backupName, dataPVCName, clusterName,
-				servingIssuerName, clientIssuerName, tt.opts)
+			backup, err := vw.Backup(rootCtx, namespace, backupName, dataPVCName, clusterName, tt.opts)
 
 			require.NotNil(t, backup)
 			assert.NotEmpty(t, backup.StartTime)
@@ -262,7 +253,7 @@ func TestVaultWardenRestore(t *testing.T) {
 	dataPVCName := "test-data-pvc"
 	clusterName := "test-cluster"
 	servingCertName := "test-serving-cert"
-	clientCertIssuerName := "test-client-cert-issuer"
+	clientCAIssuer := cmmeta.IssuerReference{Name: "test-client-cert-issuer", Kind: "ClusterIssuer"}
 
 	tests := []struct {
 		desc                             string
@@ -285,7 +276,6 @@ func TestVaultWardenRestore(t *testing.T) {
 						WaitForReadyTimeout: helpers.MaxWaitTime(4 * time.Second),
 					},
 				},
-				IssuerKind:              "ClusterIssuer",
 				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{},
 				CleanupTimeout:          helpers.MaxWaitTime(3 * time.Second),
 			},
@@ -339,8 +329,7 @@ func TestVaultWardenRestore(t *testing.T) {
 			)
 
 			func() {
-				mockCNPGRestore.EXPECT().Configure(mockClient, namespace, clusterName, servingCertName, clientCertIssuerName, restoreName, "dump.sql", cnpgrestore.CNPGRestoreOptions{
-					IssuerKind: tt.opts.IssuerKind,
+				mockCNPGRestore.EXPECT().Configure(mockClient, namespace, clusterName, servingCertName, clientCAIssuer, restoreName, "dump.sql", cnpgrestore.CNPGRestoreOptions{
 					PostgresUserCert: cnpgrestore.CNPGRestoreOptionsCert{
 						Subject:            tt.opts.Certificates.PostgresUserCert.Subject,
 						CRPOpts:            tt.opts.Certificates.PostgresUserCert.CRPOpts,
@@ -368,7 +357,7 @@ func TestVaultWardenRestore(t *testing.T) {
 					})
 			}()
 
-			restore, err := vw.Restore(rootCtx, namespace, restoreName, dataPVCName, clusterName, servingCertName, clientCertIssuerName, tt.opts)
+			restore, err := vw.Restore(rootCtx, namespace, restoreName, dataPVCName, clusterName, servingCertName, clientCAIssuer, tt.opts)
 
 			require.NotNil(t, restore)
 			assert.NotEmpty(t, restore.StartTime)

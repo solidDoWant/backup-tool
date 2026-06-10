@@ -23,7 +23,7 @@ import (
 func TestCreateCertificate(t *testing.T) {
 	namespace := "test-ns"
 	certName := "test-cert"
-	issuer := "test-issuer"
+	issuer := cmmeta.IssuerReference{Name: "test-issuer"}
 
 	standardCert := &certmanagerv1.Certificate{
 		TypeMeta: metav1.TypeMeta{
@@ -39,7 +39,7 @@ func TestCreateCertificate(t *testing.T) {
 			IssuerRef: cmmeta.IssuerReference{
 				Group: certmanager.GroupName,
 				Kind:  "Issuer",
-				Name:  issuer,
+				Name:  issuer.Name,
 			},
 			PrivateKey: &certmanagerv1.CertificatePrivateKey{
 				Algorithm:      certmanagerv1.Ed25519KeyAlgorithm,
@@ -52,6 +52,7 @@ func TestCreateCertificate(t *testing.T) {
 
 	tests := []struct {
 		desc                  string
+		issuerRef             *cmmeta.IssuerReference // overrides the base issuer when set
 		opts                  CreateCertificateOptions
 		expected              *certmanagerv1.Certificate
 		simulateClientFailure bool
@@ -65,13 +66,13 @@ func TestCreateCertificate(t *testing.T) {
 			},
 		},
 		{
-			desc: "all options",
+			desc:      "all options",
+			issuerRef: &cmmeta.IssuerReference{Name: "test-issuer", Kind: "ClusterIssuer"},
 			opts: CreateCertificateOptions{
 				GenerateName: true,
 				CommonName:   "test.example.com",
 				DNSNames:     []string{"test1.example.com", "test2.example.com"},
 				Duration:     new(24 * time.Hour),
-				IssuerKind:   "ClusterIssuer",
 				SecretName:   "secret-name-override",
 				Subject: &certmanagerv1.X509Subject{
 					Organizations:       []string{"Test Org"},
@@ -141,7 +142,11 @@ func TestCreateCertificate(t *testing.T) {
 			}
 
 			ctx := th.NewTestContext()
-			cert, err := client.CreateCertificate(ctx, namespace, certName, issuer, tt.opts)
+			issuerRef := issuer
+			if tt.issuerRef != nil {
+				issuerRef = *tt.issuerRef
+			}
+			cert, err := client.CreateCertificate(ctx, namespace, certName, issuerRef, tt.opts)
 
 			if tt.simulateClientFailure {
 				assert.Error(t, err)
@@ -505,31 +510,34 @@ func TestCreateIssuer(t *testing.T) {
 	issuerName := "test-issuer"
 	caCertSecretName := "test-ca-secret"
 
-	standardIssuer := &certmanagerv1.Issuer{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       certmanagerv1.IssuerKind,
-			APIVersion: certmanagerv1.SchemeGroupVersion.Identifier(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-		},
-		Spec: certmanagerv1.IssuerSpec{
-			IssuerConfig: certmanagerv1.IssuerConfig{
-				CA: &certmanagerv1.CAIssuer{
-					SecretName: caCertSecretName,
-				},
+	caConfig := certmanagerv1.IssuerConfig{CA: &certmanagerv1.CAIssuer{SecretName: caCertSecretName}}
+	selfSignedConfig := certmanagerv1.IssuerConfig{SelfSigned: &certmanagerv1.SelfSignedIssuer{}}
+
+	standardIssuer := func(config certmanagerv1.IssuerConfig) *certmanagerv1.Issuer {
+		return &certmanagerv1.Issuer{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       certmanagerv1.IssuerKind,
+				APIVersion: certmanagerv1.SchemeGroupVersion.Identifier(),
 			},
-		},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: certmanagerv1.IssuerSpec{
+				IssuerConfig: config,
+			},
+		}
 	}
 
 	tests := []struct {
 		desc                  string
+		config                certmanagerv1.IssuerConfig
 		opts                  CreateIssuerOptions
 		expected              *certmanagerv1.Issuer
 		simulateClientFailure bool
 	}{
 		{
-			desc: "no options",
+			desc:   "CA issuer, no options",
+			config: caConfig,
 			expected: &certmanagerv1.Issuer{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: issuerName,
@@ -537,7 +545,17 @@ func TestCreateIssuer(t *testing.T) {
 			},
 		},
 		{
-			desc: "with generate name",
+			desc:   "self-signed issuer, no options",
+			config: selfSignedConfig,
+			expected: &certmanagerv1.Issuer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: issuerName,
+				},
+			},
+		},
+		{
+			desc:   "CA issuer with generate name",
+			config: caConfig,
 			opts: CreateIssuerOptions{
 				GenerateName: true,
 			},
@@ -549,6 +567,7 @@ func TestCreateIssuer(t *testing.T) {
 		},
 		{
 			desc:                  "simulate client failure",
+			config:                caConfig,
 			simulateClientFailure: true,
 		},
 	}
@@ -563,7 +582,7 @@ func TestCreateIssuer(t *testing.T) {
 			}
 
 			ctx := th.NewTestContext()
-			issuer, err := client.CreateIssuer(ctx, namespace, issuerName, caCertSecretName, tt.opts)
+			issuer, err := client.CreateIssuer(ctx, namespace, issuerName, tt.config, tt.opts)
 
 			if tt.simulateClientFailure {
 				assert.Error(t, err)
@@ -577,7 +596,7 @@ func TestCreateIssuer(t *testing.T) {
 			// Ignore fields that are set by the API server and not relevant to the test
 			issuer.ManagedFields = nil
 
-			expectedIssuer := standardIssuer.DeepCopy()
+			expectedIssuer := standardIssuer(tt.config)
 			require.NoError(t, mergo.Merge(expectedIssuer, tt.expected, mergo.WithOverride))
 			assert.Equal(t, expectedIssuer, issuer)
 

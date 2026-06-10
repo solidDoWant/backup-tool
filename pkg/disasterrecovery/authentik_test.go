@@ -1,6 +1,7 @@
 package disasterrecovery
 
 import (
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"strings"
 	"testing"
 	"time"
@@ -41,8 +42,6 @@ func TestAuthentikBackup(t *testing.T) {
 	backupName := "test-backup"
 	namespace := "test-ns"
 	clusterName := "test-cluster"
-	servingIssuerName := "serving-cert-issuer"
-	clientIssuerName := "client-cert-issuer"
 	mediaS3Path := "s3://media"
 	mediaS3Credentials := s3.NewCredentials("accessKeyID", "secretAccessKey")
 
@@ -64,14 +63,6 @@ func TestAuthentikBackup(t *testing.T) {
 				VolumeSize:         resource.MustParse("10Gi"),
 				VolumeStorageClass: "custom-storage-class",
 				CloneClusterOptions: clonedcluster.CloneClusterOptions{
-					Certificates: clonedcluster.CloneClusterOptionsCertificates{
-						ServingCert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
-							IssuerKind: "ClusterIssuer",
-						},
-						ClientCACert: clonedcluster.CloneClusterOptionsExternallyIssuedCertificate{
-							IssuerKind: "Issuer",
-						},
-					},
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
 				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{},
@@ -157,8 +148,9 @@ func TestAuthentikBackup(t *testing.T) {
 					return
 				}
 
-				// Configuration
-				mockCNPGBackup.EXPECT().Configure(mockClient, namespace, clusterName, servingIssuerName, clientIssuerName, backupName, "dump.sql", cnpgbackup.CNPGBackupOptions{
+				// Configuration. The serving/client-CA issuers are part of the cloning options
+				// (clusterCloning.certificates.*) and pass through to the action verbatim.
+				mockCNPGBackup.EXPECT().Configure(mockClient, namespace, clusterName, backupName, "dump.sql", cnpgbackup.CNPGBackupOptions{
 					CloningOpts:    tt.opts.CloneClusterOptions,
 					CleanupTimeout: tt.opts.CleanupTimeout,
 				}).Return(th.ErrIfTrue(tt.simulateConfigureCNPGBackupError))
@@ -201,7 +193,7 @@ func TestAuthentikBackup(t *testing.T) {
 			}()
 
 			backup, err := authentik.Backup(rootCtx, namespace, backupName, clusterName,
-				servingIssuerName, clientIssuerName, mediaS3Path, mediaS3Credentials, tt.opts)
+				mediaS3Path, mediaS3Credentials, tt.opts)
 
 			require.NotNil(t, backup)
 			assert.NotEmpty(t, backup.StartTime)
@@ -225,7 +217,7 @@ func TestAuthentikRestore(t *testing.T) {
 	restoreName := "test-restore"
 	clusterName := "test-cluster"
 	servingCertName := "test-serving-cert"
-	clientCertIssuerName := "test-client-cert-issuer"
+	clientCAIssuer := cmmeta.IssuerReference{Name: "test-client-cert-issuer", Kind: "ClusterIssuer"}
 	mediaS3Path := "s3://media"
 	mediaS3Credentials := s3.NewCredentials("accessKeyID", "secretAccessKey")
 
@@ -247,7 +239,6 @@ func TestAuthentikRestore(t *testing.T) {
 						Organizations: []string{"test-org"},
 					},
 				},
-				IssuerKind:              "ClusterIssuer",
 				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{},
 				CleanupTimeout:          helpers.MaxWaitTime(3 * time.Second),
 			},
@@ -289,10 +280,9 @@ func TestAuthentikRestore(t *testing.T) {
 			)
 
 			func() {
-				mockCNPGRestore.EXPECT().Configure(mockClient, namespace, clusterName, servingCertName, clientCertIssuerName, restoreName, "dump.sql", cnpgrestore.CNPGRestoreOptions{
+				mockCNPGRestore.EXPECT().Configure(mockClient, namespace, clusterName, servingCertName, clientCAIssuer, restoreName, "dump.sql", cnpgrestore.CNPGRestoreOptions{
 					PostgresUserCert: tt.opts.PostgresUserCert,
 					CleanupTimeout:   tt.opts.CleanupTimeout,
-					IssuerKind:       tt.opts.IssuerKind,
 				}).Return(th.ErrIfTrue(tt.simulateCNPGRestoreError))
 				if tt.simulateCNPGRestoreError {
 					return
@@ -314,7 +304,7 @@ func TestAuthentikRestore(t *testing.T) {
 					})
 			}()
 
-			restore, err := authentik.Restore(rootCtx, namespace, restoreName, clusterName, servingCertName, clientCertIssuerName, mediaS3Path, mediaS3Credentials, tt.opts)
+			restore, err := authentik.Restore(rootCtx, namespace, restoreName, clusterName, servingCertName, clientCAIssuer, mediaS3Path, mediaS3Credentials, tt.opts)
 
 			require.NotNil(t, restore)
 			assert.NotEmpty(t, restore.StartTime)

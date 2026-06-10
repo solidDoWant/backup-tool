@@ -5,6 +5,7 @@ import (
 	"time"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/google/uuid"
 	"github.com/gravitational/trace"
@@ -30,7 +31,6 @@ type CNPGRestoreOptionsCert struct {
 }
 
 type CNPGRestoreOptions struct {
-	IssuerKind       string                 `yaml:"issuerKind,omitempty"`
 	PostgresUserCert CNPGRestoreOptionsCert `yaml:"postgresUserCert,omitempty"`
 	CleanupTimeout   helpers.MaxWaitTime    `yaml:"cleanupTimeout,omitempty"`
 }
@@ -45,25 +45,25 @@ type CNPGRestoreOptions struct {
 // to the next one.
 type CNPGRestoreInterface interface {
 	remote.CleanupAction
-	Configure(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertName, clientCertIssuerName, drVolName, backupFileRelPath string, opts CNPGRestoreOptions) error
+	Configure(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertName string, clientCAIssuer cmmeta.IssuerReference, drVolName, backupFileRelPath string, opts CNPGRestoreOptions) error
 }
 
 type configureState struct {
-	uid                  string // Unique identifier to prevent accidental collisions between multiple instances
-	isConfigured         bool
-	kubeClusterClient    kubecluster.ClientInterface
-	namespace            string
-	drVolName            string
-	backupFileRelPath    string
-	clusterName          string
-	servingCertName      string
-	clientCertIssuerName string
-	opts                 CNPGRestoreOptions
+	uid               string // Unique identifier to prevent accidental collisions between multiple instances
+	isConfigured      bool
+	kubeClusterClient kubecluster.ClientInterface
+	namespace         string
+	drVolName         string
+	backupFileRelPath string
+	clusterName       string
+	servingCertName   string
+	clientCAIssuer    cmmeta.IssuerReference
+	opts              CNPGRestoreOptions
 }
 
 // Configures the action prior to validation and execution. This should be called before
 // any other methods. Returns an error if the action is already configured.
-func (cs *configureState) Configure(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertName, clientCertIssuerName, drVolName, backupFileRelPath string, opts CNPGRestoreOptions) error {
+func (cs *configureState) Configure(kubeClusterClient kubecluster.ClientInterface, namespace, clusterName, servingCertName string, clientCAIssuer cmmeta.IssuerReference, drVolName, backupFileRelPath string, opts CNPGRestoreOptions) error {
 	if cs.isConfigured {
 		return trace.Errorf("attempted to configure multiple times")
 	}
@@ -73,7 +73,7 @@ func (cs *configureState) Configure(kubeClusterClient kubecluster.ClientInterfac
 	cs.namespace = namespace
 	cs.clusterName = clusterName
 	cs.servingCertName = servingCertName
-	cs.clientCertIssuerName = clientCertIssuerName
+	cs.clientCAIssuer = clientCAIssuer
 	cs.drVolName = drVolName
 	cs.backupFileRelPath = backupFileRelPath
 	cs.opts = opts
@@ -118,8 +118,8 @@ func (vs *validateState) Validate(ctx *contexts.Context) (err error) {
 	}
 	vs.servingCert = servingCert
 
-	if err := common.ValidateIssuer(ctx.Child(), vs.kubeClusterClient, vs.namespace, vs.opts.IssuerKind, vs.clientCertIssuerName); err != nil {
-		return trace.Wrap(err, "failed to validate CNPG cluster client cert issuer %q", vs.clientCertIssuerName)
+	if err := common.ValidateIssuer(ctx.Child(), vs.kubeClusterClient, vs.namespace, vs.clientCAIssuer); err != nil {
+		return trace.Wrap(err, "failed to validate CNPG cluster client cert issuer %q", vs.clientCAIssuer.Name)
 	}
 
 	if _, err := vs.kubeClusterClient.Core().GetPVC(ctx.Child(), vs.namespace, vs.drVolName); err != nil {
@@ -163,7 +163,7 @@ func (ss *setupState) Setup(ctx *contexts.Context, btiOpts *backuptoolinstance.C
 		WaitForCertTimeout: ss.opts.PostgresUserCert.WaitForCertTimeout,
 		CleanupTimeout:     ss.opts.CleanupTimeout,
 	}
-	postgresUserCert, err := ss.kubeClusterClient.NewClusterUserCert(ctx.Child(), ss.namespace, "postgres", ss.clientCertIssuerName, ss.clusterName, cucOptions)
+	postgresUserCert, err := ss.kubeClusterClient.NewClusterUserCert(ctx.Child(), ss.namespace, "postgres", ss.clientCAIssuer, ss.clusterName, cucOptions)
 	if err != nil {
 		return trace.Wrap(err, "failed to create postgres user CNPG cluster client cert")
 	}

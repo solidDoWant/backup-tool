@@ -75,8 +75,8 @@
         "servingCertName": {
           "type": "string"
         },
-        "clientCertIssuer": {
-          "$ref": "#/$defs/ConfigIssuer"
+        "clientCAIssuer": {
+          "$ref": "#/$defs/IssuerReference"
         },
         "postgresUserCert": {
           "$ref": "#/$defs/CNPGRestoreOptionsCert"
@@ -87,7 +87,7 @@
       "required": [
         "name",
         "servingCertName",
-        "clientCertIssuer"
+        "clientCAIssuer"
       ]
     },
     "AzureDiskVolumeSource": {
@@ -254,21 +254,6 @@
       },
       "additionalProperties": false,
       "type": "object"
-    },
-    "ConfigIssuer": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "kind": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name"
-      ]
     },
     "ConfigMapProjection": {
       "properties": {
@@ -584,6 +569,21 @@
           "type": "string"
         },
         "PullPolicy": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "IssuerReference": {
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Kind": {
+          "type": "string"
+        },
+        "Group": {
           "type": "string"
         }
       },

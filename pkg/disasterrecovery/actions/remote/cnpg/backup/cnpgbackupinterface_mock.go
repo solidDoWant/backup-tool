@@ -130,17 +130,17 @@ func (_c *MockCNPGBackupInterface_Cleanup_Call) RunAndReturn(run func(*contexts.
 	return _c
 }
 
-// Configure provides a mock function with given fields: kubeClusterClient, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, drVolName, backupFileRelPath, opts
-func (_m *MockCNPGBackupInterface) Configure(kubeClusterClient kubecluster.ClientInterface, namespace string, clusterName string, servingCertIssuerName string, clientCertIssuerName string, drVolName string, backupFileRelPath string, opts CNPGBackupOptions) error {
-	ret := _m.Called(kubeClusterClient, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, drVolName, backupFileRelPath, opts)
+// Configure provides a mock function with given fields: kubeClusterClient, namespace, clusterName, drVolName, backupFileRelPath, opts
+func (_m *MockCNPGBackupInterface) Configure(kubeClusterClient kubecluster.ClientInterface, namespace string, clusterName string, drVolName string, backupFileRelPath string, opts CNPGBackupOptions) error {
+	ret := _m.Called(kubeClusterClient, namespace, clusterName, drVolName, backupFileRelPath, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Configure")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(kubecluster.ClientInterface, string, string, string, string, string, string, CNPGBackupOptions) error); ok {
-		r0 = rf(kubeClusterClient, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, drVolName, backupFileRelPath, opts)
+	if rf, ok := ret.Get(0).(func(kubecluster.ClientInterface, string, string, string, string, CNPGBackupOptions) error); ok {
+		r0 = rf(kubeClusterClient, namespace, clusterName, drVolName, backupFileRelPath, opts)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -157,18 +157,16 @@ type MockCNPGBackupInterface_Configure_Call struct {
 //   - kubeClusterClient kubecluster.ClientInterface
 //   - namespace string
 //   - clusterName string
-//   - servingCertIssuerName string
-//   - clientCertIssuerName string
 //   - drVolName string
 //   - backupFileRelPath string
 //   - opts CNPGBackupOptions
-func (_e *MockCNPGBackupInterface_Expecter) Configure(kubeClusterClient interface{}, namespace interface{}, clusterName interface{}, servingCertIssuerName interface{}, clientCertIssuerName interface{}, drVolName interface{}, backupFileRelPath interface{}, opts interface{}) *MockCNPGBackupInterface_Configure_Call {
-	return &MockCNPGBackupInterface_Configure_Call{Call: _e.mock.On("Configure", kubeClusterClient, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, drVolName, backupFileRelPath, opts)}
+func (_e *MockCNPGBackupInterface_Expecter) Configure(kubeClusterClient interface{}, namespace interface{}, clusterName interface{}, drVolName interface{}, backupFileRelPath interface{}, opts interface{}) *MockCNPGBackupInterface_Configure_Call {
+	return &MockCNPGBackupInterface_Configure_Call{Call: _e.mock.On("Configure", kubeClusterClient, namespace, clusterName, drVolName, backupFileRelPath, opts)}
 }
 
-func (_c *MockCNPGBackupInterface_Configure_Call) Run(run func(kubeClusterClient kubecluster.ClientInterface, namespace string, clusterName string, servingCertIssuerName string, clientCertIssuerName string, drVolName string, backupFileRelPath string, opts CNPGBackupOptions)) *MockCNPGBackupInterface_Configure_Call {
+func (_c *MockCNPGBackupInterface_Configure_Call) Run(run func(kubeClusterClient kubecluster.ClientInterface, namespace string, clusterName string, drVolName string, backupFileRelPath string, opts CNPGBackupOptions)) *MockCNPGBackupInterface_Configure_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(kubecluster.ClientInterface), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(string), args[6].(string), args[7].(CNPGBackupOptions))
+		run(args[0].(kubecluster.ClientInterface), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(CNPGBackupOptions))
 	})
 	return _c
 }
@@ -178,7 +176,7 @@ func (_c *MockCNPGBackupInterface_Configure_Call) Return(_a0 error) *MockCNPGBac
 	return _c
 }
 
-func (_c *MockCNPGBackupInterface_Configure_Call) RunAndReturn(run func(kubecluster.ClientInterface, string, string, string, string, string, string, CNPGBackupOptions) error) *MockCNPGBackupInterface_Configure_Call {
+func (_c *MockCNPGBackupInterface_Configure_Call) RunAndReturn(run func(kubecluster.ClientInterface, string, string, string, string, CNPGBackupOptions) error) *MockCNPGBackupInterface_Configure_Call {
 	_c.Call.Return(run)
 	return _c
 }

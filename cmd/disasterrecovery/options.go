@@ -13,8 +13,3 @@ type ConfigBackupVolume struct {
 type ConfigBTI struct {
 	CreationOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:",inline"`
 }
-
-type ConfigIssuer struct {
-	Name string `yaml:"name" jsonschema:"required"`
-	Kind string `yaml:"kind" jsonschema:"omitempty"`
-}

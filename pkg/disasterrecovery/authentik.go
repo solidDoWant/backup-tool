@@ -1,6 +1,7 @@
 package disasterrecovery
 
 import (
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
@@ -49,7 +50,7 @@ func NewAuthentik(kubeClusterClient kubecluster.ClientInterface) *Authentik {
 	}
 }
 
-func (a *Authentik) Backup(ctx *contexts.Context, namespace, backupName, clusterName, servingCertIssuerName, clientCertIssuerName, mediaS3Path string, mediaS3Credentials s3.CredentialsInterface, opts AuthentikBackupOptions) (backup *DREvent, err error) {
+func (a *Authentik) Backup(ctx *contexts.Context, namespace, backupName, clusterName, mediaS3Path string, mediaS3Credentials s3.CredentialsInterface, opts AuthentikBackupOptions) (backup *DREvent, err error) {
 	backup = NewDREventNow(backupName)
 	ctx.Log.With("backupName", backup.GetFullName(), "namespace", namespace).Info("Starting backup process")
 	defer func() {
@@ -84,7 +85,7 @@ func (a *Authentik) Backup(ctx *contexts.Context, namespace, backupName, cluster
 	}
 
 	cnpgBackup := a.newCNPGBackup()
-	if err := cnpgBackup.Configure(a.kubeClusterClient, namespace, clusterName, servingCertIssuerName, clientCertIssuerName, backupName, authentikSQLFileName, backupOpts); err != nil {
+	if err := cnpgBackup.Configure(a.kubeClusterClient, namespace, clusterName, backupName, authentikSQLFileName, backupOpts); err != nil {
 		return backup, trace.Wrap(err, "failed to configure CNPG cluster backup")
 	}
 	stage.WithAction("Authentik CNPG backup", cnpgBackup)
@@ -116,12 +117,11 @@ func (a *Authentik) Backup(ctx *contexts.Context, namespace, backupName, cluster
 
 type AuthentikRestoreOptions struct {
 	PostgresUserCert        cnpgrestore.CNPGRestoreOptionsCert                 `yaml:"postgresUserCert,omitempty"`
-	IssuerKind              string                                             `yaml:"issuerKind,omitempty"`
 	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	CleanupTimeout          helpers.MaxWaitTime                                `yaml:"cleanupTimeout,omitempty"`
 }
 
-func (a *Authentik) Restore(ctx *contexts.Context, namespace, restoreName, clusterName, servingCertName, clientCertIssuerName string, mediaS3Path string, mediaS3Credentials s3.CredentialsInterface, opts AuthentikRestoreOptions) (restore *DREvent, err error) {
+func (a *Authentik) Restore(ctx *contexts.Context, namespace, restoreName, clusterName, servingCertName string, clientCAIssuer cmmeta.IssuerReference, mediaS3Path string, mediaS3Credentials s3.CredentialsInterface, opts AuthentikRestoreOptions) (restore *DREvent, err error) {
 	restore = NewDREventNow(restoreName)
 	ctx.Log.With("restoreName", restore.GetFullName(), "namespace", namespace).Info("Starting restore process")
 	defer func() {
@@ -141,9 +141,8 @@ func (a *Authentik) Restore(ctx *contexts.Context, namespace, restoreName, clust
 	})
 
 	cnpgRestore := a.newCNPGRestore()
-	if err := cnpgRestore.Configure(a.kubeClusterClient, namespace, clusterName, servingCertName, clientCertIssuerName, restoreName, authentikSQLFileName, cnpgrestore.CNPGRestoreOptions{
+	if err := cnpgRestore.Configure(a.kubeClusterClient, namespace, clusterName, servingCertName, clientCAIssuer, restoreName, authentikSQLFileName, cnpgrestore.CNPGRestoreOptions{
 		PostgresUserCert: opts.PostgresUserCert,
-		IssuerKind:       opts.IssuerKind,
 		CleanupTimeout:   opts.CleanupTimeout,
 	}); err != nil {
 		return restore, trace.Wrap(err, "failed to configure CNPG cluster restoration")

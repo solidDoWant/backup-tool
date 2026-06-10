@@ -5,6 +5,7 @@ import (
 
 	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/createcrpforcertificate"
@@ -28,7 +29,7 @@ func TestNewClusterUserCertOpts(t *testing.T) {
 func TestNewClusterUserCert(t *testing.T) {
 	namespace := "test-ns"
 	username := "test-user"
-	issuerName := "test-issuer"
+	issuerRef := cmmeta.IssuerReference{Name: "test-issuer", Kind: "ClusterIssuer"}
 	clusterName := "test-cluster"
 
 	tests := []struct {
@@ -50,7 +51,6 @@ func TestNewClusterUserCert(t *testing.T) {
 					Enabled:           true,
 					WaitForCRPTimeout: helpers.ShortWaitTime,
 				},
-				IssuerKind: "test-kind",
 				Subject: &certmanagerv1.X509Subject{
 					Organizations:       []string{"test-org"},
 					OrganizationalUnits: []string{"test-ou"},
@@ -124,14 +124,14 @@ func TestNewClusterUserCert(t *testing.T) {
 				}
 
 				// 1.
-				c.cmClient.EXPECT().CreateCertificate(mock.Anything, namespace, mock.Anything, issuerName, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, certName, issuerName string, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
+				c.cmClient.EXPECT().CreateCertificate(mock.Anything, namespace, mock.Anything, issuerRef, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, certName string, ref cmmeta.IssuerReference, opts certmanager.CreateCertificateOptions) (*certmanagerv1.Certificate, error) {
 						assert.True(t, calledCtx.IsChildOf(ctx))
 						assert.Contains(t, certName, clusterName)
 						assert.Contains(t, certName, username)
 						assert.Equal(t, opts.CommonName, username)
 						assert.Equal(t, []certmanagerv1.KeyUsage{certmanagerv1.UsageClientAuth}, opts.Usages)
-						assert.Equal(t, opts.IssuerKind, tt.opts.IssuerKind)
+						assert.Equal(t, issuerRef, ref)
 
 						createdCert.Name = certName
 
@@ -178,7 +178,7 @@ func TestNewClusterUserCert(t *testing.T) {
 				c.clusterUserCert.EXPECT().setCertificate(createdCert)
 			}()
 
-			clusterUserCert, err := c.NewClusterUserCert(ctx, namespace, username, issuerName, clusterName, tt.opts)
+			clusterUserCert, err := c.NewClusterUserCert(ctx, namespace, username, issuerRef, clusterName, tt.opts)
 
 			if errExpected {
 				assert.Error(t, err)

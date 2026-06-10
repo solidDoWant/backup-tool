@@ -6,6 +6,7 @@ import (
 
 	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
@@ -35,7 +36,6 @@ type NewClusterUserCertOptsCRP struct {
 }
 
 type NewClusterUserCertOpts struct {
-	IssuerKind         string                     `yaml:"issuerKind,omitempty"`
 	Subject            *certmanagerv1.X509Subject `yaml:"subject,omitempty"`
 	CRPOpts            NewClusterUserCertOptsCRP  `yaml:"certificateRequestPolicy,omitempty"`
 	WaitForCertTimeout helpers.MaxWaitTime        `yaml:"waitForCertTimeout,omitempty"`
@@ -46,8 +46,8 @@ func newClusterUserCert(p providerInterfaceInternal) ClusterUserCertInterface {
 	return &ClusterUserCert{p: p}
 }
 
-func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username, issuerName, clusterName string, opts NewClusterUserCertOpts) (cuc ClusterUserCertInterface, err error) {
-	ctx.Log.With("username", username, "issuerName", issuerName).Info("Creating user certificate")
+func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username string, issuerRef cmmeta.IssuerReference, clusterName string, opts NewClusterUserCertOpts) (cuc ClusterUserCertInterface, err error) {
+	ctx.Log.With("username", username, "issuerRef", issuerRef).Info("Creating user certificate")
 	defer ctx.Log.Info("Finished creating user certificate", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
 
 	cuc = p.newClusterUserCert()
@@ -72,10 +72,9 @@ func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username
 		SecretLabels: map[string]string{
 			utils.WatchedLabelName: "true",
 		},
-		IssuerKind: opts.IssuerKind,
 	}
 
-	cert, err := p.cmClient.CreateCertificate(ctx.Child(), namespace, certName, issuerName, certOptions)
+	cert, err := p.cmClient.CreateCertificate(ctx.Child(), namespace, certName, issuerRef, certOptions)
 	if err != nil {
 		return errHandler(err, "failed to create %q user cert %q", username, helpers.FullNameStr(namespace, certName))
 	}
