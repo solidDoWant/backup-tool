@@ -44,9 +44,6 @@ func TestConfigure(t *testing.T) {
 		clientCAIssuer:    cmmeta.IssuerReference{Name: "clientCertIssuerName"},
 		opts: CNPGRestoreOptions{
 			PostgresUserCert: CNPGRestoreOptionsCert{
-				Subject: &certmanagerv1.X509Subject{
-					Organizations: []string{"test-org"},
-				},
 				WaitForCertTimeout: helpers.ShortWaitTime,
 				CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{
 					WaitForCRPTimeout: helpers.ShortWaitTime,
@@ -340,9 +337,6 @@ func TestSetup(t *testing.T) {
 						backupFileRelPath: "backupFileRelPath",
 						opts: CNPGRestoreOptions{
 							PostgresUserCert: CNPGRestoreOptionsCert{
-								Subject: &certmanagerv1.X509Subject{
-									Organizations: []string{"test-org"},
-								},
 								CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{
 									WaitForCRPTimeout: helpers.ShortWaitTime,
 								},
@@ -370,7 +364,6 @@ func TestSetup(t *testing.T) {
 				}
 
 				mockClient.EXPECT().NewClusterUserCert(mock.Anything, currentState.namespace, "postgres", currentState.clientCAIssuer, currentState.clusterName, clusterusercert.NewClusterUserCertOpts{
-					Subject:            currentState.opts.PostgresUserCert.Subject,
 					CRPOpts:            currentState.opts.PostgresUserCert.CRPOpts,
 					WaitForCertTimeout: currentState.opts.PostgresUserCert.WaitForCertTimeout,
 					CleanupTimeout:     currentState.opts.CleanupTimeout,
@@ -471,9 +464,6 @@ func TestCleanup(t *testing.T) {
 						backupFileRelPath: "backupFileRelPath",
 						opts: CNPGRestoreOptions{
 							PostgresUserCert: CNPGRestoreOptionsCert{
-								Subject: &certmanagerv1.X509Subject{
-									Organizations: []string{"test-org"},
-								},
 								CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{
 									WaitForCRPTimeout: helpers.ShortWaitTime,
 								},
@@ -585,9 +575,6 @@ func TestExecute(t *testing.T) {
 							backupFileRelPath: "backupFileRelPath",
 							opts: CNPGRestoreOptions{
 								PostgresUserCert: CNPGRestoreOptionsCert{
-									Subject: &certmanagerv1.X509Subject{
-										Organizations: []string{"test-org"},
-									},
 									CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{
 										WaitForCRPTimeout: helpers.ShortWaitTime,
 									},

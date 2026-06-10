@@ -25,7 +25,6 @@ type CreateCertificateOptions struct {
 	Duration      *time.Duration
 	SecretLabels  map[string]string
 	SecretName    string
-	Subject       *certmanagerv1.X509Subject
 	Usages        []certmanagerv1.KeyUsage
 	KeyAlgorithm  certmanagerv1.PrivateKeyAlgorithm
 }
@@ -48,7 +47,6 @@ func (cmc *Client) CreateCertificate(ctx *contexts.Context, namespace, name stri
 			NameConstraints:       opts.CAConstraints,
 			CommonName:            opts.CommonName,
 			DNSNames:              opts.DNSNames,
-			Subject:               opts.Subject,
 			Usages:                opts.Usages,
 			EncodeUsagesInRequest: new(true),
 			PrivateKey: &certmanagerv1.CertificatePrivateKey{

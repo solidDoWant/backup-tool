@@ -74,16 +74,6 @@ func TestCreateCertificate(t *testing.T) {
 				DNSNames:     []string{"test1.example.com", "test2.example.com"},
 				Duration:     new(24 * time.Hour),
 				SecretName:   "secret-name-override",
-				Subject: &certmanagerv1.X509Subject{
-					Organizations:       []string{"Test Org"},
-					Countries:           []string{"Test Country"},
-					OrganizationalUnits: []string{"Test OU"},
-					Localities:          []string{"Test Locality"},
-					Provinces:           []string{"Test Province"},
-					StreetAddresses:     []string{"Test Street"},
-					PostalCodes:         []string{"12345"},
-					SerialNumber:        "12345",
-				},
 				SecretLabels: map[string]string{"env": "test"},
 				Usages: []certmanagerv1.KeyUsage{
 					certmanagerv1.UsageEmailProtection,
@@ -106,16 +96,6 @@ func TestCreateCertificate(t *testing.T) {
 						Labels: map[string]string{"env": "test"},
 					},
 					SecretName: "secret-name-override",
-					Subject: &certmanagerv1.X509Subject{
-						Organizations:       []string{"Test Org"},
-						Countries:           []string{"Test Country"},
-						OrganizationalUnits: []string{"Test OU"},
-						Localities:          []string{"Test Locality"},
-						Provinces:           []string{"Test Province"},
-						StreetAddresses:     []string{"Test Street"},
-						PostalCodes:         []string{"12345"},
-						SerialNumber:        "12345",
-					},
 					Usages: []certmanagerv1.KeyUsage{
 						certmanagerv1.UsageEmailProtection,
 						certmanagerv1.UsageNetscapeSGC,

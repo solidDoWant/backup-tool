@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
 	cnpgbackup "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/backup"
@@ -235,9 +234,7 @@ func TestAuthentikRestore(t *testing.T) {
 			desc: "success - all options set",
 			opts: AuthentikRestoreOptions{
 				PostgresUserCert: cnpgrestore.CNPGRestoreOptionsCert{
-					Subject: &v1.X509Subject{
-						Organizations: []string{"test-org"},
-					},
+					WaitForCertTimeout: helpers.MaxWaitTime(4 * time.Second),
 				},
 				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{},
 				CleanupTimeout:          helpers.MaxWaitTime(3 * time.Second),

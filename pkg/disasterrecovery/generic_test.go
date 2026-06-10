@@ -3,6 +3,7 @@ package disasterrecovery
 import (
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"testing"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
@@ -278,7 +279,7 @@ postgres:
     clientCAIssuer: { name: cnpg-client-ca, kind: ClusterIssuer }
     servingCert: vw-db-serving
     postgresUserCert:
-      subject: { organizations: [vw] }
+      waitForCertTimeout: 4m
 files:
   - name: data
     pvc: vw-data
@@ -310,8 +311,7 @@ s3:
 		require.NoError(t, yaml.UnmarshalWithOptions([]byte(restoreYAML), &c, yaml.Strict()))
 		require.NoError(t, c.Validate())
 		require.Len(t, c.Postgres, 1)
-		require.NotNil(t, c.Postgres[0].PostgresUserCert.Subject)
-		assert.Equal(t, []string{"vw"}, c.Postgres[0].PostgresUserCert.Subject.Organizations)
+		assert.Equal(t, helpers.MaxWaitTime(4*time.Minute), c.Postgres[0].PostgresUserCert.WaitForCertTimeout)
 		require.Len(t, c.FileGroups, 1)
 		assert.Equal(t, map[string]string{"app": "vw-shard"}, c.FileGroups[0].Selector.MatchLabels)
 	})

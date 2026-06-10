@@ -38,10 +38,9 @@ type NewClusterUserCertOptsCRP struct {
 }
 
 type NewClusterUserCertOpts struct {
-	Subject            *certmanagerv1.X509Subject `yaml:"subject,omitempty"`
-	CRPOpts            NewClusterUserCertOptsCRP  `yaml:"certificateRequestPolicy,omitempty"`
-	WaitForCertTimeout helpers.MaxWaitTime        `yaml:"waitForCertTimeout,omitempty"`
-	CleanupTimeout     helpers.MaxWaitTime        `yaml:"cleanupTimeout,omitempty"`
+	CRPOpts            NewClusterUserCertOptsCRP `yaml:"certificateRequestPolicy,omitempty"`
+	WaitForCertTimeout helpers.MaxWaitTime       `yaml:"waitForCertTimeout,omitempty"`
+	CleanupTimeout     helpers.MaxWaitTime       `yaml:"cleanupTimeout,omitempty"`
 }
 
 func newClusterUserCert(p providerInterfaceInternal) ClusterUserCertInterface {
@@ -69,7 +68,6 @@ func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username
 	certName := helpers.CleanName(fmt.Sprintf("%s-%s-user", clusterName, username))
 	certOptions := certmanager.CreateCertificateOptions{
 		CommonName: username,
-		Subject:    opts.Subject,
 		Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageClientAuth},
 		SecretLabels: map[string]string{
 			utils.WatchedLabelName: "true",

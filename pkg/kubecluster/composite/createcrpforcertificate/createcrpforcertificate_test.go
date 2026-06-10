@@ -86,16 +86,6 @@ func TestCreateCRPForCertificate(t *testing.T) {
 						Algorithm: "RSA",
 						Size:      2048,
 					},
-					Subject: &certmanagerv1.X509Subject{
-						Organizations:       []string{"Test Org"},
-						OrganizationalUnits: []string{"Test OU"},
-						Countries:           []string{"Test Country"},
-						Provinces:           []string{"Test Province"},
-						Localities:          []string{"Test Locality"},
-						StreetAddresses:     []string{"Test Street"},
-						PostalCodes:         []string{"Test Postal Code"},
-						SerialNumber:        "Test Serial Number",
-					},
 				},
 			},
 			opts: CreateCRPForCertificateOpts{
@@ -144,40 +134,6 @@ func TestCreateCRPForCertificate(t *testing.T) {
 						Usages: &[]certmanagerv1.KeyUsage{
 							certmanagerv1.UsageDigitalSignature,
 							certmanagerv1.UsageKeyEncipherment,
-						},
-						Subject: &policyv1alpha1.CertificateRequestPolicyAllowedX509Subject{
-							Organizations: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   new([]string{"Test Org"}),
-								Required: new(true),
-							},
-							OrganizationalUnits: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   new([]string{"Test OU"}),
-								Required: new(true),
-							},
-							Countries: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   new([]string{"Test Country"}),
-								Required: new(true),
-							},
-							Provinces: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   new([]string{"Test Province"}),
-								Required: new(true),
-							},
-							Localities: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   new([]string{"Test Locality"}),
-								Required: new(true),
-							},
-							StreetAddresses: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   new([]string{"Test Street"}),
-								Required: new(true),
-							},
-							PostalCodes: &policyv1alpha1.CertificateRequestPolicyAllowedStringSlice{
-								Values:   new([]string{"Test Postal Code"}),
-								Required: new(true),
-							},
-							SerialNumber: &policyv1alpha1.CertificateRequestPolicyAllowedString{
-								Value:    new("Test Serial Number"),
-								Required: new(true),
-							},
 						},
 					},
 					Selector: policyv1alpha1.CertificateRequestPolicySelector{

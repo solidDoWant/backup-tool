@@ -70,7 +70,6 @@ type ClonedCluster struct {
 // internal self-signed issuer; the user certs from the client-CA issuer), so each gets a tight
 // CertificateRequestPolicy when (and only when) approver-policy is detected as enforcing on the cluster.
 type CloneClusterOptionsCertificate struct {
-	Subject             *certmanagerv1.X509Subject                `yaml:"subject,omitempty"`
 	CRPOpts             clusterusercert.NewClusterUserCertOptsCRP `yaml:"certificateRequestPolicy,omitempty"`
 	WaitForReadyTimeout helpers.MaxWaitTime                       `yaml:"waitForReadyTimeout,omitempty"`
 }
@@ -198,7 +197,6 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 	ctx.Log.Step().Info("Creating serving certificate for the new cluster", "certificateName", servingCertName)
 	servingCertOptions := certmanager.CreateCertificateOptions{
 		CommonName: servingCertName,
-		Subject:    opts.Certificates.ServingCert.Subject,
 		Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageServerAuth},
 		SecretLabels: map[string]string{
 			utils.WatchedLabelName: "true",
@@ -231,7 +229,6 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 			},
 		},
 		CommonName: helpers.TruncateStringEllipsis(newClusterName, 64-len(clientCACNSuffix)) + clientCACNSuffix,
-		Subject:    opts.Certificates.ClientCACert.Subject,
 		Usages:     []certmanagerv1.KeyUsage{certmanagerv1.UsageCertSign},
 		SecretLabels: map[string]string{
 			utils.WatchedLabelName: "true",
@@ -261,7 +258,6 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 
 	// 4.1 Create the postgres user certificate
 	cucOptions := clusterusercert.NewClusterUserCertOpts{
-		Subject:            opts.Certificates.PostgresUserCert.Subject,
 		CRPOpts:            opts.Certificates.PostgresUserCert.CRPOpts,
 		WaitForCertTimeout: opts.Certificates.PostgresUserCert.WaitForReadyTimeout,
 		CleanupTimeout:     opts.CleanupTimeout,
@@ -274,7 +270,6 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 
 	// 4.2 Create the streaming_replica user certificate
 	cucOptions = clusterusercert.NewClusterUserCertOpts{
-		Subject:            opts.Certificates.StreamingReplicaUserCert.Subject,
 		CRPOpts:            opts.Certificates.StreamingReplicaUserCert.CRPOpts,
 		WaitForCertTimeout: opts.Certificates.StreamingReplicaUserCert.WaitForReadyTimeout,
 		CleanupTimeout:     opts.CleanupTimeout,

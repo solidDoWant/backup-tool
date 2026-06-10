@@ -25,7 +25,6 @@ import (
 )
 
 type CNPGRestoreOptionsCert struct {
-	Subject            *certmanagerv1.X509Subject                `yaml:"subject,omitempty"`
 	CRPOpts            clusterusercert.NewClusterUserCertOptsCRP `yaml:"certificateRequestPolicy,omitempty"`
 	WaitForCertTimeout helpers.MaxWaitTime                       `yaml:"waitForCertTimeout,omitempty"`
 }
@@ -158,7 +157,6 @@ func (ss *setupState) Setup(ctx *contexts.Context, btiOpts *backuptoolinstance.C
 	}
 
 	cucOptions := clusterusercert.NewClusterUserCertOpts{
-		Subject:            ss.opts.PostgresUserCert.Subject,
 		CRPOpts:            ss.opts.PostgresUserCert.CRPOpts,
 		WaitForCertTimeout: ss.opts.PostgresUserCert.WaitForCertTimeout,
 		CleanupTimeout:     ss.opts.CleanupTimeout,

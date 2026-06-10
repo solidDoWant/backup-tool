@@ -5,9 +5,6 @@
   "$defs": {
     "CNPGRestoreOptionsCert": {
       "properties": {
-        "subject": {
-          "$ref": "#/$defs/X509Subject"
-        },
         "certificateRequestPolicy": {
           "$ref": "#/$defs/NewClusterUserCertOptsCRP"
         },
@@ -222,57 +219,6 @@
       "properties": {
         "waitForCRPTimeout": {
           "type": "integer"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "X509Subject": {
-      "properties": {
-        "Organizations": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "Countries": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "OrganizationalUnits": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "Localities": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "Provinces": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "StreetAddresses": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "PostalCodes": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "SerialNumber": {
-          "type": "string"
         }
       },
       "additionalProperties": false,

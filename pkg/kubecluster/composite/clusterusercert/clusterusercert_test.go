@@ -53,16 +53,6 @@ func TestNewClusterUserCert(t *testing.T) {
 				CRPOpts: NewClusterUserCertOptsCRP{
 					WaitForCRPTimeout: helpers.ShortWaitTime,
 				},
-				Subject: &certmanagerv1.X509Subject{
-					Organizations:       []string{"test-org"},
-					OrganizationalUnits: []string{"test-ou"},
-					Countries:           []string{"test-country"},
-					Provinces:           []string{"test-province"},
-					Localities:          []string{"test-locality"},
-					StreetAddresses:     []string{"test-street"},
-					PostalCodes:         []string{"test-postal"},
-					SerialNumber:        "test-serial",
-				},
 				WaitForCertTimeout: helpers.ShortWaitTime,
 				CleanupTimeout:     helpers.ShortWaitTime,
 			},
