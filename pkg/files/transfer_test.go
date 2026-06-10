@@ -384,7 +384,7 @@ func TestSyncFiles(t *testing.T) {
 				tC.setup(t, tC.src, tC.dest)
 			}
 
-			err := runtime.SyncFiles(th.NewTestContext(), tC.src, tC.dest)
+			err := runtime.SyncFiles(th.NewTestContext(), tC.src, tC.dest, SyncFilesOptions{})
 			tC.errFunc(t, err)
 
 			if tC.verify != nil {

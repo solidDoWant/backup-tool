@@ -429,7 +429,7 @@ func TestExecute(t *testing.T) {
 								sourcePVCName:     "sourcePVCName",
 								drVolName:         "drVolName",
 								backupDirRelPath:  "data-vol",
-								opts:              FilesBackupOptions{},
+								opts:              FilesBackupOptions{Filter: files.FileFilter{Include: []files.FilePattern{{Glob: "*.db"}}, Exclude: []files.FilePattern{{Glob: "*.tmp"}}}},
 							},
 							isValidated: true,
 						},
@@ -446,8 +446,10 @@ func TestExecute(t *testing.T) {
 			ctx := th.NewTestContext()
 			if currentState.isSetup {
 				drDataPath := filepath.Join(currentState.mountPaths.drVolume, currentState.backupDirRelPath)
-				mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, currentState.mountPaths.data, drDataPath).
-					RunAndReturn(func(calledCtx *contexts.Context, src, dest string) error {
+				// The configured filter must be plumbed through to the sync verbatim; matching on the exact
+				// SyncFilesOptions here asserts the backup direction whitelists/blacklists files.
+				mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, currentState.mountPaths.data, drDataPath, files.SyncFilesOptions{Filter: currentState.opts.Filter}).
+					RunAndReturn(func(calledCtx *contexts.Context, src, dest string, _ files.SyncFilesOptions) error {
 						assert.True(t, calledCtx.IsChildOf(ctx))
 						return th.ErrIfTrue(tt.simulateSyncErr)
 					})

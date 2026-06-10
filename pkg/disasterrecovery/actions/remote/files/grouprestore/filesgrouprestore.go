@@ -9,6 +9,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/layout"
+	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
@@ -166,7 +167,7 @@ func (es *executeState) Execute(ctx *contexts.Context, backupToolClient clients.
 	// 1:1 confirmed - restore each captured member into its identically-named target PVC.
 	for targetPVCName, mountPath := range es.targetMountPaths {
 		srcPath := filepath.Join(groupDirPath, targetPVCName)
-		if err := backupToolClient.Files().SyncFiles(ctx.Child(), srcPath, mountPath); err != nil {
+		if err := backupToolClient.Files().SyncFiles(ctx.Child(), srcPath, mountPath, files.SyncFilesOptions{}); err != nil {
 			return trace.Wrap(err, "failed to sync captured member %q at %q onto target PVC at %q", targetPVCName, srcPath, mountPath)
 		}
 	}

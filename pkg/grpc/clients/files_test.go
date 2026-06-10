@@ -77,7 +77,7 @@ func TestFilesClient_SyncFiles(t *testing.T) {
 	FilesTransferTest(t,
 		func(fc *FilesClient) error {
 			ctx := th.NewTestContext()
-			return fc.SyncFiles(ctx, src, dest)
+			return fc.SyncFiles(ctx, src, dest, files.SyncFilesOptions{})
 		},
 		"SyncFiles",
 		files_v1.SyncFilesRequest_builder{Source: &src, Dest: &dest}.Build(),

@@ -15,6 +15,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/layout"
 	filesrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/restore"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/s3sync"
+	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/clonedcluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume"
@@ -44,11 +45,14 @@ type GenericFilesSource struct {
 
 // GenericFilesBackupSource is a files source plus backup-only capture options. SnapshotClass selects the
 // VolumeSnapshotClass used when snapshotting the source PVC for a consistent point-in-time clone; when
-// empty the cluster default VolumeSnapshotClass is used. Restore takes no source snapshot, so this field
-// is backup-only and lives on a backup-specific type (mirroring the postgres backup/restore split).
+// empty the cluster default VolumeSnapshotClass is used. Include/Exclude (inlined files.FileFilter)
+// optionally whitelist/blacklist which files within the source PVC are captured. These are backup-only
+// fields and live on a backup-specific type (mirroring the postgres backup/restore split): the capture is
+// already filtered on disk, so restore reads it back verbatim and needs no filter.
 type GenericFilesBackupSource struct {
 	GenericFilesSource `yaml:",inline"`
 	SnapshotClass      string `yaml:"snapshotClass,omitempty"`
+	files.FileFilter   `yaml:",inline"`
 }
 
 // GenericFileGroupSource captures (backup) / restores a label-selected group of data-directory PVCs into /
@@ -251,6 +255,11 @@ func (c GenericBackupConfig) Validate() error {
 	if err := validateFilesSources(filesSources); err != nil {
 		return trace.Wrap(err)
 	}
+	for _, src := range c.Files {
+		if err := src.FileFilter.Validate(); err != nil {
+			return trace.Wrap(err, "files source %q has an invalid include/exclude filter", src.Name)
+		}
+	}
 
 	fileGroupSources := make([]GenericFileGroupSource, len(c.FileGroups))
 	for i := range c.FileGroups {
@@ -414,6 +423,7 @@ func (g *GenericApp) Backup(ctx *contexts.Context, config GenericBackupConfig) (
 		action := g.newFilesBackup()
 		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.PVC, backup.Name, src.Name, filesbackup.FilesBackupOptions{
 			SnapshotClass:  src.SnapshotClass,
+			Filter:         src.FileFilter,
 			CleanupTimeout: config.CleanupTimeout,
 		}); err != nil {
 			return backup, trace.Wrap(err, "failed to configure files source %q backup", src.Name)

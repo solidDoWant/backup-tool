@@ -77,7 +77,7 @@ func TestCopyFiles(t *testing.T) {
 
 func TestSyncFiles(t *testing.T) {
 	onExpectCall := func(expecter *files.MockRuntime_Expecter, ctx *contexts.Context, src, dest string) *mock.Call {
-		return expecter.SyncFiles(ctx, src, dest).Call
+		return expecter.SyncFiles(ctx, src, dest, files.SyncFilesOptions{}).Call
 	}
 
 	call := func(fs *FilesServer, ctx context.Context, src, dest string) (interface{}, error) {

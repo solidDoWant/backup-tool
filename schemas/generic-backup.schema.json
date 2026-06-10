@@ -113,6 +113,15 @@
         "secretAccessKey"
       ]
     },
+    "FilePattern": {
+      "properties": {
+        "glob": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "GenericBackupConfig": {
       "properties": {
         "namespace": {
@@ -206,6 +215,18 @@
         },
         "snapshotClass": {
           "type": "string"
+        },
+        "include": {
+          "items": {
+            "$ref": "#/$defs/FilePattern"
+          },
+          "type": "array"
+        },
+        "exclude": {
+          "items": {
+            "$ref": "#/$defs/FilePattern"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,

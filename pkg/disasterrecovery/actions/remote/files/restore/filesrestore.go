@@ -7,6 +7,7 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
+	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
@@ -133,7 +134,7 @@ func (es *executeState) Execute(ctx *contexts.Context, backupToolClient clients.
 	}
 
 	drDataPath := filepath.Join(es.mountPaths.drVolume, es.backupDirRelPath)
-	err = backupToolClient.Files().SyncFiles(ctx.Child(), drDataPath, es.mountPaths.data)
+	err = backupToolClient.Files().SyncFiles(ctx.Child(), drDataPath, es.mountPaths.data, files.SyncFilesOptions{})
 	return trace.Wrap(err, "failed to sync data directory files at %q to the data PVC at %q", drDataPath, es.mountPaths.data)
 }
 

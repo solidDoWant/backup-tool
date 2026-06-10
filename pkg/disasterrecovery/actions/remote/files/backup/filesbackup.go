@@ -9,6 +9,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/cleanup"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
+	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
@@ -19,7 +20,11 @@ import (
 )
 
 type FilesBackupOptions struct {
-	SnapshotClass  string              `yaml:"snapshotClass,omitempty"` // VolumeSnapshotClass used to snapshot the source PVC; cluster default when empty.
+	SnapshotClass string `yaml:"snapshotClass,omitempty"` // VolumeSnapshotClass used to snapshot the source PVC; cluster default when empty.
+	// Filter optionally whitelists (Include) / blacklists (Exclude) which files are captured into the DR
+	// volume. When empty, the entire data directory is captured. Only the backup direction filters;
+	// restore reads back the already-filtered capture.
+	Filter         files.FileFilter    `yaml:",inline"`
 	CleanupTimeout helpers.MaxWaitTime `yaml:"cleanupTimeout,omitempty"`
 }
 
@@ -198,7 +203,7 @@ func (es *executeState) Execute(ctx *contexts.Context, backupToolClient clients.
 	}
 
 	drDataPath := filepath.Join(es.mountPaths.drVolume, es.backupDirRelPath)
-	err = backupToolClient.Files().SyncFiles(ctx.Child(), es.mountPaths.data, drDataPath)
+	err = backupToolClient.Files().SyncFiles(ctx.Child(), es.mountPaths.data, drDataPath, files.SyncFilesOptions{Filter: es.opts.Filter})
 	return trace.Wrap(err, "failed to sync data directory files at %q to the disaster recovery volume at %q", es.mountPaths.data, drDataPath)
 }
 

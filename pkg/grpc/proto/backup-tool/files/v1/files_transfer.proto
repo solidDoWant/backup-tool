@@ -9,9 +9,19 @@ message CopyFilesRequest {
 
 message CopyFilesResponse {}
 
+// FilePattern matches file paths. The matcher is selected by which field is set; additional matchers
+// (e.g. a regex) can be added as new fields without breaking the message shape.
+message FilePattern {
+  string glob = 1;
+}
+
 message SyncFilesRequest {
   string source = 1;
   string dest = 2;
+  // include is a whitelist; when non-empty only files matching one of these patterns are synced.
+  repeated FilePattern include = 3;
+  // exclude is a blacklist; any entry matching one of these patterns is omitted (exclude wins).
+  repeated FilePattern exclude = 4;
 }
 
 message SyncFilesResponse {}

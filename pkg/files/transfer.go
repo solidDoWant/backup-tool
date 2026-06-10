@@ -13,7 +13,13 @@ import (
 
 // Copies the filesytem object (file, directory, etc.) to the destination path.
 // Special files (such as sockets or device files) are not included.
-func (*LocalRuntime) CopyFiles(ctx *contexts.Context, src, dest string) (err error) {
+func (lr *LocalRuntime) CopyFiles(ctx *contexts.Context, src, dest string) (err error) {
+	return lr.copyFiles(ctx, src, dest, FileFilter{})
+}
+
+// copyFiles copies the filesystem object at src to dest, omitting any entry the filter excludes.
+// Special files (such as sockets or device files) are not included.
+func (*LocalRuntime) copyFiles(ctx *contexts.Context, src, dest string, filter FileFilter) (err error) {
 	ctx.Log.With("src", src, "dest", dest).Info("Copying files")
 	defer ctx.Log.Info("Finished copying files", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
 
@@ -47,7 +53,7 @@ func (*LocalRuntime) CopyFiles(ctx *contexts.Context, src, dest string) (err err
 		}
 	}
 
-	err = cp.Copy(src, dest, cp.Options{
+	copyOpts := cp.Options{
 		// Copy the symlink exactly as is
 		OnSymlink: func(src string) cp.SymlinkAction {
 			return cp.Shallow
@@ -61,14 +67,34 @@ func (*LocalRuntime) CopyFiles(ctx *contexts.Context, src, dest string) (err err
 		PermissionControl: cp.PerservePermission,
 		PreserveTimes:     true,
 		PreserveOwner:     true,
-	})
+	}
+
+	// Only install a Skip callback when the filter actually constrains something, so an unfiltered copy
+	// behaves exactly as before (and skips the per-entry relative-path computation).
+	if !filter.IsZero() {
+		copyOpts.Skip = func(srcInfo os.FileInfo, itemSrc, _ string) (bool, error) {
+			relPath, err := filepath.Rel(src, itemSrc)
+			if err != nil {
+				return false, trace.Wrap(err, "failed to compute path %q relative to copy root %q", itemSrc, src)
+			}
+
+			// The copy root itself (".") is always transferred; the filter only governs its contents.
+			if relPath == "." {
+				return false, nil
+			}
+
+			return !filter.shouldTransfer(relPath, srcInfo.IsDir()), nil
+		}
+	}
+
+	err = cp.Copy(src, dest, copyOpts)
 
 	return trace.Wrap(err, "failed to copy files from %q to %q", src, dest)
 }
 
 // Make the destination path contents match the input directory contents.
 // Special files (such as sockets or device files) are not included.
-func (lr *LocalRuntime) SyncFiles(ctx *contexts.Context, src, dest string) (err error) {
+func (lr *LocalRuntime) SyncFiles(ctx *contexts.Context, src, dest string, opts SyncFilesOptions) (err error) {
 	ctx.Log.With("src", src, "dest", dest).Info("Syncing files")
 	defer ctx.Log.Info("Finished syncing files", ctx.Stopwatch.Keyval(), contexts.ErrorKeyvals(&err))
 
@@ -76,12 +102,14 @@ func (lr *LocalRuntime) SyncFiles(ctx *contexts.Context, src, dest string) (err 
 		return err
 	}
 
-	if err := deleteMissingFiles(ctx.Child(), src, dest); err != nil {
+	// Pass the filter so that destination entries which are filtered out (excluded, or not whitelisted)
+	// are removed even when they still exist in the source - the destination must match the filtered view.
+	if err := deleteMissingFiles(ctx.Child(), src, dest, opts.Filter); err != nil {
 		return trace.Wrap(err, "failed to delete missing files from %q in %q", dest, src)
 	}
 
-	// Copy all files
-	return lr.CopyFiles(ctx.Child(), src, dest)
+	// Copy all (filter-permitted) files
+	return lr.copyFiles(ctx.Child(), src, dest, opts.Filter)
 }
 
 // Lists the names of the immediate subdirectories of the provided path. Non-directory entries are
@@ -110,7 +138,7 @@ func (*LocalRuntime) ListDirectory(ctx *contexts.Context, path string) (entries 
 	return entries, nil
 }
 
-func deleteMissingFiles(ctx *contexts.Context, src, dest string) error {
+func deleteMissingFiles(ctx *contexts.Context, src, dest string, filter FileFilter) error {
 	ctx.Log.Info("Deleting files in the destination that are missing from the source")
 	defer ctx.Log.Info("Finished deleting files")
 
@@ -150,18 +178,26 @@ func deleteMissingFiles(ctx *contexts.Context, src, dest string) error {
 
 		_, err = os.Lstat(pathInSrc)
 		if err == nil {
-			// File exists in the source, no need to rm it from destination
-			walkerCtx.Log.Debug("File exists in source, skipping", "path", pathInSrc)
-			return nil
-		}
-		walkerCtx.Log.Debug("File does not exist in source, removing from destination", "path", pathInDest)
+			// The path exists in the source. Keep it only if the filter also permits it - a path that is
+			// excluded (or, under a whitelist, not included) must be removed from the destination so the
+			// destination matches the filtered view of the source. Directories are always permitted by the
+			// filter when a whitelist is set, so this only prunes excluded subtrees and filtered-out files.
+			if filter.shouldTransfer(relativePath, d.IsDir()) {
+				walkerCtx.Log.Debug("File exists in source and passes the filter, skipping", "path", pathInSrc)
+				return nil
+			}
 
-		if !os.IsNotExist(err) {
-			// File may or may not exist, but another error was thrown
-			return trace.Wrap(err, "failed to lstat %q", pathInSrc)
+			walkerCtx.Log.Debug("File exists in source but is filtered out, removing from destination", "path", pathInDest)
+		} else {
+			if !os.IsNotExist(err) {
+				// File may or may not exist, but another error was thrown
+				return trace.Wrap(err, "failed to lstat %q", pathInSrc)
+			}
+			walkerCtx.Log.Debug("File does not exist in source, removing from destination", "path", pathInDest)
 		}
 
-		// File does not exist in the source, so it should not exist in the destination and must be removed
+		// The path does not exist in the source (or is filtered out), so it must not exist in the
+		// destination and must be removed.
 		err = os.RemoveAll(pathInDest)
 		if err != nil {
 			return trace.Wrap(err, "failed to remove path %q from the destination path, which does not exist in the source path", pathInDest)

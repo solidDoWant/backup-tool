@@ -10,6 +10,7 @@ import (
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/files/layout"
+	"github.com/solidDoWant/backup-tool/pkg/files"
 	"github.com/solidDoWant/backup-tool/pkg/grpc/clients"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/backuptoolinstance"
@@ -230,7 +231,7 @@ func (es *executeState) Execute(ctx *contexts.Context, backupToolClient clients.
 
 	for sourcePVCName, mountPath := range es.memberMountPaths {
 		drDataPath := filepath.Join(es.drVolumeMountPath, layout.FileGroupsDirName, es.groupName, sourcePVCName)
-		if err := backupToolClient.Files().SyncFiles(ctx.Child(), mountPath, drDataPath); err != nil {
+		if err := backupToolClient.Files().SyncFiles(ctx.Child(), mountPath, drDataPath, files.SyncFilesOptions{}); err != nil {
 			return trace.Wrap(err, "failed to sync member %q files at %q to the disaster recovery volume at %q", sourcePVCName, mountPath, drDataPath)
 		}
 	}

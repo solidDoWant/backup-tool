@@ -290,8 +290,8 @@ func TestExecute(t *testing.T) {
 			ctx := th.NewTestContext()
 			if currentState.isSetup {
 				drDataPath := filepath.Join(currentState.mountPaths.drVolume, currentState.backupDirRelPath)
-				mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, drDataPath, currentState.mountPaths.data).
-					RunAndReturn(func(calledCtx *contexts.Context, src, dest string) error {
+				mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, drDataPath, currentState.mountPaths.data, files.SyncFilesOptions{}).
+					RunAndReturn(func(calledCtx *contexts.Context, src, dest string, _ files.SyncFilesOptions) error {
 						assert.True(t, calledCtx.IsChildOf(ctx))
 						return th.ErrIfTrue(tt.simulateSyncErr)
 					})

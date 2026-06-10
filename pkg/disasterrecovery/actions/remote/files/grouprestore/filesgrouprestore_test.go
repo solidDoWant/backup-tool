@@ -344,8 +344,8 @@ func TestExecute(t *testing.T) {
 				if !tt.simulateListErr && !tt.expectMismatch {
 					for targetPVCName, mountPath := range tt.targetMountPaths {
 						srcPath := filepath.Join(groupDirPath, targetPVCName)
-						mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, srcPath, mountPath).
-							RunAndReturn(func(calledCtx *contexts.Context, src, dest string) error {
+						mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, srcPath, mountPath, files.SyncFilesOptions{}).
+							RunAndReturn(func(calledCtx *contexts.Context, src, dest string, _ files.SyncFilesOptions) error {
 								assert.True(t, calledCtx.IsChildOf(ctx))
 								return th.ErrIfTrue(tt.simulateSyncErr)
 							}).Maybe()

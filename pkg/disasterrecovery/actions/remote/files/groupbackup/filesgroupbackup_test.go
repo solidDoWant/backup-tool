@@ -491,8 +491,8 @@ func TestExecute(t *testing.T) {
 			if currentState.isSetup {
 				for sourcePVC, mountPath := range currentState.memberMountPaths {
 					drDataPath := filepath.Join(currentState.drVolumeMountPath, layout.FileGroupsDirName, currentState.groupName, sourcePVC)
-					mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, mountPath, drDataPath).
-						RunAndReturn(func(calledCtx *contexts.Context, src, dest string) error {
+					mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, mountPath, drDataPath, files.SyncFilesOptions{}).
+						RunAndReturn(func(calledCtx *contexts.Context, src, dest string, _ files.SyncFilesOptions) error {
 							assert.True(t, calledCtx.IsChildOf(ctx))
 							return th.ErrIfTrue(tt.simulateSyncErr)
 						}).Maybe()

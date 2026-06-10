@@ -21,6 +21,19 @@ func NewFilesServer() *FilesServer {
 	}
 }
 
+// filePatternsFromProto maps wire file filter patterns back onto the local representation.
+func filePatternsFromProto(protoPatterns []*files_v1.FilePattern) []files.FilePattern {
+	if len(protoPatterns) == 0 {
+		return nil
+	}
+
+	patterns := make([]files.FilePattern, len(protoPatterns))
+	for i, protoPattern := range protoPatterns {
+		patterns[i] = files.FilePattern{Glob: protoPattern.GetGlob()}
+	}
+	return patterns
+}
+
 func (fs *FilesServer) CopyFiles(ctx context.Context, req *files_v1.CopyFilesRequest) (*files_v1.CopyFilesResponse, error) {
 	grpcCtx := contexts.UnwrapHandlerContext(ctx)
 	err := fs.runtime.CopyFiles(grpcCtx, req.GetSource(), req.GetDest())
@@ -33,7 +46,12 @@ func (fs *FilesServer) CopyFiles(ctx context.Context, req *files_v1.CopyFilesReq
 
 func (fs *FilesServer) SyncFiles(ctx context.Context, req *files_v1.SyncFilesRequest) (*files_v1.SyncFilesResponse, error) {
 	grpcCtx := contexts.UnwrapHandlerContext(ctx)
-	err := fs.runtime.SyncFiles(grpcCtx, req.GetSource(), req.GetDest())
+	err := fs.runtime.SyncFiles(grpcCtx, req.GetSource(), req.GetDest(), files.SyncFilesOptions{
+		Filter: files.FileFilter{
+			Include: filePatternsFromProto(req.GetInclude()),
+			Exclude: filePatternsFromProto(req.GetExclude()),
+		},
+	})
 	if err != nil {
 		return nil, trail.Send(grpcCtx, err)
 	}

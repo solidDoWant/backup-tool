@@ -174,10 +174,92 @@ func (b0 CopyFilesResponse_builder) Build() *CopyFilesResponse {
 	return m0
 }
 
+// FilePattern matches file paths. The matcher is selected by which field is set; additional matchers
+// (e.g. a regex) can be added as new fields without breaking the message shape.
+type FilePattern struct {
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Glob        *string                `protobuf:"bytes,1,opt,name=glob"`
+	XXX_raceDetectHookData protoimpl.RaceDetectHookData
+	XXX_presence           [1]uint32
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *FilePattern) Reset() {
+	*x = FilePattern{}
+	mi := &file_files_transfer_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FilePattern) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FilePattern) ProtoMessage() {}
+
+func (x *FilePattern) ProtoReflect() protoreflect.Message {
+	mi := &file_files_transfer_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *FilePattern) GetGlob() string {
+	if x != nil {
+		if x.xxx_hidden_Glob != nil {
+			return *x.xxx_hidden_Glob
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *FilePattern) SetGlob(v string) {
+	x.xxx_hidden_Glob = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 1)
+}
+
+func (x *FilePattern) HasGlob() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
+}
+
+func (x *FilePattern) ClearGlob() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_Glob = nil
+}
+
+type FilePattern_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Glob *string
+}
+
+func (b0 FilePattern_builder) Build() *FilePattern {
+	m0 := &FilePattern{}
+	b, x := &b0, m0
+	_, _ = b, x
+	if b.Glob != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 1)
+		x.xxx_hidden_Glob = b.Glob
+	}
+	return m0
+}
+
 type SyncFilesRequest struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Source      *string                `protobuf:"bytes,1,opt,name=source"`
 	xxx_hidden_Dest        *string                `protobuf:"bytes,2,opt,name=dest"`
+	xxx_hidden_Include     *[]*FilePattern        `protobuf:"bytes,3,rep,name=include"`
+	xxx_hidden_Exclude     *[]*FilePattern        `protobuf:"bytes,4,rep,name=exclude"`
 	XXX_raceDetectHookData protoimpl.RaceDetectHookData
 	XXX_presence           [1]uint32
 	unknownFields          protoimpl.UnknownFields
@@ -186,7 +268,7 @@ type SyncFilesRequest struct {
 
 func (x *SyncFilesRequest) Reset() {
 	*x = SyncFilesRequest{}
-	mi := &file_files_transfer_proto_msgTypes[2]
+	mi := &file_files_transfer_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -198,7 +280,7 @@ func (x *SyncFilesRequest) String() string {
 func (*SyncFilesRequest) ProtoMessage() {}
 
 func (x *SyncFilesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_files_transfer_proto_msgTypes[2]
+	mi := &file_files_transfer_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -229,14 +311,40 @@ func (x *SyncFilesRequest) GetDest() string {
 	return ""
 }
 
+func (x *SyncFilesRequest) GetInclude() []*FilePattern {
+	if x != nil {
+		if x.xxx_hidden_Include != nil {
+			return *x.xxx_hidden_Include
+		}
+	}
+	return nil
+}
+
+func (x *SyncFilesRequest) GetExclude() []*FilePattern {
+	if x != nil {
+		if x.xxx_hidden_Exclude != nil {
+			return *x.xxx_hidden_Exclude
+		}
+	}
+	return nil
+}
+
 func (x *SyncFilesRequest) SetSource(v string) {
 	x.xxx_hidden_Source = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 4)
 }
 
 func (x *SyncFilesRequest) SetDest(v string) {
 	x.xxx_hidden_Dest = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 2)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 4)
+}
+
+func (x *SyncFilesRequest) SetInclude(v []*FilePattern) {
+	x.xxx_hidden_Include = &v
+}
+
+func (x *SyncFilesRequest) SetExclude(v []*FilePattern) {
+	x.xxx_hidden_Exclude = &v
 }
 
 func (x *SyncFilesRequest) HasSource() bool {
@@ -268,6 +376,10 @@ type SyncFilesRequest_builder struct {
 
 	Source *string
 	Dest   *string
+	// include is a whitelist; when non-empty only files matching one of these patterns are synced.
+	Include []*FilePattern
+	// exclude is a blacklist; any entry matching one of these patterns is omitted (exclude wins).
+	Exclude []*FilePattern
 }
 
 func (b0 SyncFilesRequest_builder) Build() *SyncFilesRequest {
@@ -275,13 +387,15 @@ func (b0 SyncFilesRequest_builder) Build() *SyncFilesRequest {
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.Source != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 4)
 		x.xxx_hidden_Source = b.Source
 	}
 	if b.Dest != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 2)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 4)
 		x.xxx_hidden_Dest = b.Dest
 	}
+	x.xxx_hidden_Include = &b.Include
+	x.xxx_hidden_Exclude = &b.Exclude
 	return m0
 }
 
@@ -293,7 +407,7 @@ type SyncFilesResponse struct {
 
 func (x *SyncFilesResponse) Reset() {
 	*x = SyncFilesResponse{}
-	mi := &file_files_transfer_proto_msgTypes[3]
+	mi := &file_files_transfer_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -305,7 +419,7 @@ func (x *SyncFilesResponse) String() string {
 func (*SyncFilesResponse) ProtoMessage() {}
 
 func (x *SyncFilesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_files_transfer_proto_msgTypes[3]
+	mi := &file_files_transfer_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -339,7 +453,7 @@ type ListDirectoryRequest struct {
 
 func (x *ListDirectoryRequest) Reset() {
 	*x = ListDirectoryRequest{}
-	mi := &file_files_transfer_proto_msgTypes[4]
+	mi := &file_files_transfer_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -351,7 +465,7 @@ func (x *ListDirectoryRequest) String() string {
 func (*ListDirectoryRequest) ProtoMessage() {}
 
 func (x *ListDirectoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_files_transfer_proto_msgTypes[4]
+	mi := &file_files_transfer_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -415,7 +529,7 @@ type ListDirectoryResponse struct {
 
 func (x *ListDirectoryResponse) Reset() {
 	*x = ListDirectoryResponse{}
-	mi := &file_files_transfer_proto_msgTypes[5]
+	mi := &file_files_transfer_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -427,7 +541,7 @@ func (x *ListDirectoryResponse) String() string {
 func (*ListDirectoryResponse) ProtoMessage() {}
 
 func (x *ListDirectoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_files_transfer_proto_msgTypes[5]
+	mi := &file_files_transfer_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -471,31 +585,38 @@ const file_files_transfer_proto_rawDesc = "" +
 	"\x10CopyFilesRequest\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12\x12\n" +
 	"\x04dest\x18\x02 \x01(\tR\x04dest\"\x13\n" +
-	"\x11CopyFilesResponse\">\n" +
+	"\x11CopyFilesResponse\"!\n" +
+	"\vFilePattern\x12\x12\n" +
+	"\x04glob\x18\x01 \x01(\tR\x04glob\"\x8e\x01\n" +
 	"\x10SyncFilesRequest\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12\x12\n" +
-	"\x04dest\x18\x02 \x01(\tR\x04dest\"\x13\n" +
+	"\x04dest\x18\x02 \x01(\tR\x04dest\x12&\n" +
+	"\ainclude\x18\x03 \x03(\v2\f.FilePatternR\ainclude\x12&\n" +
+	"\aexclude\x18\x04 \x03(\v2\f.FilePatternR\aexclude\"\x13\n" +
 	"\x11SyncFilesResponse\"*\n" +
 	"\x14ListDirectoryRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"1\n" +
 	"\x15ListDirectoryResponse\x12\x18\n" +
 	"\aentries\x18\x01 \x03(\tR\aentriesBUZSgithub.com/solidDoWant/backup-tool/pkg/grpc/gen/proto/backup-tool/files/v1;files_v1b\beditionsp\xe8\a"
 
-var file_files_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_files_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_files_transfer_proto_goTypes = []any{
 	(*CopyFilesRequest)(nil),      // 0: CopyFilesRequest
 	(*CopyFilesResponse)(nil),     // 1: CopyFilesResponse
-	(*SyncFilesRequest)(nil),      // 2: SyncFilesRequest
-	(*SyncFilesResponse)(nil),     // 3: SyncFilesResponse
-	(*ListDirectoryRequest)(nil),  // 4: ListDirectoryRequest
-	(*ListDirectoryResponse)(nil), // 5: ListDirectoryResponse
+	(*FilePattern)(nil),           // 2: FilePattern
+	(*SyncFilesRequest)(nil),      // 3: SyncFilesRequest
+	(*SyncFilesResponse)(nil),     // 4: SyncFilesResponse
+	(*ListDirectoryRequest)(nil),  // 5: ListDirectoryRequest
+	(*ListDirectoryResponse)(nil), // 6: ListDirectoryResponse
 }
 var file_files_transfer_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	2, // 0: SyncFilesRequest.include:type_name -> FilePattern
+	2, // 1: SyncFilesRequest.exclude:type_name -> FilePattern
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_files_transfer_proto_init() }
@@ -509,7 +630,7 @@ func file_files_transfer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_files_transfer_proto_rawDesc), len(file_files_transfer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
