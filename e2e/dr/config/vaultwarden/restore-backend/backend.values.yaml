@@ -1,35 +1,7 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
-controllers:
-  postgres-restore-wal-bucket:
-    type: job
-    containers:
-      create-bucket:
-        image:
-          repository: d3fk/s3cmd
-          tag: latest
-        command:
-          - s3cmd
-        args:
-          - --access_key=$(AWS_ACCESS_KEY_ID)
-          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
-          - --host=seaweedfs-s3:8333
-          - --host-bucket=seaweedfs-s3:8333
-          - --no-ssl
-          - mb
-          # This is a different bucket from the original instance
-          - s3://vaultwarden-restore-wal/
-        env:
-          AWS_ACCESS_KEY_ID:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-          AWS_SECRET_ACCESS_KEY:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
+# The restore WAL bucket (s3://vaultwarden-restore-wal/, distinct from the source instance's) isn't
+# pre-created here — the barman-cloud WAL archiver creates its destination bucket on first archive.
 persistence:
   restore-data-vol:
     suffix: restore-data-vol

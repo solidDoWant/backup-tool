@@ -2,54 +2,8 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
 # Restore targets for the dummy app: two empty CNPG clusters and an empty data PVC that the generic
 # restore populates in place. The S3 sources restore back into the original buckets (in-place), so no
-# separate restore buckets are needed beyond each restore cluster's own WAL bucket.
-controllers:
-  dummy-restore-db1-wal-bucket:
-    type: job
-    containers:
-      create-bucket:
-        image:
-          repository: d3fk/s3cmd
-          tag: latest
-        command:
-          - s3cmd
-        args:
-          - --access_key=$(AWS_ACCESS_KEY_ID)
-          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
-          - --host=seaweedfs-s3:8333
-          - --host-bucket=seaweedfs-s3:8333
-          - --no-ssl
-          - mb
-          - s3://dummy-restore-db1-wal/
-        env: &s3Env
-          AWS_ACCESS_KEY_ID:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-          AWS_SECRET_ACCESS_KEY:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
-  dummy-restore-db2-wal-bucket:
-    type: job
-    containers:
-      create-bucket:
-        image:
-          repository: d3fk/s3cmd
-          tag: latest
-        command:
-          - s3cmd
-        args:
-          - --access_key=$(AWS_ACCESS_KEY_ID)
-          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
-          - --host=seaweedfs-s3:8333
-          - --host-bucket=seaweedfs-s3:8333
-          - --no-ssl
-          - mb
-          - s3://dummy-restore-db2-wal/
-        env: *s3Env
+# separate restore buckets are needed beyond each restore cluster's own WAL bucket — and those WAL
+# buckets aren't pre-created here, since the barman-cloud WAL archiver creates them on first archive.
 persistence:
   data-vol:
     suffix: data-vol # PVC name: dummy-restore-backend-data-vol

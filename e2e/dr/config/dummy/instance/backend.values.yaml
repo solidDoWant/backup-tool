@@ -4,54 +4,9 @@
 # two seeded CNPG clusters, two seeded S3 buckets, and one seeded data PVC — so a backup has real content
 # to capture and a restore has real content to reproduce.
 controllers:
-  # --- WAL buckets (barman-cloud archiving target for each source cluster) ---
-  dummy-db1-wal-bucket:
-    type: job
-    containers:
-      create-bucket:
-        image:
-          repository: d3fk/s3cmd
-          tag: latest
-        command:
-          - s3cmd
-        args:
-          - --access_key=$(AWS_ACCESS_KEY_ID)
-          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
-          - --host=seaweedfs-s3:8333
-          - --host-bucket=seaweedfs-s3:8333
-          - --no-ssl
-          - mb
-          - s3://dummy-db1-wal/
-        env: &s3Env
-          AWS_ACCESS_KEY_ID:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-          AWS_SECRET_ACCESS_KEY:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
-  dummy-db2-wal-bucket:
-    type: job
-    containers:
-      create-bucket:
-        image:
-          repository: d3fk/s3cmd
-          tag: latest
-        command:
-          - s3cmd
-        args:
-          - --access_key=$(AWS_ACCESS_KEY_ID)
-          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
-          - --host=seaweedfs-s3:8333
-          - --host-bucket=seaweedfs-s3:8333
-          - --no-ssl
-          - mb
-          - s3://dummy-db2-wal/
-        env: *s3Env
   # --- Data buckets (the two S3 sources the generic config backs up), each seeded with one object ---
+  # Note: the per-cluster WAL buckets (dummy-db{1,2}-wal) are intentionally not pre-created here — the
+  # barman-cloud WAL archiver creates its destination bucket on first archive.
   dummy-bucket1-seed:
     type: job
     containers:
@@ -68,7 +23,17 @@ controllers:
             mc mb --ignore-existing sw/dummy-bucket1 && \
             printf 'bucket1-seed' > /tmp/obj && \
             mc cp /tmp/obj sw/dummy-bucket1/seed.txt
-        env: *s3Env
+        env: &s3Env
+          AWS_ACCESS_KEY_ID:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_access_key_id
+          AWS_SECRET_ACCESS_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: seaweedfs-s3-secret
+                key: admin_secret_access_key
   dummy-bucket2-seed:
     type: job
     containers:

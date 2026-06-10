@@ -1,34 +1,7 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
-controllers:
-  postgres-wal-bucket:
-    type: job
-    containers:
-      create-bucket:
-        image:
-          repository: d3fk/s3cmd
-          tag: latest
-        command:
-          - s3cmd
-        args:
-          - --access_key=$(AWS_ACCESS_KEY_ID)
-          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
-          - --host=seaweedfs-s3:8333
-          - --host-bucket=seaweedfs-s3:8333
-          - --no-ssl
-          - mb
-          - s3://vaultwarden-wal/
-        env:
-          AWS_ACCESS_KEY_ID:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-          AWS_SECRET_ACCESS_KEY:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
+# The WAL bucket (s3://vaultwarden-wal/) isn't pre-created here — the barman-cloud WAL archiver
+# creates its destination bucket on first archive.
 rawResources:
   postgres-serving-cert:
     forceRename: postgres-serving-cert

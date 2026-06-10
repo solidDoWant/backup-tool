@@ -1,62 +1,10 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
 controllers:
-  teleport-core-postgres-wal-bucket:
-    type: job
-    containers:
-      create-bucket:
-        image:
-          repository: d3fk/s3cmd
-          tag: latest
-        command:
-          - s3cmd
-        args:
-          - --access_key=$(AWS_ACCESS_KEY_ID)
-          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
-          - --host=seaweedfs-s3:8333
-          - --host-bucket=seaweedfs-s3:8333
-          - --no-ssl
-          - mb
-          - s3://teleport-core-postgres-wal/
-        env:
-          AWS_ACCESS_KEY_ID:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-          AWS_SECRET_ACCESS_KEY:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
-  teleport-audit-postgres-wal-bucket:
-    type: job
-    containers:
-      create-bucket:
-        image:
-          repository: d3fk/s3cmd
-          tag: latest
-        command:
-          - s3cmd
-        args:
-          - --access_key=$(AWS_ACCESS_KEY_ID)
-          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
-          - --host=seaweedfs-s3:8333
-          - --host-bucket=seaweedfs-s3:8333
-          - --no-ssl
-          - mb
-          - s3://teleport-audit-postgres-wal/
-        env:
-          AWS_ACCESS_KEY_ID:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-          AWS_SECRET_ACCESS_KEY:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
+  # The two postgres WAL buckets (s3://teleport-core-postgres-wal/, s3://teleport-audit-postgres-wal/)
+  # aren't pre-created here — the barman-cloud WAL archiver creates its destination bucket on first
+  # archive. The audit-session-logs bucket below is a real S3 source backup-tool captures, so it must
+  # be created here.
   teleport-audit-session-logs-bucket:
     type: job
     containers:

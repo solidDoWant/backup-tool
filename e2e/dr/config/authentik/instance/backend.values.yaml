@@ -1,34 +1,9 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-5.0.1/charts/library/common/values.schema.json
 controllers:
-  authentik-postgres-wal-bucket:
-    type: job
-    containers:
-      create-bucket:
-        image:
-          repository: d3fk/s3cmd
-          tag: latest
-        command:
-          - s3cmd
-        args:
-          - --access_key=$(AWS_ACCESS_KEY_ID)
-          - --secret_key=$(AWS_SECRET_ACCESS_KEY)
-          - --host=seaweedfs-s3:8333
-          - --host-bucket=seaweedfs-s3:8333
-          - --no-ssl
-          - mb
-          - s3://authentik-postgres-wal/
-        env:
-          AWS_ACCESS_KEY_ID:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_access_key_id
-          AWS_SECRET_ACCESS_KEY:
-            valueFrom:
-              secretKeyRef:
-                name: seaweedfs-s3-secret
-                key: admin_secret_access_key
+  # The postgres WAL bucket (s3://authentik-postgres-wal/) isn't pre-created here — the barman-cloud
+  # WAL archiver creates its destination bucket on first archive. The media bucket below, by contrast,
+  # is a real S3 source backup-tool captures, so it must be created (and versioning enabled) here.
   # Enable versioning on the media bucket so the DR backup exercises backup-tool's version-aware
   # point-in-time capture path. Uses the MinIO client (mc) rather than s3cmd, which can't configure
   # versioning. (Objects only ever have one version here; this just verifies the PIT path works.)
