@@ -156,3 +156,28 @@ func TestSyncFilesFilter(t *testing.T) {
 		})
 	}
 }
+
+// TestSyncFilesFullyFilteredCreatesEmptyDest guards the invariant the fileGroups (VGS) backup relies on:
+// even when a filter excludes every file in a member PVC, the destination directory is still created (just
+// empty). The group restore enumerates fileGroups/<group>/<pvc> subdirs to enforce a 1:1 capture<->target
+// mapping, so a fully-filtered member must still leave its subdir behind or that check would spuriously fail.
+func TestSyncFilesFullyFilteredCreatesEmptyDest(t *testing.T) {
+	src := t.TempDir()
+	writeFile(t, src, "a.tmp")
+	writeFile(t, src, "nested/b.tmp")
+
+	// The destination subdir does not exist yet, mirroring a fresh fileGroups/<group>/<pvc> path.
+	dest := filepath.Join(t.TempDir(), "member")
+
+	// An exclude of "**" matches every entry, so no file (or directory) is transferred.
+	err := NewLocalRuntime().SyncFiles(th.NewTestContext(), src, dest, SyncFilesOptions{Filter: FileFilter{Exclude: globs("**")}})
+	require.NoError(t, err)
+
+	// The member subdir itself must still exist (the copy root is always transferred) so the group restore's
+	// 1:1 capture<->target enumeration still sees it; none of the filtered-out files should have landed.
+	info, err := os.Stat(dest)
+	require.NoError(t, err, "destination directory must be created even when all contents are filtered out")
+	require.True(t, info.IsDir())
+	require.NoFileExists(t, filepath.Join(dest, "a.tmp"))
+	require.NoFileExists(t, filepath.Join(dest, "nested", "b.tmp"))
+}

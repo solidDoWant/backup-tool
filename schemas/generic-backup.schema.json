@@ -196,6 +196,18 @@
         },
         "snapshotClass": {
           "type": "string"
+        },
+        "include": {
+          "items": {
+            "$ref": "#/$defs/FilePattern"
+          },
+          "type": "array"
+        },
+        "exclude": {
+          "items": {
+            "$ref": "#/$defs/FilePattern"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,

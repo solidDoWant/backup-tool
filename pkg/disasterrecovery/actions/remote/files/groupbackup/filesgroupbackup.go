@@ -21,7 +21,13 @@ import (
 )
 
 type FilesGroupBackupOptions struct {
-	SnapshotClass  string              `yaml:"snapshotClass,omitempty"` // VolumeGroupSnapshotClass used to snapshot the source PVCs; cluster default when empty.
+	SnapshotClass string `yaml:"snapshotClass,omitempty"` // VolumeGroupSnapshotClass used to snapshot the source PVCs; cluster default when empty.
+	// Filter optionally whitelists (Include) / blacklists (Exclude) which files are captured. It is applied
+	// identically to every member PVC of the group (membership is selector-resolved, so a per-member filter
+	// would not fit). Filtering is within-tree only, so every selected member still produces its
+	// fileGroups/<group>/<pvc> subdirectory and the restore-side 1:1 member check is unaffected. Backup-only;
+	// restore reads back the already-filtered capture.
+	Filter         files.FileFilter    `yaml:",inline"`
 	CleanupTimeout helpers.MaxWaitTime `yaml:"cleanupTimeout,omitempty"`
 }
 
@@ -231,7 +237,7 @@ func (es *executeState) Execute(ctx *contexts.Context, backupToolClient clients.
 
 	for sourcePVCName, mountPath := range es.memberMountPaths {
 		drDataPath := filepath.Join(es.drVolumeMountPath, layout.FileGroupsDirName, es.groupName, sourcePVCName)
-		if err := backupToolClient.Files().SyncFiles(ctx.Child(), mountPath, drDataPath, files.SyncFilesOptions{}); err != nil {
+		if err := backupToolClient.Files().SyncFiles(ctx.Child(), mountPath, drDataPath, files.SyncFilesOptions{Filter: es.opts.Filter}); err != nil {
 			return trace.Wrap(err, "failed to sync member %q files at %q to the disaster recovery volume at %q", sourcePVCName, mountPath, drDataPath)
 		}
 	}

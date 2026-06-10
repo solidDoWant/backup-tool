@@ -472,7 +472,7 @@ func TestExecute(t *testing.T) {
 								kubeClusterClient: kubecluster.NewMockClientInterface(t),
 								namespace:         "namespace",
 								groupName:         "app",
-								opts:              FilesGroupBackupOptions{},
+								opts:              FilesGroupBackupOptions{Filter: files.FileFilter{Exclude: []files.FilePattern{{Glob: "**/*.tmp"}}}},
 							},
 							isValidated: true,
 						},
@@ -491,7 +491,8 @@ func TestExecute(t *testing.T) {
 			if currentState.isSetup {
 				for sourcePVC, mountPath := range currentState.memberMountPaths {
 					drDataPath := filepath.Join(currentState.drVolumeMountPath, layout.FileGroupsDirName, currentState.groupName, sourcePVC)
-					mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, mountPath, drDataPath, files.SyncFilesOptions{}).
+					// The group-wide filter must be plumbed through to every member's sync verbatim.
+					mockFilesRuntime.EXPECT().SyncFiles(mock.Anything, mountPath, drDataPath, files.SyncFilesOptions{Filter: currentState.opts.Filter}).
 						RunAndReturn(func(calledCtx *contexts.Context, src, dest string, _ files.SyncFilesOptions) error {
 							assert.True(t, calledCtx.IsChildOf(ctx))
 							return th.ErrIfTrue(tt.simulateSyncErr)

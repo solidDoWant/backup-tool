@@ -68,11 +68,15 @@ type GenericFileGroupSource struct {
 
 // GenericFileGroupBackupSource is a file-group source plus backup-only capture options. SnapshotClass
 // selects the VolumeGroupSnapshotClass used when snapshotting the member PVCs; when empty the cluster
-// default is used. Restore takes no snapshot, so this field is backup-only and lives on a backup-specific
-// type (mirroring the files/postgres backup/restore split).
+// default is used. Include/Exclude (inlined files.FileFilter) optionally whitelist/blacklist which files
+// are captured, applied identically to every member PVC of the group (membership is selector-resolved, so
+// there is no per-member filter). These are backup-only fields and live on a backup-specific type
+// (mirroring the files/postgres backup/restore split): the capture is already filtered on disk, so restore
+// reads it back verbatim.
 type GenericFileGroupBackupSource struct {
 	GenericFileGroupSource `yaml:",inline"`
 	SnapshotClass          string `yaml:"snapshotClass,omitempty"`
+	files.FileFilter       `yaml:",inline"`
 }
 
 // GenericS3Source syncs an object-store prefix to (backup) / from (restore) a subdirectory of the DR
@@ -268,6 +272,11 @@ func (c GenericBackupConfig) Validate() error {
 	if err := validateFileGroupSources(fileGroupSources); err != nil {
 		return trace.Wrap(err)
 	}
+	for _, src := range c.FileGroups {
+		if err := src.FileFilter.Validate(); err != nil {
+			return trace.Wrap(err, "fileGroup source %q has an invalid include/exclude filter", src.Name)
+		}
+	}
 	if err := validateS3Sources(c.S3); err != nil {
 		return trace.Wrap(err)
 	}
@@ -435,6 +444,7 @@ func (g *GenericApp) Backup(ctx *contexts.Context, config GenericBackupConfig) (
 		action := g.newFilesGroupBackup()
 		if err := action.Configure(g.kubeClusterClient, config.Namespace, src.Selector, backup.Name, src.Name, filesgroupbackup.FilesGroupBackupOptions{
 			SnapshotClass:  src.SnapshotClass,
+			Filter:         src.FileFilter,
 			CleanupTimeout: config.CleanupTimeout,
 		}); err != nil {
 			return backup, trace.Wrap(err, "failed to configure fileGroup source %q backup", src.Name)
