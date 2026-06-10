@@ -3,7 +3,8 @@
 jobConfig:
   drType: vaultwarden
   drAction: backup
-  configFile: {}
+  configFile:
+    namespace: "{{ .Release.Namespace }}"
   configType: Secret
   type: cronjob
   cronjob:
