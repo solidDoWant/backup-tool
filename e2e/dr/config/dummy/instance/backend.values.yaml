@@ -86,7 +86,9 @@ controllers:
             printf 'bucket2-seed' > /tmp/obj && \
             mc cp /tmp/obj sw/dummy-bucket2/seed.txt
         env: *s3Env
-  # --- Source data PVC seed (writes a known file into the files-source PVC) ---
+  # --- Source data PVC seed (writes known files into the files-source PVC) ---
+  # Alongside the kept files (hello.txt, sub/keep.txt) it writes files the backup config's filter should
+  # exclude: *.tmp at any depth (skip.tmp, sub/also.tmp) and everything under the top-level cache/ dir.
   dummy-data-seed:
     type: job
     containers:
@@ -98,7 +100,7 @@ controllers:
           - /bin/sh
           - -c
         args:
-          - printf 'files-seed' > /data/hello.txt
+          - mkdir -p /data/sub /data/cache && printf 'files-seed' > /data/hello.txt && printf 'nested-keep' > /data/sub/keep.txt && printf 'tmp' > /data/sub/also.tmp && printf 'tmp' > /data/skip.tmp && printf 'cache' > /data/cache/inner.txt
 persistence:
   data-vol:
     suffix: data-vol # PVC name: dummy-backend-data-vol
@@ -162,7 +164,8 @@ rawResources:
                   - /bin/sh
                   - -c
                 args:
-                  - printf 'shard-a-seed' > /a/d.txt && printf 'shard-b-seed' > /b/d.txt
+                  # d.txt is the kept payload; skip.log in each shard is what the fileGroups filter excludes.
+                  - printf 'shard-a-seed' > /a/d.txt && printf 'shard-b-seed' > /b/d.txt && printf 'log' > /a/skip.log && printf 'log' > /b/skip.log
                 volumeMounts:
                   - name: a
                     mountPath: /a

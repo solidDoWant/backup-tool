@@ -303,11 +303,24 @@ func TestDummy(t *testing.T) {
 			assertSeedFile(t, filepath.Join(mountpoint, "bucket1", "seed.txt"), "bucket1-seed")
 			assertSeedFile(t, filepath.Join(mountpoint, "bucket2", "seed.txt"), "bucket2-seed")
 
+			// The files source's include/exclude filter (exclude **/*.tmp and the top-level cache/ dir) is
+			// applied per entry end to end: a nested non-excluded file survives, while the .tmp files (at any
+			// depth) and the entire cache/ subtree are absent from the capture.
+			assertSeedFile(t, filepath.Join(mountpoint, "files", "sub", "keep.txt"), "nested-keep")
+			assert.NoFileExists(t, filepath.Join(mountpoint, "files", "skip.tmp"))
+			assert.NoFileExists(t, filepath.Join(mountpoint, "files", "sub", "also.tmp"))
+			assert.NoDirExists(t, filepath.Join(mountpoint, "files", "cache"))
+
 			// The fileGroups source captured both label-selected shard PVCs as one VolumeGroupSnapshot into
 			// fileGroups/<group>/<pvc>/. Both member subdirs present with their seeded content confirms the
 			// group was frozen and synced atomically (one subdir per member PVC, keyed by source PVC name).
 			assertSeedFile(t, filepath.Join(mountpoint, "fileGroups", "shards", "dummy-shard-a", "d.txt"), "shard-a-seed")
 			assertSeedFile(t, filepath.Join(mountpoint, "fileGroups", "shards", "dummy-shard-b", "d.txt"), "shard-b-seed")
+
+			// The group-wide filter (exclude **/*.log) applied to every member: the .log file seeded into each
+			// shard is dropped, while the kept payload (d.txt, asserted above) and the member subdir remain.
+			assert.NoFileExists(t, filepath.Join(mountpoint, "fileGroups", "shards", "dummy-shard-a", "skip.log"))
+			assert.NoFileExists(t, filepath.Join(mountpoint, "fileGroups", "shards", "dummy-shard-b", "skip.log"))
 
 			return ctx
 		}).

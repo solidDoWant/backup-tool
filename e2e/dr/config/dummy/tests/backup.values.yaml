@@ -33,12 +33,20 @@ jobConfig:
     files:
       - name: files # => DR subdir "files"
         pvc: dummy-backend-data-vol
+        # Whitelist/blacklist which files are captured. "**" crosses any depth; a bare name is anchored at
+        # the PVC root, and excluding a directory prunes its whole subtree.
+        exclude:
+          - glob: "**/*.tmp" # any .tmp file, at any depth
+          - glob: cache # the top-level cache/ dir and everything under it
     fileGroups:
       - name: shards # => DR subtree "fileGroups/shards/<pvc>"
         snapshotClass: csi-hostpath-groupsnapclass
         selector:
           matchLabels:
             app: dummy-fileshard
+        # Applied identically to every member PVC of the group.
+        exclude:
+          - glob: "**/*.log"
     s3:
       - name: bucket1 # => DR subdir "bucket1"
         path: s3://dummy-bucket1/
