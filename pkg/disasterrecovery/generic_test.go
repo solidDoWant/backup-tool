@@ -41,8 +41,8 @@ func validBackupConfig() GenericBackupConfig {
 			Cluster: "vw-db",
 			ClusterCloning: clonedcluster.CloneClusterOptions{
 				Certificates: clonedcluster.CloneClusterOptionsCertificates{
-					ServingCert:  clonedcluster.CloneClusterOptionsCertificate{CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{Enabled: true}},
-					ClientCACert: clonedcluster.CloneClusterOptionsCertificate{CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{Enabled: true}},
+					ServingCert:  clonedcluster.CloneClusterOptionsCertificate{CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{WaitForCRPTimeout: helpers.ShortWaitTime}},
+					ClientCACert: clonedcluster.CloneClusterOptionsCertificate{CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{WaitForCRPTimeout: helpers.ShortWaitTime}},
 				},
 			},
 		}},
@@ -247,10 +247,10 @@ postgres:
       certificates:
         servingCert:
           certificateRequestPolicy:
-            enabled: true
+            waitForCRPTimeout: 250ms
         clientCACert:
           certificateRequestPolicy:
-            enabled: true
+            waitForCRPTimeout: 250ms
 files:
   - name: data
     pvc: vw-data

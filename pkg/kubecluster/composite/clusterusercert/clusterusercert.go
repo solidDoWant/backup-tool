@@ -30,8 +30,10 @@ type ClusterUserCert struct {
 	crp         *policyv1alpha1.CertificateRequestPolicy
 }
 
+// NewClusterUserCertOptsCRP tunes the CertificateRequestPolicy created for a user cert. Whether a
+// policy is created at all is detected at runtime (see approverpolicy.ClientInterface.IsAvailable) rather
+// than configured, since approver-policy enforcement is a cluster-wide all-or-nothing property.
 type NewClusterUserCertOptsCRP struct {
-	Enabled           bool                `yaml:"enabled,omitempty"`
 	WaitForCRPTimeout helpers.MaxWaitTime `yaml:"waitForCRPTimeout,omitempty"`
 }
 
@@ -80,8 +82,13 @@ func (p *Provider) NewClusterUserCert(ctx *contexts.Context, namespace, username
 	}
 	cuc.setCertificate(cert)
 
-	// 2. Create the CertificateRequestPolicy, if enabled
-	if opts.CRPOpts.Enabled {
+	// 2. Create the CertificateRequestPolicy, but only when approver-policy is enforcing approval (see IsAvailable).
+	shouldDeployCRP, err := p.apClient.IsAvailable(ctx.Child())
+	if err != nil {
+		return errHandler(err, "failed to determine whether approver-policy is enforcing CertificateRequest approval")
+	}
+
+	if shouldDeployCRP {
 		ctx.Log.Step().Info("Creating CertificateRequestPolicy for user certificate")
 		crpName := certName
 		crp, err := p.ccfp.CreateCRPForCertificate(ctx.Child(), cert, createcrpforcertificate.CreateCRPForCertificateOpts{MaxWaitTime: opts.CRPOpts.WaitForCRPTimeout})

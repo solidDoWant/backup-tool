@@ -744,9 +744,6 @@
     },
     "NewClusterUserCertOptsCRP": {
       "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
         "waitForCRPTimeout": {
           "type": "integer"
         }

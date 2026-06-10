@@ -11,15 +11,11 @@ jobConfig:
         clientCAIssuer:
           name: dummy-restore-postgres-auth-ca-issuer
         servingCert: dummy-restore-db1-serving
-        postgresUserCert: &postgresUserCert
-          certificateRequestPolicy:
-            enabled: true
       - name: db2
         cluster: dummy-restore-db2
         clientCAIssuer:
           name: dummy-restore-postgres-auth-ca-issuer
         servingCert: dummy-restore-db2-serving
-        postgresUserCert: *postgresUserCert
     files:
       - name: files
         pvc: dummy-restore-backend-data-vol

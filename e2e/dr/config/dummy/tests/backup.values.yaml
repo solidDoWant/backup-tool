@@ -11,22 +11,10 @@ jobConfig:
     postgres:
       - name: db1 # => db1.sql
         cluster: dummy-db1
+        # clusterCloning is required for the generic app, so set one (otherwise empty) field. CRP creation
+        # needs no config — it is auto-detected (see CLAUDE.md).
         clusterCloning: &clusterCloning
-          # The clone mints its serving + client-CA certs from an internally-created self-signed issuer;
-          # approver-policy is enforcing in e2e, so enable each cert's CertificateRequestPolicy.
-          certificates:
-            servingCert:
-              certificateRequestPolicy:
-                enabled: true
-            clientCACert:
-              certificateRequestPolicy:
-                enabled: true
-            postgresUserCert:
-              certificateRequestPolicy:
-                enabled: true
-            streamingReplicaUserCert:
-              certificateRequestPolicy:
-                enabled: true
+          waitForClusterTimeout: 30m
       - name: db2 # => db2.sql
         cluster: dummy-db2
         clusterCloning: *clusterCloning

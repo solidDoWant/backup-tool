@@ -1,14 +1,47 @@
 package approverpolicy
 
 import (
+	"slices"
 	"time"
 
 	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// IsAvailable reports whether the cert-manager approver-policy API is installed on the cluster (i.e.
+// the CertificateRequestPolicy CRD is registered). This is the cluster-wide "all or nothing" signal for
+// CertificateRequestPolicies: when approver-policy is installed it disables cert-manager's built-in
+// CertificateRequest approver and takes over approval, so every certificate this tool issues needs a
+// matching CertificateRequestPolicy to be approved; when it is absent the built-in approver handles
+// approval and creating a policy would fail against a non-existent API. The result is memoized for the
+// life of the client, as the set of installed cluster APIs does not change within a single DR event.
+func (c *Client) IsAvailable(ctx *contexts.Context) (bool, error) {
+	c.availableMu.Lock()
+	defer c.availableMu.Unlock()
+
+	if c.availableCache != nil {
+		return *c.availableCache, nil
+	}
+
+	gv := policyv1alpha1.SchemeGroupVersion
+	ctx.Log.With("groupVersion", gv.String()).Debug("Checking whether the approver-policy API is installed")
+
+	resources, err := c.client.Discovery().ServerResourcesForGroupVersion(gv.String())
+	if err != nil && !apierrors.IsNotFound(err) {
+		return false, trace.Wrap(err, "failed to query the API server for the %q API group", gv.String())
+	}
+
+	available := resources != nil && slices.ContainsFunc(resources.APIResources, func(resource metav1.APIResource) bool {
+		return resource.Kind == policyv1alpha1.CertificateRequestPolicyKind
+	})
+
+	c.availableCache = &available
+	return available, nil
+}
 
 type CreateCertificateRequestPolicyOptions struct {
 	helpers.GenerateName

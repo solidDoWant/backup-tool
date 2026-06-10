@@ -35,8 +35,10 @@ func TestNewClusterUserCert(t *testing.T) {
 	tests := []struct {
 		desc                                 string
 		opts                                 NewClusterUserCertOpts
+		crpEnabled                           bool
 		simulateClusterCleanupError          bool
 		simulateCreateCertError              bool
+		simulateIsAvailableError             bool
 		simulateCreateCRPForCertificateError bool
 		simulateReissueCertificateError      bool
 		simulateWaitForReadyCertError        bool
@@ -45,10 +47,10 @@ func TestNewClusterUserCert(t *testing.T) {
 			desc: "basic test",
 		},
 		{
-			desc: "basic test with CRP enabled",
+			desc:       "basic test with CRP enabled",
+			crpEnabled: true,
 			opts: NewClusterUserCertOpts{
 				CRPOpts: NewClusterUserCertOptsCRP{
-					Enabled:           true,
 					WaitForCRPTimeout: helpers.ShortWaitTime,
 				},
 				Subject: &certmanagerv1.X509Subject{
@@ -75,13 +77,17 @@ func TestNewClusterUserCert(t *testing.T) {
 			simulateCreateCertError:     true,
 		},
 		{
+			desc:                     "simulate approver-policy detection error",
+			simulateIsAvailableError: true,
+		},
+		{
 			desc:                                 "simulate create CRP for certificate error",
-			opts:                                 NewClusterUserCertOpts{CRPOpts: NewClusterUserCertOptsCRP{Enabled: true}},
+			crpEnabled:                           true,
 			simulateCreateCRPForCertificateError: true,
 		},
 		{
 			desc:                            "simulate reissue certificate error",
-			opts:                            NewClusterUserCertOpts{CRPOpts: NewClusterUserCertOptsCRP{Enabled: true}},
+			crpEnabled:                      true,
 			simulateReissueCertificateError: true,
 		},
 		{
@@ -110,6 +116,7 @@ func TestNewClusterUserCert(t *testing.T) {
 			errExpected := th.ErrExpected(
 				tt.simulateClusterCleanupError,
 				tt.simulateCreateCertError,
+				tt.simulateIsAvailableError,
 				tt.simulateCreateCRPForCertificateError,
 				tt.simulateReissueCertificateError,
 				tt.simulateWaitForReadyCertError,
@@ -142,8 +149,16 @@ func TestNewClusterUserCert(t *testing.T) {
 				}
 				c.clusterUserCert.EXPECT().setCertificate(createdCert)
 
-				// 2.
-				if tt.opts.CRPOpts.Enabled {
+				// 2. Detect whether approver-policy is enforcing approval on the cluster.
+				c.apClient.EXPECT().IsAvailable(mock.Anything).RunAndReturn(func(calledCtx *contexts.Context) (bool, error) {
+					assert.True(t, calledCtx.IsChildOf(ctx))
+					return th.ErrOr1Val(tt.crpEnabled, tt.simulateIsAvailableError)
+				})
+				if tt.simulateIsAvailableError {
+					return
+				}
+
+				if tt.crpEnabled {
 					c.ccfp.EXPECT().CreateCRPForCertificate(mock.Anything, createdCert, createcrpforcertificate.CreateCRPForCertificateOpts{MaxWaitTime: tt.opts.CRPOpts.WaitForCRPTimeout}).
 						RunAndReturn(func(calledCtx *contexts.Context, cert *certmanagerv1.Certificate, opts createcrpforcertificate.CreateCRPForCertificateOpts) (*policyv1alpha1.CertificateRequestPolicy, error) {
 							assert.True(t, calledCtx.IsChildOf(ctx))

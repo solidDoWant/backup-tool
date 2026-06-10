@@ -7,9 +7,6 @@ jobConfig:
       servingCertName: ar-postgres-serving-cert
       clientCAIssuer:
         name: ar-postgres-auth-ca-issuer
-      postgresUserCert:
-        certificateRequestPolicy:
-          enabled: true
     s3:
       s3Path: s3://ar-media/
       credentials:

@@ -130,6 +130,62 @@ func (_c *MockClientInterface_DeleteCertificateRequestPolicy_Call) RunAndReturn(
 	return _c
 }
 
+// IsAvailable provides a mock function with given fields: ctx
+func (_m *MockClientInterface) IsAvailable(ctx *contexts.Context) (bool, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsAvailable")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context) (bool, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context) bool); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_IsAvailable_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsAvailable'
+type MockClientInterface_IsAvailable_Call struct {
+	*mock.Call
+}
+
+// IsAvailable is a helper method to define mock.On call
+//   - ctx *contexts.Context
+func (_e *MockClientInterface_Expecter) IsAvailable(ctx interface{}) *MockClientInterface_IsAvailable_Call {
+	return &MockClientInterface_IsAvailable_Call{Call: _e.mock.On("IsAvailable", ctx)}
+}
+
+func (_c *MockClientInterface_IsAvailable_Call) Run(run func(ctx *contexts.Context)) *MockClientInterface_IsAvailable_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_IsAvailable_Call) Return(_a0 bool, _a1 error) *MockClientInterface_IsAvailable_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_IsAvailable_Call) RunAndReturn(run func(*contexts.Context) (bool, error)) *MockClientInterface_IsAvailable_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // WaitForReadyCertificateRequestPolicy provides a mock function with given fields: ctx, name, opts
 func (_m *MockClientInterface) WaitForReadyCertificateRequestPolicy(ctx *contexts.Context, name string, opts WaitForReadyCertificateRequestPolicyOpts) (*v1alpha1.CertificateRequestPolicy, error) {
 	ret := _m.Called(ctx, name, opts)

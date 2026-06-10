@@ -4,22 +4,6 @@ jobConfig:
     backupName: at-e2e
     cluster:
       name: authentik-postgres
-      clusterCloning:
-        # The clone mints its serving + client-CA certs from an internally-created self-signed issuer;
-        # approver-policy is enforcing in e2e, so enable each cert's CertificateRequestPolicy.
-        certificates:
-          servingCert:
-            certificateRequestPolicy:
-              enabled: true
-          clientCACert:
-            certificateRequestPolicy:
-              enabled: true
-          postgresUserCert:
-            certificateRequestPolicy:
-              enabled: true
-          streamingReplicaUserCert:
-            certificateRequestPolicy:
-              enabled: true
     s3:
       s3Path: s3://authentik-media/
       credentials:

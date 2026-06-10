@@ -1,6 +1,8 @@
 package approverpolicy
 
 import (
+	"sync"
+
 	policyv1alpha1 "github.com/cert-manager/approver-policy/pkg/apis/policy/v1alpha1"
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
@@ -9,6 +11,9 @@ import (
 )
 
 type ClientInterface interface {
+	// IsAvailable reports whether the approver-policy API is installed (and so enforcing
+	// CertificateRequest approval) on the cluster. It is memoized for the life of the client.
+	IsAvailable(ctx *contexts.Context) (bool, error)
 	CreateCertificateRequestPolicy(ctx *contexts.Context, name string, spec policyv1alpha1.CertificateRequestPolicySpec, opts CreateCertificateRequestPolicyOptions) (*policyv1alpha1.CertificateRequestPolicy, error)
 	WaitForReadyCertificateRequestPolicy(ctx *contexts.Context, name string, opts WaitForReadyCertificateRequestPolicyOpts) (*policyv1alpha1.CertificateRequestPolicy, error)
 	DeleteCertificateRequestPolicy(ctx *contexts.Context, name string) error
@@ -16,6 +21,10 @@ type ClientInterface interface {
 
 type Client struct {
 	client versioned.Interface
+
+	// availableMu guards availableCache, the memoized result of IsAvailable.
+	availableMu    sync.Mutex
+	availableCache *bool
 }
 
 func NewClient(config *rest.Config) (*Client, error) {

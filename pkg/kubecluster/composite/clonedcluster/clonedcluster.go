@@ -67,8 +67,8 @@ type ClonedCluster struct {
 
 // CloneClusterOptionsCertificate describes options for one of the clone's certificates. Every cert the
 // clone creates is issued by an issuer the backup tool creates (the serving and client-CA certs from an
-// internal self-signed issuer; the user certs from the client-CA issuer), so each can carry an optional
-// CertificateRequestPolicy (required only when approver-policy is enforcing).
+// internal self-signed issuer; the user certs from the client-CA issuer), so each gets a tight
+// CertificateRequestPolicy when (and only when) approver-policy is detected as enforcing on the cluster.
 type CloneClusterOptionsCertificate struct {
 	Subject             *certmanagerv1.X509Subject                `yaml:"subject,omitempty"`
 	CRPOpts             clusterusercert.NewClusterUserCertOptsCRP `yaml:"certificateRequestPolicy,omitempty"`
@@ -366,8 +366,8 @@ func (p *Provider) CloneClusterFromBackup(ctx *contexts.Context, namespace, exis
 	return cluster, nil
 }
 
-// createClonedClusterCertificate creates one of the clone's certificates and, when its
-// CertificateRequestPolicy is enabled, a tight policy derived from the cert (via createcrpforcertificate)
+// createClonedClusterCertificate creates one of the clone's certificates and, when approver-policy is
+// enforcing approval on the cluster, a tight policy derived from the cert (via createcrpforcertificate)
 // so approver-policy approves it. This mirrors the clusterusercert flow: because the policy is derived
 // from the cert it must be created after the cert, so the first issuance is denied and the cert is
 // reissued once the policy exists. The cert and any policy are recorded on the cluster (via setCert and
@@ -380,7 +380,13 @@ func (p *Provider) createClonedClusterCertificate(ctx *contexts.Context, namespa
 	}
 	setCert(cert)
 
-	if clusterCertOpts.CRPOpts.Enabled {
+	// Only deploy a CertificateRequestPolicy when approver-policy is enforcing approval (see IsAvailable).
+	shouldDeployCRP, err := p.apClient.IsAvailable(ctx.Child())
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to determine whether approver-policy is enforcing CertificateRequest approval")
+	}
+
+	if shouldDeployCRP {
 		crp, err := p.ccfp.CreateCRPForCertificate(ctx.Child(), cert, createcrpforcertificate.CreateCRPForCertificateOpts{MaxWaitTime: clusterCertOpts.CRPOpts.WaitForCRPTimeout})
 		if err != nil {
 			return nil, trace.Wrap(err, "failed to create certificate request policy for certificate %q", helpers.FullName(cert))

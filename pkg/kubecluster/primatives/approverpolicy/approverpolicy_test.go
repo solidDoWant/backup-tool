@@ -17,6 +17,90 @@ import (
 	kubetesting "k8s.io/client-go/testing"
 )
 
+func TestIsAvailable(t *testing.T) {
+	gv := policyv1alpha1.SchemeGroupVersion.String()
+
+	tests := []struct {
+		desc          string
+		resources     []*metav1.APIResourceList
+		reactorErr    bool
+		wantAvailable bool
+		wantErr       bool
+	}{
+		{
+			desc: "approver-policy installed",
+			resources: []*metav1.APIResourceList{{
+				GroupVersion: gv,
+				APIResources: []metav1.APIResource{{Name: "certificaterequestpolicies", Kind: "CertificateRequestPolicy"}},
+			}},
+			wantAvailable: true,
+		},
+		{
+			desc: "group present without the CRP kind",
+			resources: []*metav1.APIResourceList{{
+				GroupVersion: gv,
+				APIResources: []metav1.APIResource{{Name: "somethingelses", Kind: "SomethingElse"}},
+			}},
+			wantAvailable: false,
+		},
+		{
+			// The fake discovery returns a NotFound error when the group version is absent, matching a
+			// real API server with approver-policy uninstalled. This must be treated as "not available",
+			// not as an error.
+			desc:          "approver-policy not installed",
+			resources:     nil,
+			wantAvailable: false,
+		},
+		{
+			desc:       "discovery error",
+			reactorErr: true,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			client, fakeClientset := createTestClient()
+			fakeClientset.Fake.Resources = tt.resources
+			if tt.reactorErr {
+				fakeClientset.PrependReactor("get", "resource", func(action kubetesting.Action) (bool, runtime.Object, error) {
+					return true, nil, assert.AnError
+				})
+			}
+
+			ctx := th.NewTestContext()
+			available, err := client.IsAvailable(ctx)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAvailable, available)
+		})
+	}
+}
+
+func TestIsAvailableMemoized(t *testing.T) {
+	client, fakeClientset := createTestClient()
+	fakeClientset.Fake.Resources = []*metav1.APIResourceList{{
+		GroupVersion: policyv1alpha1.SchemeGroupVersion.String(),
+		APIResources: []metav1.APIResource{{Name: "certificaterequestpolicies", Kind: "CertificateRequestPolicy"}},
+	}}
+	ctx := th.NewTestContext()
+
+	available, err := client.IsAvailable(ctx)
+	require.NoError(t, err)
+	assert.True(t, available)
+
+	// Remove the API. A non-memoized implementation would now report false; the cached result must hold.
+	fakeClientset.Fake.Resources = nil
+	available, err = client.IsAvailable(ctx)
+	require.NoError(t, err)
+	assert.True(t, available)
+}
+
 func TestCreateCertificateRequestPolicy(t *testing.T) {
 	standardCRPSpec := policyv1alpha1.CertificateRequestPolicySpec{}
 

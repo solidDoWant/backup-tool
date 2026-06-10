@@ -49,7 +49,7 @@ func TestConfigure(t *testing.T) {
 				},
 				WaitForCertTimeout: helpers.ShortWaitTime,
 				CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{
-					Enabled: true,
+					WaitForCRPTimeout: helpers.ShortWaitTime,
 				},
 			},
 			CleanupTimeout: 3 * helpers.ShortWaitTime,
@@ -344,7 +344,7 @@ func TestSetup(t *testing.T) {
 									Organizations: []string{"test-org"},
 								},
 								CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{
-									Enabled: true,
+									WaitForCRPTimeout: helpers.ShortWaitTime,
 								},
 								WaitForCertTimeout: helpers.ShortWaitTime,
 							},
@@ -475,7 +475,7 @@ func TestCleanup(t *testing.T) {
 									Organizations: []string{"test-org"},
 								},
 								CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{
-									Enabled: true,
+									WaitForCRPTimeout: helpers.ShortWaitTime,
 								},
 								WaitForCertTimeout: helpers.ShortWaitTime,
 							},
@@ -589,7 +589,7 @@ func TestExecute(t *testing.T) {
 										Organizations: []string{"test-org"},
 									},
 									CRPOpts: clusterusercert.NewClusterUserCertOptsCRP{
-										Enabled: true,
+										WaitForCRPTimeout: helpers.ShortWaitTime,
 									},
 									WaitForCertTimeout: helpers.ShortWaitTime,
 								},

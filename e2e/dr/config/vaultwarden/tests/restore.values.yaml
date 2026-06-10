@@ -8,7 +8,3 @@ jobConfig:
     servingCertName: postgres-restore-serving-cert
     clientCAIssuer:
       name: postgres-restore-auth-ca-issuer
-    certificates:
-      postgresUserCert:
-        certificateRequestPolicy:
-          enabled: true
