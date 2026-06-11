@@ -212,7 +212,12 @@ func RestrictedContainerSecurityContext(uid, gid int64) *corev1.SecurityContext 
 	}
 }
 
-func PrivilegedPodSecurityContext() *corev1.PodSecurityContext {
+// FileManagementPodSecurityContext is the pod-level context for a pod that must read, chown, and
+// chmod arbitrary files (e.g. the backup-tool instance writing app data into a DR volume). It runs
+// as container-root because chowning files to arbitrary uids/gids requires it, but it is NOT
+// privileged - see FileManagementContainerSecurityContext. Running as root is permitted under the
+// "baseline" Pod Security Standard, so this is compatible with pod-security.kubernetes.io/enforce: baseline.
+func FileManagementPodSecurityContext() *corev1.PodSecurityContext {
 	return &corev1.PodSecurityContext{
 		RunAsUser:    new(int64(0)),
 		RunAsGroup:   new(int64(0)),
@@ -223,14 +228,29 @@ func PrivilegedPodSecurityContext() *corev1.PodSecurityContext {
 	}
 }
 
-func PrivilegedContainerSecurityContext() *corev1.SecurityContext {
+// FileManagementContainerSecurityContext is the container-level context for a container that reads,
+// chowns, and chmods arbitrary files. Rather than running fully privileged, it drops all capabilities
+// and adds back only the four needed to faithfully preserve file metadata across a copy:
+//   - CHOWN: chown files/dirs to arbitrary uids/gids (cp PreserveOwner)
+//   - DAC_OVERRIDE: read/write files/dirs regardless of their permission bits
+//   - FOWNER: chmod/utime files the process does not own (cp PerservePermission, PreserveTimes)
+//   - FSETID: preserve setuid/setgid bits when chmod-ing files whose owner/group differs from the process
+//
+// All four are in the default capability set, so adding them keeps the container compatible with the
+// "baseline" Pod Security Standard (only Privileged: true would break baseline). This is still NOT
+// compatible with the stricter "restricted" standard, which forbids running as root and adding capabilities.
+func FileManagementContainerSecurityContext() *corev1.SecurityContext {
 	return &corev1.SecurityContext{
-		Privileged:               new(true),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+			Add:  []corev1.Capability{"CHOWN", "DAC_OVERRIDE", "FOWNER", "FSETID"},
+		},
+		Privileged:               new(false),
 		RunAsUser:                new(int64(0)),
 		RunAsGroup:               new(int64(0)),
 		RunAsNonRoot:             new(false),
 		ReadOnlyRootFilesystem:   new(true),
-		AllowPrivilegeEscalation: new(true),
+		AllowPrivilegeEscalation: new(false),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},

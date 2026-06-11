@@ -659,8 +659,8 @@ func TestRestrictedContainerSecurityContext(t *testing.T) {
 	}
 }
 
-func TestPrivilegedPodSecurityContext(t *testing.T) {
-	createdSC := PrivilegedPodSecurityContext()
+func TestFileManagementPodSecurityContext(t *testing.T) {
+	createdSC := FileManagementPodSecurityContext()
 	require.NotNil(t, createdSC)
 	assert.Equal(t, int64(0), *createdSC.RunAsUser)
 	assert.Equal(t, int64(0), *createdSC.RunAsGroup)
@@ -669,15 +669,21 @@ func TestPrivilegedPodSecurityContext(t *testing.T) {
 	assert.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, createdSC.SeccompProfile.Type)
 }
 
-func TestPrivilegedContainerSecurityContext(t *testing.T) {
-	createdSC := PrivilegedContainerSecurityContext()
+func TestFileManagementContainerSecurityContext(t *testing.T) {
+	createdSC := FileManagementContainerSecurityContext()
 	require.NotNil(t, createdSC)
-	assert.True(t, *createdSC.Privileged)
+	// Not privileged - baseline-compatible.
+	assert.False(t, *createdSC.Privileged)
+	// Drops all capabilities and adds back only the file-management set.
+	require.NotNil(t, createdSC.Capabilities)
+	assert.Equal(t, []corev1.Capability{"ALL"}, createdSC.Capabilities.Drop)
+	assert.Equal(t, []corev1.Capability{"CHOWN", "DAC_OVERRIDE", "FOWNER", "FSETID"}, createdSC.Capabilities.Add)
+	// Runs as container-root (required to chown arbitrary files; permitted under baseline).
 	assert.Equal(t, int64(0), *createdSC.RunAsUser)
 	assert.Equal(t, int64(0), *createdSC.RunAsGroup)
 	assert.False(t, *createdSC.RunAsNonRoot)
 	assert.True(t, *createdSC.ReadOnlyRootFilesystem)
-	assert.True(t, *createdSC.AllowPrivilegeEscalation)
+	assert.False(t, *createdSC.AllowPrivilegeEscalation)
 	require.NotNil(t, createdSC.SeccompProfile)
 	assert.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, createdSC.SeccompProfile.Type)
 }

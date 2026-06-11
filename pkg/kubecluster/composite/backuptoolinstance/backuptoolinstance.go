@@ -88,10 +88,11 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 				Protocol:      corev1.ProtocolTCP,
 			},
 		},
-		// Must run as root to read, chown, and chmod arbitrary files.
-		// This does not require root on the host - just on the container.
-		// Note: this is not compatible with pod-security.kubernetes.io/enforce: baseline
-		SecurityContext: core.PrivilegedContainerSecurityContext(),
+		// Runs as container-root (but unprivileged, with a narrow set of file-management
+		// capabilities) to read, chown, and chmod arbitrary files. This does not require root
+		// on the host - just on the container. Compatible with
+		// pod-security.kubernetes.io/enforce: baseline (but not: restricted).
+		SecurityContext: core.FileManagementContainerSecurityContext(),
 		StartupProbe:    probe,
 		ReadinessProbe:  probe,
 		LivenessProbe:   probe,
@@ -111,7 +112,7 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 			Containers:      []corev1.Container{container},
 			RestartPolicy:   corev1.RestartPolicyNever,
 			Volumes:         volumes,
-			SecurityContext: core.PrivilegedPodSecurityContext(),
+			SecurityContext: core.FileManagementPodSecurityContext(),
 		},
 	}
 
