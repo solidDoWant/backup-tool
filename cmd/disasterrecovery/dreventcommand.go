@@ -51,6 +51,7 @@ func buildDREventCommand(drCmd DREventCommand, drName, drEventName string) *cobr
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return drCmd.Run()
 		},
+		SilenceUsage: true,
 	}
 	eventCmd.AddCommand(runCommand)
 	drCmd.ConfigureFlags(runCommand)

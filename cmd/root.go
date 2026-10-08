@@ -14,6 +14,8 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   constants.ToolName,
 	Short: "A tool to backup and restore infra-mk3 resources",
+	// Execute prints the error's debug report itself.
+	SilenceErrors: true,
 	// Long: `backup-tool is a CLI tool to backup and restore infra-mk3 resources. // TODO
 }
 

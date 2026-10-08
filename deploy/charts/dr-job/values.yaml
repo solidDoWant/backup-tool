@@ -3,6 +3,9 @@
 jobConfig:
   drType: vaultwarden
   drAction: backup
+  # Passed as --log-format: text, json, or logfmt. JSON keeps multi-line values
+  # (e.g. error chains) in a single record for log collectors.
+  logFormat: json
   configFile:
     namespace: "{{ .Release.Namespace }}"
   configType: Secret
@@ -43,6 +46,8 @@ resources:
             - run
             - --config-file
             - /etc/backup-tool/config.yaml
+            - --log-format
+            - "{{ .Values.jobConfig.logFormat }}"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
