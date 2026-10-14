@@ -13,6 +13,20 @@
 {{- end -}}
 {{- $_ := set $container "args" $templatedArgs -}}
 
+{{/* The GRPC pods the tool starts run the same image as this container, digest included */}}
+{{- $image := $container.image -}}
+{{- $imageRef := printf "%s:%s" (tpl $image.repository .) (tpl (toString $image.tag) .) -}}
+{{- with $image.digest -}}
+{{- $imageRef = printf "%s@%s" $imageRef (tpl . $) -}}
+{{- end -}}
+{{- $env := $container.env | default dict -}}
+{{- if kindIs "slice" $env -}}
+{{- $env = append $env (dict "name" "BACKUP_TOOL_IMAGE" "value" $imageRef) -}}
+{{- else -}}
+{{- $_ := set $env "BACKUP_TOOL_IMAGE" $imageRef -}}
+{{- end -}}
+{{- $_ := set $container "env" $env -}}
+
 {{- if eq .Values.jobConfig.configType "ConfigMap" -}}
     {{/* Setup the resources */}}
     {{- $configMap := dict "config" (dict "data" (dict "config.yaml" (.Values.jobConfig.configFile | toYaml))) -}}
