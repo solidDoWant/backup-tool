@@ -3,6 +3,7 @@ package backuptoolinstance
 import (
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	"github.com/gravitational/trace"
@@ -27,6 +28,17 @@ type BackupToolInstanceInterface interface {
 type BackupToolInstance struct {
 	p   providerInterfaceInternal
 	pod *corev1.Pod
+}
+
+// ImageEnvVar overrides the image of the GRPC pods the tool starts, e.g. with a
+// digest-pinned ref. Unset, the pods use constants.FullImageName.
+const ImageEnvVar = "BACKUP_TOOL_IMAGE"
+
+func instanceImage() string {
+	if image := os.Getenv(ImageEnvVar); image != "" {
+		return image
+	}
+	return constants.FullImageName
 }
 
 func newBackupToolInstance(p providerInterfaceInternal) BackupToolInstanceInterface {
@@ -77,7 +89,7 @@ func (p *Provider) CreateBackupToolInstance(ctx *contexts.Context, namespace, in
 
 	container := corev1.Container{
 		Name:         constants.ToolName,
-		Image:        constants.FullImageName,
+		Image:        instanceImage(),
 		Command:      []string{constants.ToolName},
 		Args:         []string{"grpc"},
 		VolumeMounts: mounts,

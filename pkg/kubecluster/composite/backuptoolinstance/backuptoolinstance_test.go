@@ -38,6 +38,7 @@ func TestCreateBackupToolInstance(t *testing.T) {
 		simulateBackupToolInstanceCleanupError bool
 		simulateCreatePodError                 bool
 		simulateWaitForPodError                bool
+		imageEnv                               string
 	}{
 		{
 			name: "basic instance creation",
@@ -82,6 +83,10 @@ func TestCreateBackupToolInstance(t *testing.T) {
 			},
 		},
 		{
+			name:     "image overridden by env var",
+			imageEnv: "registry.example/backup-tool:1.2.3@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		},
+		{
 			name:                   "simulate create pod error",
 			simulateCreatePodError: true,
 		},
@@ -98,6 +103,12 @@ func TestCreateBackupToolInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(ImageEnvVar, tt.imageEnv)
+			expectedImage := constants.FullImageName
+			if tt.imageEnv != "" {
+				expectedImage = tt.imageEnv
+			}
+
 			p := newMockProvider(t)
 			ctx := th.NewTestContext()
 
@@ -128,7 +139,7 @@ func TestCreateBackupToolInstance(t *testing.T) {
 
 						container := pod.Spec.Containers[0]
 						require.Equal(t, constants.ToolName, container.Name)
-						require.Equal(t, constants.FullImageName, container.Image)
+						require.Equal(t, expectedImage, container.Image)
 						require.Equal(t, []string{constants.ToolName}, container.Command)
 						require.Equal(t, len(tt.opts.Volumes), len(container.VolumeMounts))
 						require.Len(t, container.Ports, 1)
