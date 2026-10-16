@@ -1,6 +1,8 @@
 package core
 
 import (
+	"encoding/json"
+
 	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/helpers"
@@ -8,12 +10,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type CreatePVCOptions struct {
 	helpers.GenerateName
 	StorageClassName string
 	Source           *corev1.TypedObjectReference
+	Labels           map[string]string
 }
 
 func (c *Client) CreatePVC(ctx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error) {
@@ -21,6 +25,9 @@ func (c *Client) CreatePVC(ctx *contexts.Context, namespace, pvcName string, siz
 	ctx.Log.Debug("Call parameters", "size", size.String(), "opts", opts)
 
 	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: meta_v1.ObjectMeta{
+			Labels: opts.Labels,
+		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,
@@ -113,6 +120,29 @@ func (c *Client) EnsurePVCExists(ctx *contexts.Context, namespace, pvcName strin
 	pvc, err = c.CreatePVC(ctx.Child(), namespace, pvcName, size, opts)
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to create PVC %q", helpers.FullNameStr(namespace, pvcName))
+	}
+
+	return pvc, nil
+}
+
+// LabelPVC adds the given labels to an existing PVC, overwriting the values of any keys it already has.
+// Labels not in the given set are left untouched.
+func (c *Client) LabelPVC(ctx *contexts.Context, namespace, name string, labels map[string]string) (*corev1.PersistentVolumeClaim, error) {
+	ctx.Log.With("name", name).Info("Labeling PVC")
+	ctx.Log.Debug("Call parameters", "labels", labels)
+
+	patch, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"labels": labels,
+		},
+	})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to marshal label patch")
+	}
+
+	pvc, err := c.client.CoreV1().PersistentVolumeClaims(namespace).Patch(ctx, name, types.MergePatchType, patch, meta_v1.PatchOptions{})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to label PVC %q", helpers.FullNameStr(namespace, name))
 	}
 
 	return pvc, nil

@@ -97,7 +97,16 @@ resources:
             resources:
               # Needed to deploy backup tool GRPC instances, and clean them up.
               - pods
-              # Needed for cloning PVCs
+            verbs:
+              - create
+              - get
+              - list
+              - watch
+              - delete
+          - apiGroups:
+              - ""
+            resources:
+              # Needed for cloning PVCs, and for creating the DR PVC
               - persistentvolumeclaims
             verbs:
               - create
@@ -105,6 +114,8 @@ resources:
               - list
               - watch
               - delete
+              # Needed to add the backup-tool labels to a DR PVC created by an older version
+              - patch
           # Pod exec
           # Needed to run psql in a source cluster's primary pod (over its local socket) to force a
           # restore point + WAL switch, so an idle source still archives the consistency-point WAL.

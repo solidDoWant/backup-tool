@@ -114,6 +114,8 @@ type GenericBackupVolume struct {
 	SnapshotClass        string              `yaml:"snapshotClass,omitempty"`
 	Size                 resource.Quantity   `yaml:"size,omitempty"`
 	SnapshotReadyTimeout helpers.MaxWaitTime `yaml:"snapshotReadyTimeout,omitempty"`
+	// SnapshotLabels are added to the backup snapshot, in addition to the labels set by backup-tool.
+	SnapshotLabels map[string]string `yaml:"snapshotLabels,omitempty"`
 }
 
 // GenericBackupConfig is the declarative backup config for the generic app. A backup produces the event
@@ -231,6 +233,10 @@ func validateS3Sources(s3Sources []GenericS3Source) error {
 func (c GenericBackupConfig) Validate() error {
 	if len(c.Postgres)+len(c.Files)+len(c.FileGroups)+len(c.S3) == 0 {
 		return trace.BadParameter("at least one source (postgres, files, fileGroups, or s3) must be configured")
+	}
+
+	if err := drvolume.ValidateBackupLabels(c.BackupName, GenericDRType, c.BackupVolume.SnapshotLabels); err != nil {
+		return trace.Wrap(err, "invalid backupVolume labels")
 	}
 
 	pgNames := make(map[string]struct{}, len(c.Postgres))
@@ -401,9 +407,10 @@ func (g *GenericApp) Backup(ctx *contexts.Context, config GenericBackupConfig) (
 		clusterNames = append(clusterNames, src.Cluster)
 	}
 
-	drv, err := g.kubeClusterClient.NewDRVolume(ctx.Child(), config.Namespace, backup.Name, drVolumeSize, drvolume.DRVolumeCreateOptions{
+	drv, err := g.kubeClusterClient.NewDRVolume(ctx.Child(), config.Namespace, backup.Name, GenericDRType, drVolumeSize, drvolume.DRVolumeCreateOptions{
 		VolumeStorageClass: config.BackupVolume.StorageClass,
 		CNPGClusterNames:   clusterNames,
+		SnapshotLabels:     config.BackupVolume.SnapshotLabels,
 	})
 	if err != nil {
 		return backup, trace.Wrap(err, "failed to create the DR volume")

@@ -25,6 +25,7 @@ const (
 type AuthentikBackupOptions struct {
 	VolumeSize              resource.Quantity                                  `yaml:"volumeSize,omitempty"`
 	VolumeStorageClass      string                                             `yaml:"volumeStorageClass,omitempty"`
+	SnapshotLabels          map[string]string                                  `yaml:"snapshotLabels,omitempty"`
 	CloneClusterOptions     clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
 	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	BackupSnapshot          OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
@@ -65,8 +66,9 @@ func (a *Authentik) Backup(ctx *contexts.Context, namespace, backupName, cluster
 
 	// Create the DR PVC if not exists
 	ctx.Log.Step()
-	drv, err := a.kubeClusterClient.NewDRVolume(ctx.Child(), namespace, backup.Name, opts.VolumeSize, drvolume.DRVolumeCreateOptions{
+	drv, err := a.kubeClusterClient.NewDRVolume(ctx.Child(), namespace, backup.Name, AuthentikDRType, opts.VolumeSize, drvolume.DRVolumeCreateOptions{
 		VolumeStorageClass: opts.VolumeStorageClass,
+		SnapshotLabels:     opts.SnapshotLabels,
 		CNPGClusterNames:   []string{clusterName},
 	})
 	if err != nil {

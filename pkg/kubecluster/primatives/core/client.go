@@ -29,6 +29,7 @@ type ClientInterface interface {
 	ListPVCs(ctx *contexts.Context, namespace string, opts ListPVCsOptions) ([]corev1.PersistentVolumeClaim, error)
 	DoesPVCExist(ctx *contexts.Context, namespace, name string) (bool, error)
 	EnsurePVCExists(ctx *contexts.Context, namespace, pvcName string, size resource.Quantity, opts CreatePVCOptions) (*corev1.PersistentVolumeClaim, error)
+	LabelPVC(ctx *contexts.Context, namespace, name string, labels map[string]string) (*corev1.PersistentVolumeClaim, error)
 	DeletePVC(ctx *contexts.Context, namespace, volumeName string) error
 	// Services
 	CreateService(ctx *contexts.Context, namespce string, service *corev1.Service) (*corev1.Service, error)

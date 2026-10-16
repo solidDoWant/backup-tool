@@ -175,7 +175,22 @@ func (cfc *ConfigFileCommand[T]) validateConfig(ctx context.Context, config T) e
 	}
 
 	configValidator := validator.New(validator.WithRequiredStructEnabled())
-	return trace.Wrap(configValidator.StructCtx(ctx, translated))
+	if err := configValidator.StructCtx(ctx, translated); err != nil {
+		return trace.Wrap(err)
+	}
+
+	// Config types can implement rules that can't be expressed with tags
+	if validatable, ok := any(config).(ValidatableConfig); ok {
+		return trace.Wrap(validatable.Validate())
+	}
+
+	return nil
+}
+
+// ValidatableConfig is implemented by config types with validation rules that can't be expressed with
+// struct tags. Validate is called after the tag-based validation passes.
+type ValidatableConfig interface {
+	Validate() error
 }
 
 // Read a configuration file provided via CLI flag, validate it, and return the loaded configuration.

@@ -2,6 +2,7 @@ package disasterrecovery
 
 import (
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
+	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery"
 	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
@@ -24,6 +25,10 @@ type VaultWardenBackupConfig struct {
 	BackupSnapshot     disasterrecovery.OptionsBackupSnapshot `yaml:"backupSnapshot" jsonschema:"omitempty"`
 	BackupToolInstance ConfigBTI                              `yaml:"backupToolInstance,omitempty"`
 	CleanupTimeout     helpers.MaxWaitTime                    `yaml:"cleanupTimeout,omitempty"`
+}
+
+func (c VaultWardenBackupConfig) Validate() error {
+	return trace.Wrap(c.BackupVolume.Validate(c.BackupName, disasterrecovery.VaultWardenDRType))
 }
 
 type VaultWardenRestoreConfigCNPG struct {
@@ -53,6 +58,7 @@ func NewVaultWardenDRCommand() *VaultWardenDRCommand {
 		opts := disasterrecovery.VaultWardenBackupOptions{
 			VolumeSize:              config.BackupVolume.Size,
 			VolumeStorageClass:      config.BackupVolume.StorageClass,
+			SnapshotLabels:          config.BackupVolume.SnapshotLabels,
 			CloneClusterOptions:     config.Cluster.CloneClusterOptions,
 			RemoteBackupToolOptions: config.BackupToolInstance.CreationOptions,
 			BackupSnapshot:          config.BackupSnapshot,
@@ -78,6 +84,6 @@ func NewVaultWardenDRCommand() *VaultWardenDRCommand {
 	}
 
 	return &VaultWardenDRCommand{
-		ClusterDRCommand: NewClusterDRCommand("vaultwarden", vwBackup, vwRestore),
+		ClusterDRCommand: NewClusterDRCommand(disasterrecovery.VaultWardenDRType, vwBackup, vwRestore),
 	}
 }

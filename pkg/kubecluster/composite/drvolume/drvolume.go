@@ -13,16 +13,21 @@ import (
 type DRVolumeInterface interface {
 	SnapshotAndWaitReady(ctx *contexts.Context, snapshotName string, opts DRVolumeSnapshotAndWaitOptions) error
 	setPVC(pvc *corev1.PersistentVolumeClaim)
+	setSnapshotLabels(labels map[string]string)
 }
 
 type DRVolumeCreateOptions struct {
 	VolumeStorageClass string   `yaml:"volumeStorageClass,omitempty"`
 	CNPGClusterNames   []string `yaml:"cnpgClusterNames,omitempty"`
+	// SnapshotLabels are added to every backup snapshot of the DR volume, in addition to the tool-owned
+	// and common labels. Tool-owned label keys are reserved.
+	SnapshotLabels map[string]string `yaml:"snapshotLabels,omitempty"`
 }
 
 type DRVolume struct {
-	p   providerInterfaceInternal
-	pvc *corev1.PersistentVolumeClaim
+	p              providerInterfaceInternal
+	pvc            *corev1.PersistentVolumeClaim
+	snapshotLabels map[string]string
 }
 
 func newDRVolume(p providerInterfaceInternal) DRVolumeInterface {
@@ -33,6 +38,10 @@ func newDRVolume(p providerInterfaceInternal) DRVolumeInterface {
 
 func (drv *DRVolume) setPVC(pvc *corev1.PersistentVolumeClaim) {
 	drv.pvc = pvc
+}
+
+func (drv *DRVolume) setSnapshotLabels(labels map[string]string) {
+	drv.snapshotLabels = labels
 }
 
 func (p *Provider) lookupCNPGClusterSize(ctx *contexts.Context, namespace, clusterName string) (resource.Quantity, error) {
@@ -92,8 +101,21 @@ func (p *Provider) lookupDRVolumeSize(ctx *contexts.Context, namespace string, c
 }
 
 // TODO handle expansion?
-func (p *Provider) NewDRVolume(ctx *contexts.Context, namespace, name string, configuredSize resource.Quantity, opts DRVolumeCreateOptions) (DRVolumeInterface, error) {
+// The DR volume and its backup snapshots are labeled with the tool-owned labels (identifying the backup
+// name and DR type) and the client's common labels. Backup snapshots also get opts.SnapshotLabels.
+func (p *Provider) NewDRVolume(ctx *contexts.Context, namespace, name, drType string, configuredSize resource.Quantity, opts DRVolumeCreateOptions) (DRVolumeInterface, error) {
 	ctx.Log.Info("Ensuring the DR volume exists")
+
+	// Validate before creating anything, so that a bad label doesn't fail the backup after all the work is done
+	if err := ValidateBackupLabels(name, drType, opts.SnapshotLabels); err != nil {
+		return nil, trace.Wrap(err, "invalid DR volume labels")
+	}
+
+	toolOwnedLabels := ToolOwnedLabels(name, drType)
+	commonLabels := p.core().GetCommonLabels()
+	// Tool-owned labels take precedence so that they can always be relied upon by selectors
+	pvcLabels := mergeLabels(commonLabels, toolOwnedLabels)
+	snapshotLabels := mergeLabels(commonLabels, opts.SnapshotLabels, toolOwnedLabels)
 
 	drv := p.newDRVolume()
 
@@ -110,12 +132,22 @@ func (p *Provider) NewDRVolume(ctx *contexts.Context, namespace, name string, co
 		drVolumeSize.Mul(2)
 	}
 
-	drPVC, err := p.core().EnsurePVCExists(ctx.Child(), namespace, name, drVolumeSize, core.CreatePVCOptions{StorageClassName: opts.VolumeStorageClass})
+	drPVC, err := p.core().EnsurePVCExists(ctx.Child(), namespace, name, drVolumeSize, core.CreatePVCOptions{StorageClassName: opts.VolumeStorageClass, Labels: pvcLabels})
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to ensure backup volume exists")
 	}
 
+	// DR volumes created by older versions (or with different common labels) won't have all the labels
+	if missing := missingLabels(drPVC.Labels, pvcLabels); len(missing) > 0 {
+		ctx.Log.Info("Adding missing labels to the existing DR volume")
+		drPVC, err = p.core().LabelPVC(ctx.Child(), namespace, name, missing)
+		if err != nil {
+			return nil, trace.Wrap(err, "failed to label the existing backup volume")
+		}
+	}
+
 	drv.setPVC(drPVC)
+	drv.setSnapshotLabels(snapshotLabels)
 	return drv, nil
 }
 
@@ -132,7 +164,11 @@ func (drv *DRVolume) SnapshotAndWaitReady(ctx *contexts.Context, snapshotName st
 	}
 
 	ctx.Log.Step().Info("Snapshotting the DR volume")
-	snapshot, err := drv.p.es().SnapshotVolume(ctx.Child(), drv.pvc.Namespace, drv.pvc.Name, externalsnapshotter.SnapshotVolumeOptions{Name: helpers.CleanName(snapshotName), SnapshotClass: opts.SnapshotClass})
+	snapshot, err := drv.p.es().SnapshotVolume(ctx.Child(), drv.pvc.Namespace, drv.pvc.Name, externalsnapshotter.SnapshotVolumeOptions{
+		Name:          helpers.CleanName(snapshotName),
+		SnapshotClass: opts.SnapshotClass,
+		Labels:        drv.snapshotLabels,
+	})
 	if err != nil {
 		return trace.Wrap(err, "failed to snapshot backup volume %q", helpers.FullName(drv.pvc))
 	}

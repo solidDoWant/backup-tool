@@ -720,9 +720,9 @@ func (_c *MockClientInterface_NewClusterUserCert_Call) RunAndReturn(run func(*co
 	return _c
 }
 
-// NewDRVolume provides a mock function with given fields: ctx, namespace, name, configuredSize, opts
-func (_m *MockClientInterface) NewDRVolume(ctx *contexts.Context, namespace string, name string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
-	ret := _m.Called(ctx, namespace, name, configuredSize, opts)
+// NewDRVolume provides a mock function with given fields: ctx, namespace, name, drType, configuredSize, opts
+func (_m *MockClientInterface) NewDRVolume(ctx *contexts.Context, namespace string, name string, drType string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
+	ret := _m.Called(ctx, namespace, name, drType, configuredSize, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NewDRVolume")
@@ -730,19 +730,19 @@ func (_m *MockClientInterface) NewDRVolume(ctx *contexts.Context, namespace stri
 
 	var r0 drvolume.DRVolumeInterface
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error)); ok {
-		return rf(ctx, namespace, name, configuredSize, opts)
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error)); ok {
+		return rf(ctx, namespace, name, drType, configuredSize, opts)
 	}
-	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) drvolume.DRVolumeInterface); ok {
-		r0 = rf(ctx, namespace, name, configuredSize, opts)
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) drvolume.DRVolumeInterface); ok {
+		r0 = rf(ctx, namespace, name, drType, configuredSize, opts)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(drvolume.DRVolumeInterface)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) error); ok {
-		r1 = rf(ctx, namespace, name, configuredSize, opts)
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) error); ok {
+		r1 = rf(ctx, namespace, name, drType, configuredSize, opts)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -759,15 +759,16 @@ type MockClientInterface_NewDRVolume_Call struct {
 //   - ctx *contexts.Context
 //   - namespace string
 //   - name string
+//   - drType string
 //   - configuredSize resource.Quantity
 //   - opts drvolume.DRVolumeCreateOptions
-func (_e *MockClientInterface_Expecter) NewDRVolume(ctx interface{}, namespace interface{}, name interface{}, configuredSize interface{}, opts interface{}) *MockClientInterface_NewDRVolume_Call {
-	return &MockClientInterface_NewDRVolume_Call{Call: _e.mock.On("NewDRVolume", ctx, namespace, name, configuredSize, opts)}
+func (_e *MockClientInterface_Expecter) NewDRVolume(ctx interface{}, namespace interface{}, name interface{}, drType interface{}, configuredSize interface{}, opts interface{}) *MockClientInterface_NewDRVolume_Call {
+	return &MockClientInterface_NewDRVolume_Call{Call: _e.mock.On("NewDRVolume", ctx, namespace, name, drType, configuredSize, opts)}
 }
 
-func (_c *MockClientInterface_NewDRVolume_Call) Run(run func(ctx *contexts.Context, namespace string, name string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions)) *MockClientInterface_NewDRVolume_Call {
+func (_c *MockClientInterface_NewDRVolume_Call) Run(run func(ctx *contexts.Context, namespace string, name string, drType string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions)) *MockClientInterface_NewDRVolume_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(resource.Quantity), args[4].(drvolume.DRVolumeCreateOptions))
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(resource.Quantity), args[5].(drvolume.DRVolumeCreateOptions))
 	})
 	return _c
 }
@@ -777,7 +778,7 @@ func (_c *MockClientInterface_NewDRVolume_Call) Return(_a0 drvolume.DRVolumeInte
 	return _c
 }
 
-func (_c *MockClientInterface_NewDRVolume_Call) RunAndReturn(run func(*contexts.Context, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error)) *MockClientInterface_NewDRVolume_Call {
+func (_c *MockClientInterface_NewDRVolume_Call) RunAndReturn(run func(*contexts.Context, string, string, string, resource.Quantity, drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error)) *MockClientInterface_NewDRVolume_Call {
 	_c.Call.Return(run)
 	return _c
 }

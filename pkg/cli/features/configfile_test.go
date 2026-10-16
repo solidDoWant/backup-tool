@@ -1,6 +1,8 @@
 package features
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -50,4 +52,55 @@ func TestGenerateConfigSchema(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, expectedSchema, generatedSchema)
+}
+
+type validatableTestConfig struct {
+	Name string `yaml:"name" jsonschema:"required"`
+}
+
+func (c validatableTestConfig) Validate() error {
+	if c.Name == "invalid" {
+		return assert.AnError
+	}
+	return nil
+}
+
+func TestReadConfigFile(t *testing.T) {
+	tests := []struct {
+		desc     string
+		contents string
+		wantErr  bool
+	}{
+		{
+			desc:     "valid config",
+			contents: "name: valid",
+		},
+		{
+			desc:     "fails tag validation",
+			contents: "{}",
+			wantErr:  true,
+		},
+		{
+			desc:     "fails Validate method",
+			contents: "name: invalid",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			configFilePath := filepath.Join(t.TempDir(), "config.yaml")
+			require.NoError(t, os.WriteFile(configFilePath, []byte(tt.contents), 0600))
+
+			cfc := &ConfigFileCommand[validatableTestConfig]{ConfigFilePath: configFilePath}
+			config, err := cfc.ReadConfigFile(t.Context())
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, "valid", config.Name)
+		})
+	}
 }

@@ -56,6 +56,7 @@ func TestCreatePVC(t *testing.T) {
 			opts: CreatePVCOptions{
 				GenerateName:     true,
 				StorageClassName: "custom-class",
+				Labels:           map[string]string{"key": "value"},
 				Source: &corev1.TypedObjectReference{
 					APIGroup:  new("api-group"),
 					Kind:      "some-kind",
@@ -66,6 +67,7 @@ func TestCreatePVC(t *testing.T) {
 			expectedPVC: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: pvcName,
+					Labels:       map[string]string{"key": "value"},
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					StorageClassName: new("custom-class"),
@@ -385,6 +387,79 @@ func TestEnsurePVCExists(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, tt.expectedPVC, pvc)
 			}
+		})
+	}
+}
+
+func TestLabelPVC(t *testing.T) {
+	namespace := "test-ns"
+	pvcName := "test-pvc"
+
+	tests := []struct {
+		name                string
+		initialLabels       map[string]string
+		labels              map[string]string
+		noInitialPVC        bool
+		simulateClientError bool
+		expectedLabels      map[string]string
+		expectedErr         bool
+	}{
+		{
+			name:           "pvc without labels",
+			labels:         map[string]string{"a": "1"},
+			expectedLabels: map[string]string{"a": "1"},
+		},
+		{
+			name:           "merges with and overwrites existing labels",
+			initialLabels:  map[string]string{"a": "old", "untouched": "value"},
+			labels:         map[string]string{"a": "new", "b": "2"},
+			expectedLabels: map[string]string{"a": "new", "b": "2", "untouched": "value"},
+		},
+		{
+			name:         "pvc does not exist",
+			labels:       map[string]string{"a": "1"},
+			noInitialPVC: true,
+			expectedErr:  true,
+		},
+		{
+			name:                "simulate client error",
+			labels:              map[string]string{"a": "1"},
+			simulateClientError: true,
+			expectedErr:         true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, mockK8s := createTestClient()
+			ctx := th.NewTestContext()
+
+			if !tt.noInitialPVC {
+				_, err := mockK8s.CoreV1().PersistentVolumeClaims(namespace).Create(ctx, &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: pvcName, Namespace: namespace, Labels: tt.initialLabels},
+				}, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
+
+			if tt.simulateClientError {
+				mockK8s.PrependReactor("patch", "persistentvolumeclaims", func(action kubetesting.Action) (bool, runtime.Object, error) {
+					return true, nil, assert.AnError
+				})
+			}
+
+			pvc, err := c.LabelPVC(ctx, namespace, pvcName, tt.labels)
+			if tt.expectedErr {
+				require.Error(t, err)
+				require.Nil(t, pvc)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedLabels, pvc.Labels)
+
+			storedPVC, err := mockK8s.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, metav1.GetOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedLabels, storedPVC.Labels)
 		})
 	}
 }

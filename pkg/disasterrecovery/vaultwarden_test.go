@@ -70,6 +70,7 @@ func TestVaultWardenBackup(t *testing.T) {
 				CloneClusterOptions: clonedcluster.CloneClusterOptions{
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
+				SnapshotLabels: map[string]string{"tape.home.arpa/archive": "true"},
 				BackupSnapshot: OptionsBackupSnapshot{
 					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
 					SnapshotClass: "custom-snapshot-class",
@@ -170,10 +171,11 @@ func TestVaultWardenBackup(t *testing.T) {
 					expectedDRVolumeSize.Mul(2)
 				}
 
-				mockClient.EXPECT().NewDRVolume(mock.Anything, namespace, backupName, expectedDRVolumeSize, drvolume.DRVolumeCreateOptions{
+				mockClient.EXPECT().NewDRVolume(mock.Anything, namespace, backupName, VaultWardenDRType, expectedDRVolumeSize, drvolume.DRVolumeCreateOptions{
 					VolumeStorageClass: tt.opts.VolumeStorageClass,
+					SnapshotLabels:     tt.opts.SnapshotLabels,
 					CNPGClusterNames:   []string{clusterName},
-				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
+				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, name, drType string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
 					assert.True(t, calledCtx.IsChildOf(rootCtx))
 
 					return th.ErrOr1Val(mockDRVolume, tt.simulateNewDRVolumeError)

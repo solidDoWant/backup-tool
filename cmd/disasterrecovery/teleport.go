@@ -2,6 +2,7 @@ package disasterrecovery
 
 import (
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
+	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery"
 	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
@@ -37,6 +38,10 @@ type TeleportBackupConfig struct {
 	CleanupTimeout      helpers.MaxWaitTime                    `yaml:"cleanupTimeout,omitempty"`
 }
 
+func (c TeleportBackupConfig) Validate() error {
+	return trace.Wrap(c.BackupVolume.Validate(c.BackupName, disasterrecovery.TeleportDRType))
+}
+
 type TeleportRestoreClusterConfig struct {
 	Name            string                             `yaml:"name" jsonschema:"required"`
 	ServingCertName string                             `yaml:"servingCertName" jsonschema:"required"`
@@ -69,6 +74,7 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 		opts := disasterrecovery.TeleportBackupOptions{
 			VolumeSize:          config.BackupVolume.Size,
 			VolumeStorageClass:  config.BackupVolume.StorageClass,
+			SnapshotLabels:      config.BackupVolume.SnapshotLabels,
 			CloneClusterOptions: config.CloneClusterOptions,
 			AuditCluster: disasterrecovery.TeleportBackupOptionsAudit{
 				TeleportOptionsAudit: disasterrecovery.TeleportOptionsAudit{
@@ -120,6 +126,6 @@ func NewTeleportDRCommand() *TeleportDRCommand {
 	}
 
 	return &TeleportDRCommand{
-		ClusterDRCommand: NewClusterDRCommand("teleport", tBackup, tRestore),
+		ClusterDRCommand: NewClusterDRCommand(disasterrecovery.TeleportDRType, tBackup, tRestore),
 	}
 }

@@ -43,6 +43,7 @@ type TeleportBackupOptionsAudit struct {
 type TeleportBackupOptions struct {
 	VolumeSize              resource.Quantity                                  `yaml:"volumeSize,omitempty"`
 	VolumeStorageClass      string                                             `yaml:"volumeStorageClass,omitempty"`
+	SnapshotLabels          map[string]string                                  `yaml:"snapshotLabels,omitempty"`
 	CloneClusterOptions     clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
 	AuditCluster            TeleportBackupOptionsAudit                         `yaml:"auditCluster,omitempty"`
 	AuditSessionLogs        TeleportOptionsS3Sync                              `yaml:"auditSessionLogs,omitempty"`
@@ -99,8 +100,9 @@ func (t *Teleport) Backup(ctx *contexts.Context, namespace, backupName, coreClus
 		clusterNames = append(clusterNames, opts.AuditCluster.Name)
 	}
 
-	drv, err := t.kubeClusterClient.NewDRVolume(ctx.Child(), namespace, backup.Name, opts.VolumeSize, drvolume.DRVolumeCreateOptions{
+	drv, err := t.kubeClusterClient.NewDRVolume(ctx.Child(), namespace, backup.Name, TeleportDRType, opts.VolumeSize, drvolume.DRVolumeCreateOptions{
 		VolumeStorageClass: opts.VolumeStorageClass,
+		SnapshotLabels:     opts.SnapshotLabels,
 		CNPGClusterNames:   clusterNames,
 	})
 	if err != nil {

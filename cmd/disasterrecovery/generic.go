@@ -25,6 +25,6 @@ func NewGenericDRCommand() *GenericDRCommand {
 	}
 
 	return &GenericDRCommand{
-		ClusterDRCommand: NewClusterDRCommand("generic", backup, restore),
+		ClusterDRCommand: NewClusterDRCommand(disasterrecovery.GenericDRType, backup, restore),
 	}
 }

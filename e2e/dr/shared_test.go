@@ -3,18 +3,23 @@ package dr
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/gravitational/trace"
+	esversioned "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
+	"github.com/solidDoWant/backup-tool/pkg/kubecluster/composite/drvolume"
 	"github.com/solidDoWant/backup-tool/pkg/kubecluster/primatives/cnpg/gen/clientset/versioned"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -235,6 +240,37 @@ func verifyJobSucceeds(cronJobName, namespace string) func(ctx context.Context, 
 		// the only chance to see why a backup/restore failed.
 		if !assert.Equal(t, batchv1.JobComplete, finalCondition.Type) || !assert.Equal(t, corev1.ConditionTrue, finalCondition.Status) {
 			t.Logf("DR job %q pod logs:\n%s", jobName, jobPodLogs(ctx, c, namespace, jobName))
+		}
+
+		return ctx
+	}
+}
+
+// verifyBackupLabels asserts that the DR PVC and the backup snapshot carry the tool-owned labels, and that
+// the snapshot also carries the user-configured snapshot labels, so that both can be found by a label
+// selector.
+func verifyBackupLabels(namespace, backupName, drType string, snapshotLabels map[string]string) func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
+	return func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
+		toolOwnedLabels := drvolume.ToolOwnedLabels(backupName, drType)
+
+		pvc := &corev1.PersistentVolumeClaim{}
+		err := c.Client().Resources().Get(ctx, backupName, namespace, pvc)
+		require.NoError(t, err)
+		for key, value := range toolOwnedLabels {
+			assert.Equal(t, value, pvc.Labels[key], "DR PVC label %q", key)
+		}
+
+		esClient, err := esversioned.NewForConfig(c.Client().RESTConfig())
+		require.NoError(t, err)
+
+		expectedSnapshotLabels := maps.Clone(toolOwnedLabels)
+		maps.Copy(expectedSnapshotLabels, snapshotLabels)
+		selector := labels.SelectorFromSet(expectedSnapshotLabels).String()
+
+		snapshots, err := esClient.SnapshotV1().VolumeSnapshots(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
+		require.NoError(t, err)
+		if assert.Len(t, snapshots.Items, 1, "expected exactly one backup snapshot matching %q", selector) {
+			assert.Equal(t, backupName, *snapshots.Items[0].Spec.Source.PersistentVolumeClaimName)
 		}
 
 		return ctx

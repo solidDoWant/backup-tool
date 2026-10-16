@@ -166,6 +166,12 @@
         },
         "snapshotReadyTimeout": {
           "type": "integer"
+        },
+        "snapshotLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
         }
       },
       "additionalProperties": false,
