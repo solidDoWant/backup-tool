@@ -151,9 +151,10 @@ LOCALOS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 LOCALARCH := $(shell uname -m | sed 's/x86_64/amd64/')
 LOCAL_BINARY_PATH := $(BINARY_DIR)/$(LOCALOS)/$(LOCALARCH)/$(BINARY_NAME)
 
+# CGO off so the binary is static and never depends on the build host's libc or loader path.
 $(BINARY_DIR)/%/$(BINARY_NAME): $(GO_SOURCE_FILES)
 	@mkdir -p "$(@D)"
-	@GOOS="$(word 1,$(subst /, ,$*))" GOARCH="$(word 2,$(subst /, ,$*))" go build -ldflags="$(GO_LDFLAGS)" -o "$@" .
+	@CGO_ENABLED=0 GOOS="$(word 1,$(subst /, ,$*))" GOARCH="$(word 2,$(subst /, ,$*))" go build -ldflags="$(GO_LDFLAGS)" -o "$@" .
 
 PHONY += binary
 LOCAL_BUILDERS += binary
