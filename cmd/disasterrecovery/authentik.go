@@ -2,6 +2,7 @@ package disasterrecovery
 
 import (
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
+	"github.com/gravitational/trace"
 	"github.com/solidDoWant/backup-tool/pkg/contexts"
 	"github.com/solidDoWant/backup-tool/pkg/disasterrecovery"
 	cnpgrestore "github.com/solidDoWant/backup-tool/pkg/disasterrecovery/actions/remote/cnpg/restore"
@@ -32,6 +33,10 @@ type AuthentikBackupConfig struct {
 	CleanupTimeout     helpers.MaxWaitTime                    `yaml:"cleanupTimeout,omitempty"`
 }
 
+func (c AuthentikBackupConfig) Validate() error {
+	return trace.Wrap(c.BackupVolume.Validate(c.BackupName, disasterrecovery.AuthentikDRType))
+}
+
 type AuthentikRestoreConfigCNPG struct {
 	Name                    string                             `yaml:"name" jsonschema:"required"`
 	ServingCertName         string                             `yaml:"servingCertName" jsonschema:"required"`
@@ -59,6 +64,7 @@ func NewAuthentikDRCommand() *AuthentikDRCommand {
 		opts := disasterrecovery.AuthentikBackupOptions{
 			VolumeSize:              config.BackupVolume.Size,
 			VolumeStorageClass:      config.BackupVolume.StorageClass,
+			SnapshotLabels:          config.BackupVolume.SnapshotLabels,
 			CloneClusterOptions:     config.Cluster.CloneClusterOptions,
 			RemoteBackupToolOptions: config.BackupToolInstance.CreationOptions,
 			BackupSnapshot:          config.BackupSnapshot,
@@ -87,6 +93,6 @@ func NewAuthentikDRCommand() *AuthentikDRCommand {
 	}
 
 	return &AuthentikDRCommand{
-		ClusterDRCommand: NewClusterDRCommand("authentik", aBackup, aRestore),
+		ClusterDRCommand: NewClusterDRCommand(disasterrecovery.AuthentikDRType, aBackup, aRestore),
 	}
 }

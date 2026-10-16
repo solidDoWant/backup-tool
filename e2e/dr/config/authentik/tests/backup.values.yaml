@@ -10,5 +10,8 @@ jobConfig:
         endpoint: http://seaweedfs-s3:8333
         region: dummy-value
         s3ForcePathStyle: true
+    backupVolume:
+      snapshotLabels:
+        tape.home.arpa/archive: "true"
     backupSnapshot:
       snapshotClass: openebs-zfs

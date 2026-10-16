@@ -577,6 +577,19 @@ func TestSimpleResourceLabelerSetCommonLabels(t *testing.T) {
 	assert.Nil(t, srl.CommonLabels)
 }
 
+func TestSimpleResourceLabelerGetCommonLabels(t *testing.T) {
+	srl := &SimpleResourceLabeler{}
+	assert.Nil(t, srl.GetCommonLabels())
+
+	srl.SetCommonLabels(map[string]string{"key1": "value1"})
+	labels := srl.GetCommonLabels()
+	assert.Equal(t, map[string]string{"key1": "value1"}, labels)
+
+	// Callers should not be able to modify the labeler's labels
+	labels["key2"] = "value2"
+	assert.Equal(t, map[string]string{"key1": "value1"}, srl.CommonLabels)
+}
+
 func TestSimpleResourceLabelerLabelResource(t *testing.T) {
 	srl := &SimpleResourceLabeler{
 		CommonLabels: map[string]string{

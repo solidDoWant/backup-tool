@@ -27,6 +27,7 @@ const (
 type VaultWardenBackupOptions struct {
 	VolumeSize              resource.Quantity                                  `yaml:"volumeSize,omitempty"`
 	VolumeStorageClass      string                                             `yaml:"volumeStorageClass,omitempty"`
+	SnapshotLabels          map[string]string                                  `yaml:"snapshotLabels,omitempty"`
 	CloneClusterOptions     clonedcluster.CloneClusterOptions                  `yaml:"clusterCloning,omitempty"`
 	RemoteBackupToolOptions backuptoolinstance.CreateBackupToolInstanceOptions `yaml:"remoteBackupToolOptions,omitempty"`
 	BackupSnapshot          OptionsBackupSnapshot                              `yaml:"backupSnapshot,omitempty"`
@@ -103,8 +104,9 @@ func (vw *VaultWarden) Backup(ctx *contexts.Context, namespace, backupName, data
 		drVolumeSize.Mul(2)
 	}
 
-	drv, err := vw.kubeClusterClient.NewDRVolume(ctx.Child(), namespace, backup.Name, drVolumeSize, drvolume.DRVolumeCreateOptions{
+	drv, err := vw.kubeClusterClient.NewDRVolume(ctx.Child(), namespace, backup.Name, VaultWardenDRType, drVolumeSize, drvolume.DRVolumeCreateOptions{
 		VolumeStorageClass: opts.VolumeStorageClass,
+		SnapshotLabels:     opts.SnapshotLabels,
 		CNPGClusterNames:   []string{cnpgClusterName},
 	})
 	if err != nil {

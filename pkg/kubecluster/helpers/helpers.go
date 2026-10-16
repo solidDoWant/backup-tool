@@ -294,6 +294,9 @@ func CleanName(generateName string) string {
 // with external systems like netpols.
 type ResourceLabeler interface {
 	SetCommonLabels(labels map[string]string)
+	// GetCommonLabels returns a copy of the common labels, for callers that apply them to a resource
+	// themselves rather than relying on the client to do it.
+	GetCommonLabels() map[string]string
 }
 
 // This is a subset of metav1.Object that only includes label functions.
@@ -308,6 +311,10 @@ type SimpleResourceLabeler struct {
 
 func (srl *SimpleResourceLabeler) SetCommonLabels(labels map[string]string) {
 	srl.CommonLabels = labels
+}
+
+func (srl SimpleResourceLabeler) GetCommonLabels() map[string]string {
+	return maps.Clone(srl.CommonLabels)
 }
 
 // Label a resource with the common labels provided to the labeler, if labels with

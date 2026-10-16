@@ -291,6 +291,7 @@ func TestDummy(t *testing.T) {
 		Setup(installBTHelmChart(backupReleaseName, namespace, "generic", "backup", "config/dummy/tests/backup.values.yaml", s3Creds...)).
 		Assess("backup resources are deployed", verifyCronJobIsDeployed(backupCronJobName, namespace)).
 		Assess("backup job succeeds", verifyJobSucceeds(backupCronJobName, namespace)).
+		Assess("backup resources are labeled", verifyBackupLabels(namespace, "dm-e2e", "generic", map[string]string{"tape.home.arpa/archive": "true"})).
 		Assess("backup captures every source", func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
 			mountpoint, mountpointCleanup := getPVCLocalPath(ctx, t, c, namespace, "dm-e2e")
 			defer mountpointCleanup()

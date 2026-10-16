@@ -8,6 +8,8 @@ jobConfig:
       storageClass: openebs-zfs
       snapshotClass: openebs-zfs
       size: 5Gi
+      snapshotLabels:
+        tape.home.arpa/archive: "true"
     postgres:
       - name: db1 # => db1.sql
         cluster: dummy-db1

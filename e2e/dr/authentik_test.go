@@ -95,6 +95,7 @@ func TestAuthentik(t *testing.T) {
 		Setup(installBTHelmChart(backupReleaseName, namespace, "authentik", "backup", "config/authentik/tests/backup.values.yaml", extraInstallValues...)).
 		Assess("backup resources are deployed", verifyCronJobIsDeployed(backupCronJobName, namespace)).
 		Assess("backup job succeeds", verifyJobSucceeds(backupCronJobName, namespace)).
+		Assess("backup resources are labeled", verifyBackupLabels(namespace, "at-e2e", "authentik", map[string]string{"tape.home.arpa/archive": "true"})).
 		Assess("backup files are created", func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
 			mountpoint, mountpointCleanup := getPVCLocalPath(ctx, t, c, namespace, "at-e2e")
 			defer mountpointCleanup()

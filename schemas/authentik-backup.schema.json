@@ -312,6 +312,12 @@
         },
         "storageClass": {
           "type": "string"
+        },
+        "snapshotLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
         }
       },
       "additionalProperties": false,

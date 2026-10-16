@@ -15,6 +15,7 @@ const VolumeSnapshotKind = "VolumeSnapshot" // This is not exported by the exter
 type SnapshotVolumeOptions struct {
 	Name          string
 	SnapshotClass string
+	Labels        map[string]string
 }
 
 func (c *Client) SnapshotVolume(ctx *contexts.Context, namespace, pvcName string, opts SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error) {
@@ -22,6 +23,9 @@ func (c *Client) SnapshotVolume(ctx *contexts.Context, namespace, pvcName string
 	ctx.Log.Debug("Call parameters", "opts", opts)
 
 	snapshot := &volumesnapshotv1.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: opts.Labels,
+		},
 		Spec: volumesnapshotv1.VolumeSnapshotSpec{
 			Source: volumesnapshotv1.VolumeSnapshotSource{
 				PersistentVolumeClaimName: new(pvcName),

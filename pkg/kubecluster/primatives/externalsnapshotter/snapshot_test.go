@@ -31,7 +31,7 @@ func TestSnapshotVolume(t *testing.T) {
 		},
 		{
 			name: "successful snapshot with all options",
-			opts: SnapshotVolumeOptions{Name: "snapshot-name", SnapshotClass: "snapshot-class"},
+			opts: SnapshotVolumeOptions{Name: "snapshot-name", SnapshotClass: "snapshot-class", Labels: map[string]string{"key": "value"}},
 		},
 		{
 			name:                "client error",
@@ -59,6 +59,7 @@ func TestSnapshotVolume(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.NotNil(t, vol)
+			assert.Equal(t, tt.opts.Labels, vol.Labels)
 		})
 	}
 }

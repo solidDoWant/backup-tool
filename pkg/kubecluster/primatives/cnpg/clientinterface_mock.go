@@ -307,6 +307,53 @@ func (_c *MockClientInterface_GetCluster_Call) RunAndReturn(run func(*contexts.C
 	return _c
 }
 
+// GetCommonLabels provides a mock function with no fields
+func (_m *MockClientInterface) GetCommonLabels() map[string]string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCommonLabels")
+	}
+
+	var r0 map[string]string
+	if rf, ok := ret.Get(0).(func() map[string]string); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]string)
+		}
+	}
+
+	return r0
+}
+
+// MockClientInterface_GetCommonLabels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCommonLabels'
+type MockClientInterface_GetCommonLabels_Call struct {
+	*mock.Call
+}
+
+// GetCommonLabels is a helper method to define mock.On call
+func (_e *MockClientInterface_Expecter) GetCommonLabels() *MockClientInterface_GetCommonLabels_Call {
+	return &MockClientInterface_GetCommonLabels_Call{Call: _e.mock.On("GetCommonLabels")}
+}
+
+func (_c *MockClientInterface_GetCommonLabels_Call) Run(run func()) *MockClientInterface_GetCommonLabels_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_GetCommonLabels_Call) Return(_a0 map[string]string) *MockClientInterface_GetCommonLabels_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClientInterface_GetCommonLabels_Call) RunAndReturn(run func() map[string]string) *MockClientInterface_GetCommonLabels_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetCommonLabels provides a mock function with given fields: labels
 func (_m *MockClientInterface) SetCommonLabels(labels map[string]string) {
 	_m.Called(labels)

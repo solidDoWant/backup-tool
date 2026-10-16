@@ -103,6 +103,39 @@ func (_c *MockDRVolumeInterface_setPVC_Call) RunAndReturn(run func(*v1.Persisten
 	return _c
 }
 
+// setSnapshotLabels provides a mock function with given fields: labels
+func (_m *MockDRVolumeInterface) setSnapshotLabels(labels map[string]string) {
+	_m.Called(labels)
+}
+
+// MockDRVolumeInterface_setSnapshotLabels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'setSnapshotLabels'
+type MockDRVolumeInterface_setSnapshotLabels_Call struct {
+	*mock.Call
+}
+
+// setSnapshotLabels is a helper method to define mock.On call
+//   - labels map[string]string
+func (_e *MockDRVolumeInterface_Expecter) setSnapshotLabels(labels interface{}) *MockDRVolumeInterface_setSnapshotLabels_Call {
+	return &MockDRVolumeInterface_setSnapshotLabels_Call{Call: _e.mock.On("setSnapshotLabels", labels)}
+}
+
+func (_c *MockDRVolumeInterface_setSnapshotLabels_Call) Run(run func(labels map[string]string)) *MockDRVolumeInterface_setSnapshotLabels_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(map[string]string))
+	})
+	return _c
+}
+
+func (_c *MockDRVolumeInterface_setSnapshotLabels_Call) Return() *MockDRVolumeInterface_setSnapshotLabels_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockDRVolumeInterface_setSnapshotLabels_Call) RunAndReturn(run func(map[string]string)) *MockDRVolumeInterface_setSnapshotLabels_Call {
+	_c.Run(run)
+	return _c
+}
+
 // NewMockDRVolumeInterface creates a new instance of MockDRVolumeInterface. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockDRVolumeInterface(t interface {

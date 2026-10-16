@@ -7,6 +7,9 @@ jobConfig:
         name: teleport-core
       audit:
         name: teleport-audit
+    backupVolume:
+      snapshotLabels:
+        tape.home.arpa/archive: "true"
     backupSnapshot:
       snapshotClass: openebs-zfs
     auditSessionLogs:

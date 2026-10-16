@@ -543,6 +543,53 @@ func (_c *MockClientInterface_ExecInPod_Call) RunAndReturn(run func(*contexts.Co
 	return _c
 }
 
+// GetCommonLabels provides a mock function with no fields
+func (_m *MockClientInterface) GetCommonLabels() map[string]string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCommonLabels")
+	}
+
+	var r0 map[string]string
+	if rf, ok := ret.Get(0).(func() map[string]string); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]string)
+		}
+	}
+
+	return r0
+}
+
+// MockClientInterface_GetCommonLabels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCommonLabels'
+type MockClientInterface_GetCommonLabels_Call struct {
+	*mock.Call
+}
+
+// GetCommonLabels is a helper method to define mock.On call
+func (_e *MockClientInterface_Expecter) GetCommonLabels() *MockClientInterface_GetCommonLabels_Call {
+	return &MockClientInterface_GetCommonLabels_Call{Call: _e.mock.On("GetCommonLabels")}
+}
+
+func (_c *MockClientInterface_GetCommonLabels_Call) Run(run func()) *MockClientInterface_GetCommonLabels_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_GetCommonLabels_Call) Return(_a0 map[string]string) *MockClientInterface_GetCommonLabels_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClientInterface_GetCommonLabels_Call) RunAndReturn(run func() map[string]string) *MockClientInterface_GetCommonLabels_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetEndpoint provides a mock function with given fields: ctx, namespace, name
 func (_m *MockClientInterface) GetEndpoint(ctx *contexts.Context, namespace string, name string) (*discoveryv1.EndpointSlice, error) {
 	ret := _m.Called(ctx, namespace, name)
@@ -659,6 +706,67 @@ func (_c *MockClientInterface_GetPVC_Call) Return(_a0 *v1.PersistentVolumeClaim,
 }
 
 func (_c *MockClientInterface_GetPVC_Call) RunAndReturn(run func(*contexts.Context, string, string) (*v1.PersistentVolumeClaim, error)) *MockClientInterface_GetPVC_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LabelPVC provides a mock function with given fields: ctx, namespace, name, labels
+func (_m *MockClientInterface) LabelPVC(ctx *contexts.Context, namespace string, name string, labels map[string]string) (*v1.PersistentVolumeClaim, error) {
+	ret := _m.Called(ctx, namespace, name, labels)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LabelPVC")
+	}
+
+	var r0 *v1.PersistentVolumeClaim
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, map[string]string) (*v1.PersistentVolumeClaim, error)); ok {
+		return rf(ctx, namespace, name, labels)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, string, map[string]string) *v1.PersistentVolumeClaim); ok {
+		r0 = rf(ctx, namespace, name, labels)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.PersistentVolumeClaim)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, string, map[string]string) error); ok {
+		r1 = rf(ctx, namespace, name, labels)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_LabelPVC_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LabelPVC'
+type MockClientInterface_LabelPVC_Call struct {
+	*mock.Call
+}
+
+// LabelPVC is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - name string
+//   - labels map[string]string
+func (_e *MockClientInterface_Expecter) LabelPVC(ctx interface{}, namespace interface{}, name interface{}, labels interface{}) *MockClientInterface_LabelPVC_Call {
+	return &MockClientInterface_LabelPVC_Call{Call: _e.mock.On("LabelPVC", ctx, namespace, name, labels)}
+}
+
+func (_c *MockClientInterface_LabelPVC_Call) Run(run func(ctx *contexts.Context, namespace string, name string, labels map[string]string)) *MockClientInterface_LabelPVC_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(string), args[3].(map[string]string))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_LabelPVC_Call) Return(_a0 *v1.PersistentVolumeClaim, _a1 error) *MockClientInterface_LabelPVC_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_LabelPVC_Call) RunAndReturn(run func(*contexts.Context, string, string, map[string]string) (*v1.PersistentVolumeClaim, error)) *MockClientInterface_LabelPVC_Call {
 	_c.Call.Return(run)
 	return _c
 }

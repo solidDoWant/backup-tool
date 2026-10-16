@@ -2,6 +2,7 @@ package disasterrecovery
 
 import (
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,9 +35,12 @@ import (
 // validBackupConfig returns a minimal, valid Vaultwarden-shaped backup config.
 func validBackupConfig() GenericBackupConfig {
 	return GenericBackupConfig{
-		Namespace:    "vaultwarden",
-		BackupName:   "vaultwarden",
-		BackupVolume: GenericBackupVolume{Size: resource.MustParse("10Gi")},
+		Namespace:  "vaultwarden",
+		BackupName: "vaultwarden",
+		BackupVolume: GenericBackupVolume{
+			Size:           resource.MustParse("10Gi"),
+			SnapshotLabels: map[string]string{"tape.home.arpa/archive": "true"},
+		},
 		Postgres: []GenericPostgresBackupSource{{
 			Name:    "main",
 			Cluster: "vw-db",
@@ -173,6 +177,30 @@ func TestGenericBackupConfigValidate(t *testing.T) {
 			mutate:    func(c *GenericBackupConfig) { c.Files[0].Name = "Bad_Name" },
 			errSubstr: "not DNS/path-safe",
 		},
+		{
+			name:      "invalid snapshot label key",
+			mutate:    func(c *GenericBackupConfig) { c.BackupVolume.SnapshotLabels = map[string]string{"bad key!": "true"} },
+			errSubstr: "invalid backupVolume labels",
+		},
+		{
+			name: "invalid snapshot label value",
+			mutate: func(c *GenericBackupConfig) {
+				c.BackupVolume.SnapshotLabels = map[string]string{"tape.home.arpa/archive": "not valid!"}
+			},
+			errSubstr: "invalid backupVolume labels",
+		},
+		{
+			name: "reserved snapshot label key",
+			mutate: func(c *GenericBackupConfig) {
+				c.BackupVolume.SnapshotLabels = map[string]string{"backup-tool.home.arpa/backup-name": "other"}
+			},
+			errSubstr: "reserved",
+		},
+		{
+			name:      "backup name too long for a label value",
+			mutate:    func(c *GenericBackupConfig) { c.BackupName = strings.Repeat("a", 64) },
+			errSubstr: "must be valid label values",
+		},
 	}
 
 	for _, tt := range tests {
@@ -240,6 +268,8 @@ backupVolume:
   storageClass: ceph-block
   snapshotClass: ceph-block-snap
   size: 10Gi
+  snapshotLabels:
+    tape.home.arpa/archive: "true"
 cleanupTimeout: 5m
 postgres:
   - name: main
@@ -299,6 +329,7 @@ s3:
 		require.NoError(t, yaml.UnmarshalWithOptions([]byte(backupYAML), &c, yaml.Strict()))
 		require.NoError(t, c.Validate())
 		assert.Equal(t, "ceph-block-snap", c.BackupVolume.SnapshotClass)
+		assert.Equal(t, map[string]string{"tape.home.arpa/archive": "true"}, c.BackupVolume.SnapshotLabels)
 		require.Len(t, c.Postgres, 1)
 		assert.Equal(t, "vw-db", c.Postgres[0].Cluster)
 		require.Len(t, c.FileGroups, 1)
@@ -477,11 +508,12 @@ func TestGenericAppBackup(t *testing.T) {
 				}).Maybe()
 
 			func() {
-				mockClient.EXPECT().NewDRVolume(mock.Anything, namespace, backupName, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx *contexts.Context, ns, name string, size resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
+				mockClient.EXPECT().NewDRVolume(mock.Anything, namespace, backupName, GenericDRType, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx *contexts.Context, ns, name, drType string, size resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
 						assert.True(t, ctx.IsChildOf(rootCtx))
 						assert.Equal(t, "10Gi", size.String())
 						assert.ElementsMatch(t, []string{"vw-db"}, opts.CNPGClusterNames)
+						assert.Equal(t, config.BackupVolume.SnapshotLabels, opts.SnapshotLabels)
 						return th.ErrOr1Val(mockDRVolume, tt.simulateNewDRVolumeError)
 					})
 				if tt.simulateNewDRVolumeError {

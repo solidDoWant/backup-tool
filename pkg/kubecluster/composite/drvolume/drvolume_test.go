@@ -111,28 +111,49 @@ func TestLookupCNPGClustersSize(t *testing.T) {
 func TestEnsureExists(t *testing.T) {
 	namespace := "test-ns"
 	pvcName := "test-pvc"
+	drType := "test-dr-type"
 	storageClass := "test-storage-class"
 	clusterName := "test-cluster"
 	configuredSize := resource.MustParse("1Gi")
+	commonLabels := map[string]string{"app.kubernetes.io/instance": "dr-job"}
+	userSnapshotLabels := map[string]string{"tape.home.arpa/archive": "true"}
 
 	existsOpts := DRVolumeCreateOptions{
 		VolumeStorageClass: storageClass,
 		CNPGClusterNames:   []string{clusterName},
+		SnapshotLabels:     userSnapshotLabels,
+	}
+
+	expectedPVCLabels := map[string]string{
+		"app.kubernetes.io/instance":        "dr-job",
+		"app.kubernetes.io/managed-by":      "backup-tool",
+		"backup-tool.home.arpa/backup-name": pvcName,
+		"backup-tool.home.arpa/dr-type":     drType,
+	}
+	expectedSnapshotLabels := map[string]string{
+		"app.kubernetes.io/instance":        "dr-job",
+		"app.kubernetes.io/managed-by":      "backup-tool",
+		"backup-tool.home.arpa/backup-name": pvcName,
+		"backup-tool.home.arpa/dr-type":     drType,
+		"tape.home.arpa/archive":            "true",
 	}
 	createOpts := core.CreatePVCOptions{
 		StorageClassName: storageClass,
+		Labels:           expectedPVCLabels,
 	}
 
 	t.Run("uses configured size when set", func(t *testing.T) {
 		ctx := th.NewTestContext()
 		p := newMockProvider(t)
 
-		vol := &corev1.PersistentVolumeClaim{}
+		vol := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Labels: expectedPVCLabels}}
 
+		p.coreClient.EXPECT().GetCommonLabels().Return(commonLabels)
 		p.coreClient.EXPECT().EnsurePVCExists(mock.Anything, namespace, pvcName, configuredSize, createOpts).Return(vol, nil)
 		p.drv.EXPECT().setPVC(vol)
+		p.drv.EXPECT().setSnapshotLabels(expectedSnapshotLabels)
 
-		drv, err := p.NewDRVolume(ctx, namespace, pvcName, configuredSize, existsOpts)
+		drv, err := p.NewDRVolume(ctx, namespace, pvcName, drType, configuredSize, existsOpts)
 		assert.NoError(t, err)
 		require.NotNil(t, drv)
 	})
@@ -141,8 +162,9 @@ func TestEnsureExists(t *testing.T) {
 		ctx := th.NewTestContext()
 		p := newMockProvider(t)
 
-		vol := &corev1.PersistentVolumeClaim{}
+		vol := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Labels: expectedPVCLabels}}
 
+		p.coreClient.EXPECT().GetCommonLabels().Return(commonLabels)
 		p.cnpgClient.EXPECT().GetCluster(mock.Anything, namespace, clusterName).Return(&apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
@@ -157,10 +179,80 @@ func TestEnsureExists(t *testing.T) {
 				return vol, nil
 			})
 		p.drv.EXPECT().setPVC(vol)
+		p.drv.EXPECT().setSnapshotLabels(expectedSnapshotLabels)
 
-		drv, err := p.NewDRVolume(ctx, namespace, pvcName, resource.Quantity{}, existsOpts)
+		drv, err := p.NewDRVolume(ctx, namespace, pvcName, drType, resource.Quantity{}, existsOpts)
 		assert.NoError(t, err)
 		require.NotNil(t, drv)
+	})
+
+	t.Run("adds missing labels to an existing PVC", func(t *testing.T) {
+		ctx := th.NewTestContext()
+		p := newMockProvider(t)
+
+		// Simulates a DR PVC created by an older version, with an unrelated label and a stale common label
+		existingVol := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
+			"unrelated":                         "label",
+			"app.kubernetes.io/instance":        "old-instance",
+			"backup-tool.home.arpa/backup-name": pvcName,
+		}}}
+		labeledVol := existingVol.DeepCopy()
+
+		p.coreClient.EXPECT().GetCommonLabels().Return(commonLabels)
+		p.coreClient.EXPECT().EnsurePVCExists(mock.Anything, namespace, pvcName, configuredSize, createOpts).Return(existingVol, nil)
+		p.coreClient.EXPECT().LabelPVC(mock.Anything, namespace, pvcName, map[string]string{
+			"app.kubernetes.io/instance":    "dr-job",
+			"app.kubernetes.io/managed-by":  "backup-tool",
+			"backup-tool.home.arpa/dr-type": drType,
+		}).Return(labeledVol, nil)
+		p.drv.EXPECT().setPVC(labeledVol)
+		p.drv.EXPECT().setSnapshotLabels(expectedSnapshotLabels)
+
+		drv, err := p.NewDRVolume(ctx, namespace, pvcName, drType, configuredSize, existsOpts)
+		assert.NoError(t, err)
+		require.NotNil(t, drv)
+	})
+
+	t.Run("labeling an existing PVC fails", func(t *testing.T) {
+		ctx := th.NewTestContext()
+		p := newMockProvider(t)
+
+		p.coreClient.EXPECT().GetCommonLabels().Return(nil)
+		p.coreClient.EXPECT().EnsurePVCExists(mock.Anything, namespace, pvcName, configuredSize, mock.Anything).Return(&corev1.PersistentVolumeClaim{}, nil)
+		p.coreClient.EXPECT().LabelPVC(mock.Anything, namespace, pvcName, mock.Anything).Return(nil, assert.AnError)
+
+		drv, err := p.NewDRVolume(ctx, namespace, pvcName, drType, configuredSize, existsOpts)
+		assert.Error(t, err)
+		assert.Nil(t, drv)
+	})
+
+	t.Run("tool-owned labels take precedence over common labels", func(t *testing.T) {
+		ctx := th.NewTestContext()
+		p := newMockProvider(t)
+
+		vol := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Labels: ToolOwnedLabels(pvcName, drType)}}
+
+		p.coreClient.EXPECT().GetCommonLabels().Return(map[string]string{"app.kubernetes.io/managed-by": "Helm"})
+		p.coreClient.EXPECT().EnsurePVCExists(mock.Anything, namespace, pvcName, configuredSize, core.CreatePVCOptions{
+			Labels: ToolOwnedLabels(pvcName, drType),
+		}).Return(vol, nil)
+		p.drv.EXPECT().setPVC(vol)
+		p.drv.EXPECT().setSnapshotLabels(ToolOwnedLabels(pvcName, drType))
+
+		drv, err := p.NewDRVolume(ctx, namespace, pvcName, drType, configuredSize, DRVolumeCreateOptions{})
+		assert.NoError(t, err)
+		require.NotNil(t, drv)
+	})
+
+	t.Run("invalid labels fail before any resources are touched", func(t *testing.T) {
+		ctx := th.NewTestContext()
+		p := newMockProvider(t)
+
+		drv, err := p.NewDRVolume(ctx, namespace, pvcName, drType, configuredSize, DRVolumeCreateOptions{
+			SnapshotLabels: map[string]string{"bad key!": "value"},
+		})
+		assert.Error(t, err)
+		assert.Nil(t, drv)
 	})
 }
 
@@ -168,6 +260,7 @@ func TestSnapshotAndWaitReady(t *testing.T) {
 	namespace := "test-ns"
 	pvcName := "test-pvc"
 	snapshotName := "test-snapshot"
+	snapshotLabels := map[string]string{"backup-tool.home.arpa/backup-name": pvcName}
 	opts := DRVolumeSnapshotAndWaitOptions{
 		SnapshotClass: "test-snapshot-class",
 		ReadyTimeout:  helpers.ShortWaitTime,
@@ -176,7 +269,7 @@ func TestSnapshotAndWaitReady(t *testing.T) {
 	t.Run("basic snapshot", func(t *testing.T) {
 		ctx := th.NewTestContext()
 		p := newMockProvider(t)
-		drv := &DRVolume{p: p}
+		drv := &DRVolume{p: p, snapshotLabels: snapshotLabels}
 		drv.pvc = &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pvcName,
@@ -194,6 +287,7 @@ func TestSnapshotAndWaitReady(t *testing.T) {
 		p.esClient.EXPECT().SnapshotVolume(mock.Anything, drv.pvc.Namespace, drv.pvc.Name, externalsnapshotter.SnapshotVolumeOptions{
 			Name:          snapshotName,
 			SnapshotClass: opts.SnapshotClass,
+			Labels:        snapshotLabels,
 		}).Return(snapshot, nil)
 
 		p.esClient.EXPECT().WaitForReadySnapshot(mock.Anything, drv.pvc.Namespace, snapshotName, externalsnapshotter.WaitForReadySnapshotOpts{

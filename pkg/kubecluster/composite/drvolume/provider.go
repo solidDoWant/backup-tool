@@ -9,7 +9,7 @@ import (
 )
 
 type ProviderInterface interface {
-	NewDRVolume(ctx *contexts.Context, namespace, name string, configuredSize resource.Quantity, opts DRVolumeCreateOptions) (DRVolumeInterface, error)
+	NewDRVolume(ctx *contexts.Context, namespace, name, drType string, configuredSize resource.Quantity, opts DRVolumeCreateOptions) (DRVolumeInterface, error)
 }
 
 type providerInterfaceInternal interface {

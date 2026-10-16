@@ -79,6 +79,7 @@ func TestTeleportBackup(t *testing.T) {
 					Credentials: *auditSessionLogsS3Credentials,
 					Enabled:     true,
 				},
+				SnapshotLabels: map[string]string{"tape.home.arpa/archive": "true"},
 				BackupSnapshot: OptionsBackupSnapshot{
 					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
 					SnapshotClass: "custom-snapshot-class",
@@ -175,10 +176,11 @@ func TestTeleportBackup(t *testing.T) {
 			// Setup mocks
 			func() {
 				// DR PVC
-				mockClient.EXPECT().NewDRVolume(mock.Anything, namespace, backupName, tt.opts.VolumeSize, mock.Anything).
-					RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
+				mockClient.EXPECT().NewDRVolume(mock.Anything, namespace, backupName, TeleportDRType, tt.opts.VolumeSize, mock.Anything).
+					RunAndReturn(func(calledCtx *contexts.Context, namespace, name, drType string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
 						assert.True(t, calledCtx.IsChildOf(rootCtx))
 						assert.Equal(t, tt.opts.VolumeStorageClass, opts.VolumeStorageClass)
+						assert.Equal(t, tt.opts.SnapshotLabels, opts.SnapshotLabels)
 						expectedClusterNames := []string{coreClusterName}
 						if tt.opts.AuditCluster.Enabled {
 							expectedClusterNames = append(expectedClusterNames, auditClusterName)

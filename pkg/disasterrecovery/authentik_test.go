@@ -65,6 +65,7 @@ func TestAuthentikBackup(t *testing.T) {
 					CleanupTimeout: helpers.MaxWaitTime(5 * time.Second),
 				},
 				RemoteBackupToolOptions: backuptoolinstance.CreateBackupToolInstanceOptions{},
+				SnapshotLabels:          map[string]string{"tape.home.arpa/archive": "true"},
 				BackupSnapshot: OptionsBackupSnapshot{
 					ReadyTimeout:  helpers.MaxWaitTime(2 * time.Second),
 					SnapshotClass: "custom-snapshot-class",
@@ -135,10 +136,11 @@ func TestAuthentikBackup(t *testing.T) {
 			// Setup mocks
 			func() {
 				// DR PVC
-				mockClient.EXPECT().NewDRVolume(mock.Anything, namespace, backupName, tt.opts.VolumeSize, drvolume.DRVolumeCreateOptions{
+				mockClient.EXPECT().NewDRVolume(mock.Anything, namespace, backupName, AuthentikDRType, tt.opts.VolumeSize, drvolume.DRVolumeCreateOptions{
 					VolumeStorageClass: tt.opts.VolumeStorageClass,
+					SnapshotLabels:     tt.opts.SnapshotLabels,
 					CNPGClusterNames:   []string{clusterName},
-				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, name string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
+				}).RunAndReturn(func(calledCtx *contexts.Context, namespace, name, drType string, configuredSize resource.Quantity, opts drvolume.DRVolumeCreateOptions) (drvolume.DRVolumeInterface, error) {
 					assert.True(t, calledCtx.IsChildOf(rootCtx))
 
 					return th.ErrOr1Val(mockDRVolume, tt.simulateEnsurePVCError)

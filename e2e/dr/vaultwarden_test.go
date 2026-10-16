@@ -88,6 +88,7 @@ func TestVaultWarden(t *testing.T) {
 		Setup(installBTHelmChart(backupReleaseName, namespace, "vaultwarden", "backup", "config/vaultwarden/tests/backup.values.yaml")).
 		Assess("backup resources are deployed", verifyCronJobIsDeployed(backupCronJobName, namespace)).
 		Assess("backup job succeeds", verifyJobSucceeds(backupCronJobName, namespace)).
+		Assess("backup resources are labeled", verifyBackupLabels(namespace, "vw-e2e", "vaultwarden", map[string]string{"tape.home.arpa/archive": "true"})).
 		Assess("backup files are created", func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
 			mountpoint, mountpointCleanup := getPVCLocalPath(ctx, t, c, namespace, "vw-e2e")
 			defer mountpointCleanup()
