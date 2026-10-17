@@ -1,7 +1,9 @@
 ---
 # backup-tool specific values. These populate several "resource" values.
 jobConfig:
+  # The app to back up or restore (vaultwarden, teleport, authentik, generic), or "backups" to clean up old backups
   drType: vaultwarden
+  # backup or restore for an app, or cleanup for "backups"
   drAction: backup
   # Passed as --log-format: text, json, or logfmt. JSON keeps multi-line values
   # (e.g. error chains) in a single record for log collectors.

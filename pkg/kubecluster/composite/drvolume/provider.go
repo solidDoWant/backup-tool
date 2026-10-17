@@ -10,6 +10,7 @@ import (
 
 type ProviderInterface interface {
 	NewDRVolume(ctx *contexts.Context, namespace, name, drType string, configuredSize resource.Quantity, opts DRVolumeCreateOptions) (DRVolumeInterface, error)
+	ListBackupSnapshots(ctx *contexts.Context, namespace string, opts ListBackupSnapshotsOptions) ([]BackupSnapshot, error)
 }
 
 type providerInterfaceInternal interface {

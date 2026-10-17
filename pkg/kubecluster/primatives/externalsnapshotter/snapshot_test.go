@@ -173,6 +173,82 @@ func TestWaitForReadySnapshot(t *testing.T) {
 	}
 }
 
+func TestListSnapshots(t *testing.T) {
+	snapshotWithLabels := func(namespace, name string, labels map[string]string) *volumesnapshotv1.VolumeSnapshot {
+		return &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: labels},
+		}
+	}
+
+	initialSnapshots := []*volumesnapshotv1.VolumeSnapshot{
+		snapshotWithLabels("ns-a", "app-a", map[string]string{"app": "test"}),
+		snapshotWithLabels("ns-a", "other", map[string]string{"app": "other"}),
+		snapshotWithLabels("ns-b", "app-b", map[string]string{"app": "test"}),
+	}
+
+	tests := []struct {
+		name                string
+		namespace           string
+		opts                ListSnapshotsOptions
+		expectedNames       []string
+		simulateClientError bool
+	}{
+		{
+			name:          "filters by label selector",
+			namespace:     "ns-a",
+			opts:          ListSnapshotsOptions{LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}}},
+			expectedNames: []string{"app-a"},
+		},
+		{
+			name:          "empty selector matches all in namespace",
+			namespace:     "ns-a",
+			expectedNames: []string{"app-a", "other"},
+		},
+		{
+			name:          "empty namespace matches all namespaces",
+			opts:          ListSnapshotsOptions{LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}}},
+			expectedNames: []string{"app-a", "app-b"},
+		},
+		{
+			name:                "client error",
+			namespace:           "ns-a",
+			simulateClientError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, mockES := createTestClient()
+			ctx := th.NewTestContext()
+
+			for _, snapshot := range initialSnapshots {
+				_, err := mockES.SnapshotV1().VolumeSnapshots(snapshot.Namespace).Create(ctx, snapshot, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
+
+			if tt.simulateClientError {
+				mockES.PrependReactor("list", "volumesnapshots", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, assert.AnError
+				})
+			}
+
+			snapshots, err := client.ListSnapshots(ctx, tt.namespace, tt.opts)
+			if tt.simulateClientError {
+				require.Error(t, err)
+				require.Nil(t, snapshots)
+				return
+			}
+			require.NoError(t, err)
+
+			names := make([]string, 0, len(snapshots))
+			for _, snapshot := range snapshots {
+				names = append(names, snapshot.Name)
+			}
+			require.ElementsMatch(t, tt.expectedNames, names)
+		})
+	}
+}
+
 func TestDeleteSnapshot(t *testing.T) {
 	snapshotName := "test-snapshot"
 	namespace := "default"

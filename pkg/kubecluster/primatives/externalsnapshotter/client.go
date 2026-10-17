@@ -18,6 +18,8 @@ type ClientInterface interface {
 	// VolumeSnapshot (snapshot.storage.k8s.io)
 	SnapshotVolume(*contexts.Context, string, string, SnapshotVolumeOptions) (*volumesnapshotv1.VolumeSnapshot, error)
 	WaitForReadySnapshot(ctx *contexts.Context, namespace, name string, opts WaitForReadySnapshotOpts) (*volumesnapshotv1.VolumeSnapshot, error)
+	// ListSnapshots lists snapshots in a namespace, or in all namespaces when the namespace is empty.
+	ListSnapshots(ctx *contexts.Context, namespace string, opts ListSnapshotsOptions) ([]volumesnapshotv1.VolumeSnapshot, error)
 	DeleteSnapshot(*contexts.Context, string, string) error
 	// VolumeGroupSnapshot (groupsnapshot.storage.k8s.io)
 	GroupSnapshotVolumes(ctx *contexts.Context, namespace string, selector metav1.LabelSelector, opts GroupSnapshotOptions) (*volumegroupsnapshotv1.VolumeGroupSnapshot, error)

@@ -22,6 +22,66 @@ func (_m *MockProviderInterface) EXPECT() *MockProviderInterface_Expecter {
 	return &MockProviderInterface_Expecter{mock: &_m.Mock}
 }
 
+// ListBackupSnapshots provides a mock function with given fields: ctx, namespace, opts
+func (_m *MockProviderInterface) ListBackupSnapshots(ctx *contexts.Context, namespace string, opts ListBackupSnapshotsOptions) ([]BackupSnapshot, error) {
+	ret := _m.Called(ctx, namespace, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListBackupSnapshots")
+	}
+
+	var r0 []BackupSnapshot
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, ListBackupSnapshotsOptions) ([]BackupSnapshot, error)); ok {
+		return rf(ctx, namespace, opts)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, ListBackupSnapshotsOptions) []BackupSnapshot); ok {
+		r0 = rf(ctx, namespace, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]BackupSnapshot)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, ListBackupSnapshotsOptions) error); ok {
+		r1 = rf(ctx, namespace, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockProviderInterface_ListBackupSnapshots_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListBackupSnapshots'
+type MockProviderInterface_ListBackupSnapshots_Call struct {
+	*mock.Call
+}
+
+// ListBackupSnapshots is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - opts ListBackupSnapshotsOptions
+func (_e *MockProviderInterface_Expecter) ListBackupSnapshots(ctx interface{}, namespace interface{}, opts interface{}) *MockProviderInterface_ListBackupSnapshots_Call {
+	return &MockProviderInterface_ListBackupSnapshots_Call{Call: _e.mock.On("ListBackupSnapshots", ctx, namespace, opts)}
+}
+
+func (_c *MockProviderInterface_ListBackupSnapshots_Call) Run(run func(ctx *contexts.Context, namespace string, opts ListBackupSnapshotsOptions)) *MockProviderInterface_ListBackupSnapshots_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(ListBackupSnapshotsOptions))
+	})
+	return _c
+}
+
+func (_c *MockProviderInterface_ListBackupSnapshots_Call) Return(_a0 []BackupSnapshot, _a1 error) *MockProviderInterface_ListBackupSnapshots_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockProviderInterface_ListBackupSnapshots_Call) RunAndReturn(run func(*contexts.Context, string, ListBackupSnapshotsOptions) ([]BackupSnapshot, error)) *MockProviderInterface_ListBackupSnapshots_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewDRVolume provides a mock function with given fields: ctx, namespace, name, drType, configuredSize, opts
 func (_m *MockProviderInterface) NewDRVolume(ctx *contexts.Context, namespace string, name string, drType string, configuredSize resource.Quantity, opts DRVolumeCreateOptions) (DRVolumeInterface, error) {
 	ret := _m.Called(ctx, namespace, name, drType, configuredSize, opts)

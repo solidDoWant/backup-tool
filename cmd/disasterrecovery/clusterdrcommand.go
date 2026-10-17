@@ -63,12 +63,12 @@ func (cdrec *ClusterDREventCommand[TConfig]) GenerateConfigSchema() ([]byte, err
 func (cdrec *ClusterDREventCommand[TConfig]) Run() error {
 	ctx, cancel, config, kubeCluster, err := cdrec.setup()
 	if err != nil {
-		return trace.Wrap(err, "failed to setup for %s backup", cdrec.name)
+		return trace.Wrap(err, "failed to setup for %s", cdrec.name)
 	}
 	defer cancel()
 
 	err = cdrec.run(ctx, config, kubeCluster)
-	return trace.Wrap(err, "failed to backup %s", cdrec.name)
+	return trace.Wrap(err, "failed to run %s", cdrec.name)
 }
 
 type ClusterDRCommand[TBackupConfig, TRestoreConfig any] struct {

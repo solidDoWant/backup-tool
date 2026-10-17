@@ -42,6 +42,8 @@ require (
 	sigs.k8s.io/e2e-framework v0.6.0
 )
 
+require github.com/robfig/cron/v3 v3.0.1
+
 require (
 	github.com/avast/retry-go/v5 v5.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.11 // indirect

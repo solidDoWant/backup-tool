@@ -87,6 +87,29 @@ func (c *Client) WaitForReadySnapshot(ctx *contexts.Context, namespace, name str
 	return snapshot, nil
 }
 
+type ListSnapshotsOptions struct {
+	// LabelSelector filters the returned snapshots. The zero value matches every snapshot.
+	LabelSelector metav1.LabelSelector
+}
+
+// ListSnapshots returns the snapshots in the namespace matching opts.LabelSelector. An empty namespace
+// lists snapshots in all namespaces.
+func (c *Client) ListSnapshots(ctx *contexts.Context, namespace string, opts ListSnapshotsOptions) ([]volumesnapshotv1.VolumeSnapshot, error) {
+	ctx.Log.With("selector", metav1.FormatLabelSelector(&opts.LabelSelector)).Info("Listing snapshots")
+
+	labelSelector, err := metav1.LabelSelectorAsSelector(&opts.LabelSelector)
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to convert label selector")
+	}
+
+	snapshotList, err := c.client.SnapshotV1().VolumeSnapshots(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to list snapshots in namespace %q", namespace)
+	}
+
+	return snapshotList.Items, nil
+}
+
 func (c *Client) DeleteSnapshot(ctx *contexts.Context, namespace, snapshotName string) error {
 	ctx.Log.With("name", snapshotName).Info("Deleting snapshot")
 
