@@ -259,6 +259,8 @@ clean-e2e:
 DR_SCHEMAS_PRETTY = true
 DR_SCHEMAS = vaultwarden teleport authentik generic
 DR_COMMANDS = backup restore
+# Commands that aren't per-application, as <command>-<event>
+DR_OTHER_SCHEMAS = backups-cleanup
 DR_SCHEMAS_DIR = $(PROJECT_DIR)/schemas
 
 $(DR_SCHEMAS_DIR):
@@ -291,7 +293,7 @@ release: build-all
 
 PHONY += generate-dr-schemas
 GENERATORS += generate-dr-schemas
-generate-dr-schemas: $(foreach schema,$(DR_SCHEMAS),$(foreach command,$(DR_COMMANDS),$(DR_SCHEMAS_DIR)/$(schema)-$(command).schema.json))
+generate-dr-schemas: $(foreach schema,$(DR_SCHEMAS),$(foreach command,$(DR_COMMANDS),$(DR_SCHEMAS_DIR)/$(schema)-$(command).schema.json)) $(foreach schema,$(DR_OTHER_SCHEMAS),$(DR_SCHEMAS_DIR)/$(schema).schema.json)
 
 PHONY += clean-all
 generate-all: $(GENERATORS)

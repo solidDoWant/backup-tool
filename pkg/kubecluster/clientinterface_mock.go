@@ -657,6 +657,66 @@ func (_c *MockClientInterface_ES_Call) RunAndReturn(run func() externalsnapshott
 	return _c
 }
 
+// ListBackupSnapshots provides a mock function with given fields: ctx, namespace, opts
+func (_m *MockClientInterface) ListBackupSnapshots(ctx *contexts.Context, namespace string, opts drvolume.ListBackupSnapshotsOptions) ([]drvolume.BackupSnapshot, error) {
+	ret := _m.Called(ctx, namespace, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListBackupSnapshots")
+	}
+
+	var r0 []drvolume.BackupSnapshot
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, drvolume.ListBackupSnapshotsOptions) ([]drvolume.BackupSnapshot, error)); ok {
+		return rf(ctx, namespace, opts)
+	}
+	if rf, ok := ret.Get(0).(func(*contexts.Context, string, drvolume.ListBackupSnapshotsOptions) []drvolume.BackupSnapshot); ok {
+		r0 = rf(ctx, namespace, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]drvolume.BackupSnapshot)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*contexts.Context, string, drvolume.ListBackupSnapshotsOptions) error); ok {
+		r1 = rf(ctx, namespace, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClientInterface_ListBackupSnapshots_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListBackupSnapshots'
+type MockClientInterface_ListBackupSnapshots_Call struct {
+	*mock.Call
+}
+
+// ListBackupSnapshots is a helper method to define mock.On call
+//   - ctx *contexts.Context
+//   - namespace string
+//   - opts drvolume.ListBackupSnapshotsOptions
+func (_e *MockClientInterface_Expecter) ListBackupSnapshots(ctx interface{}, namespace interface{}, opts interface{}) *MockClientInterface_ListBackupSnapshots_Call {
+	return &MockClientInterface_ListBackupSnapshots_Call{Call: _e.mock.On("ListBackupSnapshots", ctx, namespace, opts)}
+}
+
+func (_c *MockClientInterface_ListBackupSnapshots_Call) Run(run func(ctx *contexts.Context, namespace string, opts drvolume.ListBackupSnapshotsOptions)) *MockClientInterface_ListBackupSnapshots_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*contexts.Context), args[1].(string), args[2].(drvolume.ListBackupSnapshotsOptions))
+	})
+	return _c
+}
+
+func (_c *MockClientInterface_ListBackupSnapshots_Call) Return(_a0 []drvolume.BackupSnapshot, _a1 error) *MockClientInterface_ListBackupSnapshots_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClientInterface_ListBackupSnapshots_Call) RunAndReturn(run func(*contexts.Context, string, drvolume.ListBackupSnapshotsOptions) ([]drvolume.BackupSnapshot, error)) *MockClientInterface_ListBackupSnapshots_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewClusterUserCert provides a mock function with given fields: ctx, namespace, username, issuerRef, clusterName, opts
 func (_m *MockClientInterface) NewClusterUserCert(ctx *contexts.Context, namespace string, username string, issuerRef apismetav1.IssuerReference, clusterName string, opts clusterusercert.NewClusterUserCertOpts) (clusterusercert.ClusterUserCertInterface, error) {
 	ret := _m.Called(ctx, namespace, username, issuerRef, clusterName, opts)

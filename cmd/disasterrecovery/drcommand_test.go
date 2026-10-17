@@ -23,6 +23,10 @@ func TestBuildDRCommand(t *testing.T) {
 	restoreEventCommand.EXPECT().Name().Return("restore-event-command")
 	restoreEventCommand.EXPECT().GetRestoreCommand().Return(mockEventCommand)
 
+	cleanupEventCommand := NewMockDRCleanupCommand(t)
+	cleanupEventCommand.EXPECT().Name().Return("cleanup-event-command")
+	cleanupEventCommand.EXPECT().GetCleanupCommand().Return(mockEventCommand)
+
 	tests := []struct {
 		desc                 string
 		command              DRCommand
@@ -42,6 +46,11 @@ func TestBuildDRCommand(t *testing.T) {
 		{
 			desc:                 "restore event",
 			command:              restoreEventCommand,
+			expectedCommandCount: 1,
+		},
+		{
+			desc:                 "cleanup event",
+			command:              cleanupEventCommand,
 			expectedCommandCount: 1,
 		},
 	}

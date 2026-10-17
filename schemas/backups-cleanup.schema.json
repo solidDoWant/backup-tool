@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/solidDoWant/backup-tool/pkg/disasterrecovery/backup-cleanup-config",
+  "$ref": "#/$defs/BackupCleanupConfig",
+  "$defs": {
+    "BackupCleanupConfig": {
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/$defs/LabelSelector"
+        },
+        "retention": {
+          "$ref": "#/$defs/Policy"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "dryRun": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "retention"
+      ]
+    },
+    "LabelSelector": {
+      "properties": {
+        "MatchLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "MatchExpressions": {
+          "items": {
+            "$ref": "#/$defs/LabelSelectorRequirement"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "LabelSelectorRequirement": {
+      "properties": {
+        "Key": {
+          "type": "string"
+        },
+        "Operator": {
+          "type": "string"
+        },
+        "Values": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Policy": {
+      "items": {
+        "$ref": "#/$defs/Rule"
+      },
+      "type": "array"
+    },
+    "Rule": {
+      "properties": {
+        "schedule": {
+          "type": "string"
+        },
+        "keep": {
+          "type": "integer",
+          "minimum": -1
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schedule",
+        "keep"
+      ]
+    }
+  }
+}

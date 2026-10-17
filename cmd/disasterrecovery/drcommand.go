@@ -18,6 +18,11 @@ type DRRestoreCommand interface {
 	GetRestoreCommand() DREventCommand
 }
 
+type DRCleanupCommand interface {
+	DRCommand
+	GetCleanupCommand() DREventCommand
+}
+
 func buildDRCommand(drCmd DRCommand) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   drCmd.Name(),
@@ -33,6 +38,10 @@ func buildDRCommand(drCmd DRCommand) *cobra.Command {
 		cmd.AddCommand(buildDREventCommand(restoreDRCmd.GetRestoreCommand(), drCmd.Name(), "restore"))
 	}
 
+	if cleanupDRCmd, ok := drCmd.(DRCleanupCommand); ok {
+		cmd.AddCommand(buildDREventCommand(cleanupDRCmd.GetCleanupCommand(), drCmd.Name(), "cleanup"))
+	}
+
 	if len(cmd.Commands()) == 0 {
 		return nil
 	}
@@ -45,6 +54,7 @@ var drCommands = []DRCommand{
 	NewTeleportDRCommand(),
 	NewAuthentikDRCommand(),
 	NewGenericDRCommand(),
+	NewBackupsDRCommand(),
 }
 
 func getDRSubcommands() []*cobra.Command {

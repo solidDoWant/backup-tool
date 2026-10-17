@@ -12,6 +12,7 @@ packages:
       DRCommand:
       DRBackupCommand:
       DRRestoreCommand:
+      DRCleanupCommand:
   github.com/solidDoWant/backup-tool/pkg/cli/features:
     <<: *baseline_config
     interfaces:
